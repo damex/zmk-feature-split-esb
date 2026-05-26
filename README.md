@@ -66,6 +66,8 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_ESB_MAX_PAYLOAD` | 48 | max on-air bytes (>= largest split msg) |
 | `ZMK_ESB_RX_QUEUE_SIZE` | 16 | RX packet queue depth |
 | `ZMK_ESB_REPLY_QUEUE_SIZE` | 8 | central reverse-channel queue depth |
+| `ZMK_ESB_TX_FIFO_SIZE` | 8 | radio TX FIFO depth |
+| `ZMK_ESB_RX_FIFO_SIZE` | 8 | radio RX FIFO depth |
 | `ZMK_ESB_PRIORITY` | 50 | transport registration priority |
 
 ## Limitations

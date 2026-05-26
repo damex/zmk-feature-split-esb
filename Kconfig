@@ -65,13 +65,26 @@ config ZMK_ESB_REPLY_QUEUE_SIZE
     int "Central: pending reverse-channel command depth"
     default 8
 
+config ZMK_ESB_TX_FIFO_SIZE
+    int "Radio TX FIFO depth"
+    default 8
+
+config ZMK_ESB_RX_FIFO_SIZE
+    int "Radio RX FIFO depth"
+    default 8
+
 config ZMK_ESB_PRIORITY
     int "Split transport registration priority"
     default 50
 
-# Size the NCS ESB payload buffers to ours.
 config ESB_MAX_PAYLOAD_LENGTH
     default ZMK_ESB_MAX_PAYLOAD
+
+config ESB_TX_FIFO_SIZE
+    default ZMK_ESB_TX_FIFO_SIZE
+
+config ESB_RX_FIFO_SIZE
+    default ZMK_ESB_RX_FIFO_SIZE
 
 module = ZMK_ESB
 module-str = ZMK ESB split transport
