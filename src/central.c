@@ -13,12 +13,12 @@
 
 #include "esb_link.h"
 
-LOG_MODULE_DECLARE(zmk_esb, CONFIG_ZMK_ESB_LOG_LEVEL);
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-BUILD_ASSERT(sizeof(struct zmk_split_transport_peripheral_event) <= CONFIG_ZMK_ESB_MAX_PAYLOAD,
-             "peripheral event does not fit in one ESB payload; raise ZMK_ESB_MAX_PAYLOAD");
-BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_ESB_MAX_PAYLOAD,
-             "central command does not fit in one ESB payload; raise ZMK_ESB_MAX_PAYLOAD");
+BUILD_ASSERT(sizeof(struct zmk_split_transport_peripheral_event) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "peripheral event does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
+BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "central command does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
 
 #define ESB_PERIPHERAL_SOURCE 0
 
@@ -63,7 +63,7 @@ static const struct zmk_split_transport_central_api central_api = {
     .set_status_callback = central_set_status_callback,
 };
 
-ZMK_SPLIT_TRANSPORT_CENTRAL_REGISTER(esb_central, &central_api, CONFIG_ZMK_ESB_PRIORITY);
+ZMK_SPLIT_TRANSPORT_CENTRAL_REGISTER(esb_central, &central_api, CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
 /* Runs in the esb_link work thread (not the radio ISR). */
 static void central_on_rx(const uint8_t *data, size_t len) {

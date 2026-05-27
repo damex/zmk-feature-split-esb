@@ -6,7 +6,7 @@ description: |
   the peripheral must declare identical values to pair. Place this node in a dtsi
   included by both sides.
 
-compatible: "zmk,esb"
+compatible: "zmk,split-esb"
 
 properties:
   base-address:

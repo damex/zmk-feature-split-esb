@@ -1,7 +1,7 @@
 # Copyright 2026 Roman Kuzmitskii (@damex)
 # SPDX-License-Identifier: MIT
 
-if(CONFIG_ZMK_ESB)
+if(CONFIG_ZMK_SPLIT_ESB)
   zephyr_library()
   zephyr_library_compile_options(-Wconversion -Wsign-conversion)
   zephyr_library_sources(src/esb_link.c)

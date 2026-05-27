@@ -13,18 +13,18 @@
 
 #include "esb_link.h"
 
-LOG_MODULE_DECLARE(zmk_esb, CONFIG_ZMK_ESB_LOG_LEVEL);
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-BUILD_ASSERT(sizeof(struct zmk_split_transport_peripheral_event) <= CONFIG_ZMK_ESB_MAX_PAYLOAD,
-             "peripheral event does not fit in one ESB payload; raise ZMK_ESB_MAX_PAYLOAD");
-BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_ESB_MAX_PAYLOAD,
-             "central command does not fit in one ESB payload; raise ZMK_ESB_MAX_PAYLOAD");
+BUILD_ASSERT(sizeof(struct zmk_split_transport_peripheral_event) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "peripheral event does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
+BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "central command does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
 
 static zmk_split_transport_peripheral_status_changed_cb_t status_callback;
 static bool transport_enabled;
 
 static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *event) {
-#if IS_ENABLED(CONFIG_ZMK_ESB_LOSSY_INPUT)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ESB_LOSSY_INPUT)
     /* Motion is high-rate and self-correcting: drop the ACK for lower latency. */
     return event->type != ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT;
 #else
@@ -64,7 +64,7 @@ static const struct zmk_split_transport_peripheral_api peripheral_api = {
     .set_status_callback = peripheral_set_status_callback,
 };
 
-ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(esb_peripheral, &peripheral_api, CONFIG_ZMK_ESB_PRIORITY);
+ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(esb_peripheral, &peripheral_api, CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
 /* Runs in the esb_link work thread (not the radio ISR). */
 static void peripheral_on_rx(const uint8_t *data, size_t len) {

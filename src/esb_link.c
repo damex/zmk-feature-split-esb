@@ -7,7 +7,7 @@
  * table here. The reverse channel rides ACK payloads: the central stages a reply,
  * it goes out on the next received packet's ACK.
  */
-#define DT_DRV_COMPAT zmk_esb
+#define DT_DRV_COMPAT zmk_split_esb
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -19,9 +19,9 @@
 
 #include "esb_link.h"
 
-LOG_MODULE_REGISTER(zmk_esb, CONFIG_ZMK_ESB_LOG_LEVEL);
+LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_esb),
+BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_split_esb),
              "a zmk,esb node (base-address/prefix/rf-channel) is required");
 
 static const uint8_t base_address[] = DT_INST_PROP(0, base_address);
@@ -31,8 +31,8 @@ BUILD_ASSERT(sizeof(base_address) == 4, "base-address must be exactly 4 bytes");
 
 /* NCS's CONFIG_ESB_MAX_PAYLOAD_LENGTH default (32) wins over ours on Kconfig parse
  * order; raise it in your .conf or the radio rejects oversized payloads. */
-BUILD_ASSERT(CONFIG_ZMK_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
-             "set CONFIG_ESB_MAX_PAYLOAD_LENGTH >= CONFIG_ZMK_ESB_MAX_PAYLOAD in your .conf");
+BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
+             "set CONFIG_ESB_MAX_PAYLOAD_LENGTH >= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD in your .conf");
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 #define ESB_ROLE_MODE ESB_MODE_PRX
@@ -42,17 +42,17 @@ BUILD_ASSERT(CONFIG_ZMK_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
 
 struct esb_link_packet {
     uint8_t len;
-    uint8_t data[CONFIG_ZMK_ESB_MAX_PAYLOAD];
+    uint8_t data[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
 };
 
 /* RX path: the radio ISR copies a payload here; a work item hands it to the role
  * layer in thread context. */
-K_MSGQ_DEFINE(rx_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_ESB_RX_QUEUE_SIZE, 4);
+K_MSGQ_DEFINE(rx_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_SPLIT_ESB_RX_QUEUE_SIZE, 4);
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 /* Reverse-channel replies staged by a thread, drained into the ACK FIFO by the
  * ISR on the next received packet. */
-K_MSGQ_DEFINE(reply_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_ESB_REPLY_QUEUE_SIZE, 4);
+K_MSGQ_DEFINE(reply_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_SPLIT_ESB_REPLY_QUEUE_SIZE, 4);
 #endif
 
 static esb_link_rx_cb_t rx_callback;
@@ -151,11 +151,11 @@ int esb_link_init(esb_link_rx_cb_t rx_cb) {
     config.mode = ESB_ROLE_MODE;
     config.event_handler = on_esb_event;
     config.bitrate =
-        IS_ENABLED(CONFIG_ZMK_ESB_BITRATE_2MBPS) ? ESB_BITRATE_2MBPS : ESB_BITRATE_1MBPS;
+        IS_ENABLED(CONFIG_ZMK_SPLIT_ESB_BITRATE_2MBPS) ? ESB_BITRATE_2MBPS : ESB_BITRATE_1MBPS;
     config.crc = ESB_CRC_16BIT;
-    config.retransmit_count = CONFIG_ZMK_ESB_RETRANSMIT_COUNT;
-    config.retransmit_delay = CONFIG_ZMK_ESB_RETRANSMIT_DELAY_US;
-    /* With ZMK_ESB_LOSSY_INPUT the 1 kHz motion stream is no-ack, so only low-rate
+    config.retransmit_count = CONFIG_ZMK_SPLIT_ESB_RETRANSMIT_COUNT;
+    config.retransmit_delay = CONFIG_ZMK_SPLIT_ESB_RETRANSMIT_DELAY_US;
+    /* With ZMK_SPLIT_ESB_LOSSY_INPUT the 1 kHz motion stream is no-ack, so only low-rate
      * button packets get ACKed (and those ACKs carry the reverse channel). Acking
      * every packet floods the link and drops button releases. */
     config.selective_auto_ack = true;
@@ -185,7 +185,7 @@ int esb_link_init(esb_link_rx_cb_t rx_cb) {
     if (set_error) {
         LOG_DBG("esb_set_rf_channel returned %d", set_error);
     }
-    set_error = esb_set_tx_power(CONFIG_ZMK_ESB_TX_POWER_DBM);
+    set_error = esb_set_tx_power(CONFIG_ZMK_SPLIT_ESB_TX_POWER_DBM);
     if (set_error) {
         LOG_DBG("esb_set_tx_power returned %d", set_error);
     }
@@ -213,7 +213,7 @@ int esb_link_set_enabled(bool enabled) {
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 int esb_link_send(const uint8_t *data, size_t len, bool ack) {
-    if (len > CONFIG_ZMK_ESB_MAX_PAYLOAD) {
+    if (len > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     struct esb_payload payload = {0};
@@ -227,7 +227,7 @@ int esb_link_send(const uint8_t *data, size_t len, bool ack) {
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 int esb_link_stage_reply(const uint8_t *data, size_t len) {
-    if (len > CONFIG_ZMK_ESB_MAX_PAYLOAD) {
+    if (len > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     struct esb_link_packet packet;
