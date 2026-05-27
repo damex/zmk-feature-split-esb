@@ -137,6 +137,37 @@ static int hfclk_request(void) {
     return result;
 }
 
+/* Push base addresses, prefix, channel, TX power into the radio. Each set_*
+ * failure is informational only — the radio still starts on the values it had. */
+static int esb_link_radio_setup(void) {
+    uint8_t base_address_1[4] = {0};
+    uint8_t prefixes[1] = {address_prefix};
+    int set_error = esb_set_base_address_0(base_address);
+    if (set_error) {
+        LOG_DBG("esb_set_base_address_0 returned %d", set_error);
+    }
+    set_error = esb_set_base_address_1(base_address_1);
+    if (set_error) {
+        LOG_DBG("esb_set_base_address_1 returned %d", set_error);
+    }
+    set_error = esb_set_prefixes(prefixes, ARRAY_SIZE(prefixes));
+    if (set_error) {
+        LOG_DBG("esb_set_prefixes returned %d", set_error);
+    }
+    set_error = esb_set_rf_channel(rf_channel);
+    if (set_error) {
+        LOG_DBG("esb_set_rf_channel returned %d", set_error);
+    }
+    set_error = esb_set_tx_power(CONFIG_ZMK_SPLIT_ESB_TX_POWER_DBM);
+    if (set_error) {
+        LOG_DBG("esb_set_tx_power returned %d", set_error);
+    }
+    if (ESB_ROLE_MODE == ESB_MODE_PRX) {
+        return esb_start_rx();
+    }
+    return 0;
+}
+
 int esb_link_init(esb_link_rx_cb_t rx_cb) {
     rx_callback = rx_cb;
 
@@ -167,33 +198,7 @@ int esb_link_init(esb_link_rx_cb_t rx_cb) {
         return error;
     }
 
-    uint8_t base_address_1[4] = {0};
-    uint8_t prefixes[1] = {address_prefix};
-    int set_error = esb_set_base_address_0(base_address);
-    if (set_error) {
-        LOG_DBG("esb_set_base_address_0 returned %d", set_error);
-    }
-    set_error = esb_set_base_address_1(base_address_1);
-    if (set_error) {
-        LOG_DBG("esb_set_base_address_1 returned %d", set_error);
-    }
-    set_error = esb_set_prefixes(prefixes, ARRAY_SIZE(prefixes));
-    if (set_error) {
-        LOG_DBG("esb_set_prefixes returned %d", set_error);
-    }
-    set_error = esb_set_rf_channel(rf_channel);
-    if (set_error) {
-        LOG_DBG("esb_set_rf_channel returned %d", set_error);
-    }
-    set_error = esb_set_tx_power(CONFIG_ZMK_SPLIT_ESB_TX_POWER_DBM);
-    if (set_error) {
-        LOG_DBG("esb_set_tx_power returned %d", set_error);
-    }
-
-    if (ESB_ROLE_MODE == ESB_MODE_PRX) {
-        return esb_start_rx();
-    }
-    return 0;
+    return esb_link_radio_setup();
 }
 
 int esb_link_set_enabled(bool enabled) {
