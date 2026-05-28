@@ -41,7 +41,7 @@ BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
 #endif
 
 struct esb_link_packet {
-    uint8_t len;
+    uint8_t length;
     uint8_t data[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
 };
 
@@ -55,14 +55,14 @@ K_MSGQ_DEFINE(rx_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_SPLIT_ESB_RX_
 K_MSGQ_DEFINE(reply_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_SPLIT_ESB_REPLY_QUEUE_SIZE, 4);
 #endif
 
-static esb_link_rx_cb_t rx_callback;
+static esb_link_rx_callback_t rx_callback;
 
 static void rx_work_handler(struct k_work *work) {
     ARG_UNUSED(work);
     struct esb_link_packet packet;
     while (k_msgq_get(&rx_queue, &packet, K_NO_WAIT) == 0) {
         if (rx_callback != NULL) {
-            rx_callback(packet.data, packet.len);
+            rx_callback(packet.data, packet.length);
         }
     }
 }
@@ -77,8 +77,8 @@ static void stage_pending_replies(void) {
     while (k_msgq_peek(&reply_queue, &packet) == 0) {
         struct esb_payload payload = {0};
         payload.pipe = 0;
-        payload.length = packet.len;
-        memcpy(payload.data, packet.data, packet.len);
+        payload.length = packet.length;
+        memcpy(payload.data, packet.data, packet.length);
         if (esb_write_payload(&payload) != 0) {
             break; /* ACK FIFO full; retry on the next received packet */
         }
@@ -95,8 +95,8 @@ static void on_esb_event(const struct esb_evt *event) {
         struct esb_payload payload;
         while (esb_read_rx_payload(&payload) == 0) {
             struct esb_link_packet packet;
-            packet.len = (uint8_t)MIN(payload.length, (int)sizeof(packet.data));
-            memcpy(packet.data, payload.data, packet.len);
+            packet.length = (uint8_t)MIN(payload.length, (int)sizeof(packet.data));
+            memcpy(packet.data, payload.data, packet.length);
             if (k_msgq_put(&rx_queue, &packet, K_NO_WAIT) != 0) {
                 LOG_WRN("RX queue full, dropping packet");
             }
@@ -169,8 +169,8 @@ static int esb_link_radio_setup(void) {
     return 0;
 }
 
-int esb_link_init(esb_link_rx_cb_t rx_cb) {
-    rx_callback = rx_cb;
+int esb_link_init(esb_link_rx_callback_t callback) {
+    rx_callback = callback;
 
     int error = hfclk_request();
     if (error) {
@@ -217,27 +217,27 @@ int esb_link_set_enabled(bool enabled) {
 }
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-int esb_link_send(const uint8_t *data, size_t len, bool ack) {
-    if (len > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+int esb_link_send(const uint8_t *data, size_t length, bool ack) {
+    if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     struct esb_payload payload = {0};
     payload.pipe = 0;
     payload.noack = !ack;
-    payload.length = (uint8_t)len;
-    memcpy(payload.data, data, len);
+    payload.length = (uint8_t)length;
+    memcpy(payload.data, data, length);
     return esb_write_payload(&payload);
 }
 #endif
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-int esb_link_stage_reply(const uint8_t *data, size_t len) {
-    if (len > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+int esb_link_stage_reply(const uint8_t *data, size_t length) {
+    if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     struct esb_link_packet packet;
-    packet.len = (uint8_t)len;
-    memcpy(packet.data, data, len);
+    packet.length = (uint8_t)length;
+    memcpy(packet.data, data, length);
     if (k_msgq_put(&reply_queue, &packet, K_NO_WAIT) != 0) {
         return -ENOBUFS;
     }

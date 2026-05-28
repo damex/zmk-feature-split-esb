@@ -24,9 +24,10 @@ BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_SP
 
 static bool transport_enabled;
 
-static int central_send_command(uint8_t source, struct zmk_split_transport_central_command cmd) {
+static int central_send_command(uint8_t source,
+                                struct zmk_split_transport_central_command command) {
     ARG_UNUSED(source); /* single peripheral */
-    return esb_link_stage_reply((const uint8_t *)&cmd, sizeof(cmd));
+    return esb_link_stage_reply((const uint8_t *)&command, sizeof(command));
 }
 
 static int central_get_available_source_ids(uint8_t *sources) {
@@ -65,9 +66,9 @@ static const struct zmk_split_transport_central_api central_api = {
 ZMK_SPLIT_TRANSPORT_CENTRAL_REGISTER(esb_central, &central_api, CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
 /* Runs in the esb_link work thread (not the radio ISR). */
-static void central_on_rx(const uint8_t *data, size_t len) {
-    if (len != sizeof(struct zmk_split_transport_peripheral_event)) {
-        LOG_WRN("Dropping event with unexpected size %u", (unsigned int)len);
+static void central_on_rx(const uint8_t *data, size_t length) {
+    if (length != sizeof(struct zmk_split_transport_peripheral_event)) {
+        LOG_WRN("Dropping event with unexpected size %u", (unsigned int)length);
         return;
     }
     struct zmk_split_transport_peripheral_event event;

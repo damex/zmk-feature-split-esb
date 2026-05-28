@@ -28,7 +28,7 @@ static bool transport_enabled;
 
 #if DT_INST_NODE_HAS_PROP(0, lossy_codes)
 
-#define LOSSY_DT_CELL(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx)
+#define LOSSY_DT_CELL(node_id, prop, index) DT_PROP_BY_IDX(node_id, prop, index)
 
 static const uint32_t lossy_dt_cells[] = {
     DT_INST_FOREACH_PROP_ELEM_SEP(0, lossy_codes, LOSSY_DT_CELL, (,))
@@ -38,9 +38,9 @@ BUILD_ASSERT((ARRAY_SIZE(lossy_dt_cells) % 2) == 0,
              "zmk,split-esb lossy-codes must be (type, code) pairs");
 
 static bool input_is_lossy(uint8_t input_type, uint16_t input_code) {
-    for (size_t i = 0; i < ARRAY_SIZE(lossy_dt_cells); i += 2) {
-        if ((uint8_t)lossy_dt_cells[i] == input_type
-            && (uint16_t)lossy_dt_cells[i + 1] == input_code) {
+    for (size_t pair = 0; pair < ARRAY_SIZE(lossy_dt_cells); pair += 2) {
+        if ((uint8_t)lossy_dt_cells[pair] == input_type
+            && (uint16_t)lossy_dt_cells[pair + 1] == input_code) {
             return true;
         }
     }
@@ -98,9 +98,9 @@ static const struct zmk_split_transport_peripheral_api peripheral_api = {
 ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(esb_peripheral, &peripheral_api, CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
 /* Runs in the esb_link work thread (not the radio ISR). */
-static void peripheral_on_rx(const uint8_t *data, size_t len) {
-    if (len != sizeof(struct zmk_split_transport_central_command)) {
-        LOG_WRN("Dropping command with unexpected size %u", (unsigned int)len);
+static void peripheral_on_rx(const uint8_t *data, size_t length) {
+    if (length != sizeof(struct zmk_split_transport_central_command)) {
+        LOG_WRN("Dropping command with unexpected size %u", (unsigned int)length);
         return;
     }
     struct zmk_split_transport_central_command command;
