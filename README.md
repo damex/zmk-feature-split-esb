@@ -89,6 +89,16 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_SPLIT_ESB_RX_FIFO_SIZE` | 8 | radio RX FIFO depth |
 | `ZMK_SPLIT_ESB_PRIORITY` | 50 | transport registration priority |
 
+## Load order
+
+Each step overrides the previous:
+
+1. **Boot defaults:** the DT props program the radio at startup.
+2. **Saved values:** any persisted in NVS apply on top (needs `CONFIG_SETTINGS`).
+3. **Live changes:** pushed at runtime via `settings_runtime_set`, no reflash.
+
+Runtime-overridable keys: `esb/tx_power`, `esb/retransmit_count`, `esb/retransmit_delay`.
+
 ## Limitations
 
 `ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT` is 0 on an ESB-only central (ZMK derives it
