@@ -17,10 +17,28 @@ properties:
     type: int
     required: true
     description: 1-byte address prefix for pipe 0.
-  rf-channel:
-    type: int
+  hop-channels:
+    type: uint8-array
     required: true
-    description: RF channel, 2400 + N MHz (0-100).
+    description: |
+      RF channels, each 0-100 (2400 + N MHz). One channel is fixed operation;
+      two or more hop between channels in list order.
+  hop-threshold:
+    type: int
+    default: 3
+    description: Peripheral consecutive failed keepalive windows before hopping to the next channel.
+  hop-window-ms:
+    type: int
+    default: 32
+    description: Peripheral keepalive period and hop evaluation window while data is flowing.
+  idle-keepalive-ms:
+    type: int
+    default: 128
+    description: Peripheral keepalive period when no data is flowing.
+  scan-dwell-ms:
+    type: int
+    default: 5
+    description: Central dwell per channel while scanning for the peripheral.
   tx-power-dbm:
     type: int
     default: 0

@@ -23,11 +23,10 @@
 LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_split_esb),
-             "a zmk,split-esb node (base-address/prefix/rf-channel) is required");
+             "a zmk,split-esb node (base-address/prefix/hop-channels) is required");
 
 static const uint8_t base_address[] = DT_INST_PROP(0, base_address);
 static const uint8_t address_prefix = DT_INST_PROP(0, prefix);
-static const uint8_t rf_channel = DT_INST_PROP(0, rf_channel);
 static const int8_t tx_power_dbm = DT_INST_PROP(0, tx_power_dbm);
 static const uint16_t retransmit_count = DT_INST_PROP(0, retransmit_count);
 static const uint16_t retransmit_delay_us = DT_INST_PROP(0, retransmit_delay_us);
@@ -35,6 +34,33 @@ static const bool use_fast_ramp_up = DT_INST_PROP(0, use_fast_ramp_up);
 static const uint8_t crc_bits = DT_INST_PROP(0, crc_bits);
 static const uint16_t bitrate_kbps = DT_INST_PROP(0, bitrate_kbps);
 BUILD_ASSERT(sizeof(base_address) == 4, "base-address must be exactly 4 bytes");
+
+static const uint8_t hop_channels[] = DT_INST_PROP(0, hop_channels);
+#define HOP_COUNT ARRAY_SIZE(hop_channels)
+BUILD_ASSERT(HOP_COUNT >= 1, "hop-channels needs at least one channel");
+static uint8_t hop_index;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static const uint16_t scan_dwell_ms = DT_INST_PROP(0, scan_dwell_ms);
+/* Two keepalive periods, so one missed keepalive doesn't trigger a scan. */
+#define LOCK_MISS_PERIODS 2
+static const uint16_t active_lock_ms = LOCK_MISS_PERIODS * DT_INST_PROP(0, hop_window_ms);
+static const uint16_t idle_lock_ms = LOCK_MISS_PERIODS * DT_INST_PROP(0, idle_keepalive_ms);
+#else
+static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
+static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
+static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
+static atomic_t fails_in_window;
+static atomic_t data_sent_since_tick;
+static uint8_t bad_windows; /* keepalive_work only */
+#endif
+
+/* Length-1 acked keepalive, never motion: a retransmit can't replay stale deltas.
+ * Carries the hop signal under noack motion, holds the central lock when idle.
+ * Its one byte is the peripheral's current rate. */
+#define ESB_KEEPALIVE_LENGTH 1
+#define KEEPALIVE_RATE_OFFSET 0
+#define KEEPALIVE_RATE_IDLE 0x00
+#define KEEPALIVE_RATE_ACTIVE 0x01
 
 static enum esb_crc esb_crc_from_bits(uint8_t bits) {
     switch (bits) {
@@ -136,13 +162,75 @@ static void stage_pending_replies(void) {
 }
 #endif
 
+/* Both ends hop the table in the same order, so they re-rendezvous within a sweep.
+ * Leapfrog guard: HOP_COUNT * scan-dwell-ms < hop-threshold * hop-window-ms. */
+static void apply_hop_channel(void) {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    esb_stop_rx();
+    esb_set_rf_channel(hop_channels[hop_index]);
+    esb_start_rx();
+#else
+    esb_set_rf_channel(hop_channels[hop_index]); /* PTX: no RX to stop */
+#endif
+}
+
+static void hop_next_channel(void) {
+    hop_index = (uint8_t)((hop_index + 1U) % HOP_COUNT);
+    apply_hop_channel();
+}
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+/* On lock-timeout expiry the peer is lost: step a channel, re-arm at scan-dwell
+ * to sweep until RX returns. */
+static struct k_work_delayable scan_work;
+static void scan_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    hop_next_channel();
+    k_work_reschedule(&scan_work, K_MSEC(scan_dwell_ms));
+}
+#else
+/* Hop after hop-threshold consecutive windows with a TX failure. */
+static struct k_work_delayable keepalive_work;
+static void keepalive_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    if (atomic_set(&fails_in_window, 0) > 0) {
+        bad_windows++;
+    } else {
+        bad_windows = 0;
+    }
+    if (bad_windows >= hop_threshold) {
+        bad_windows = 0;
+        hop_next_channel();
+    }
+    bool active = atomic_set(&data_sent_since_tick, 0) != 0;
+    struct esb_payload keepalive = {0};
+    keepalive.pipe = 0;
+    keepalive.length = ESB_KEEPALIVE_LENGTH;
+    keepalive.data[KEEPALIVE_RATE_OFFSET] = active ? KEEPALIVE_RATE_ACTIVE : KEEPALIVE_RATE_IDLE;
+    (void)esb_write_payload(&keepalive);
+    k_work_reschedule(&keepalive_work, K_MSEC(active ? hop_window_ms : idle_keepalive_ms));
+}
+#endif
+
 /* Runs in the ESB IRQ: only move bytes into queues, defer the ZMK handoff. */
 static void on_esb_event(const struct esb_evt *event) {
     switch (event->evt_id) {
     case ESB_EVENT_RX_RECEIVED: {
         bool received = false;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+        bool peer_active = false;
+#endif
         struct esb_payload payload;
         while (esb_read_rx_payload(&payload) == 0) {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+            if (payload.length == ESB_KEEPALIVE_LENGTH) {
+                if (payload.data[KEEPALIVE_RATE_OFFSET] == KEEPALIVE_RATE_ACTIVE) {
+                    peer_active = true;
+                }
+                continue; /* keepalive: never queued */
+            }
+            peer_active = true;
+#endif
             struct esb_link_packet *slot = spsc_acquire(&rx_spsc);
             if (slot == NULL) {
                 atomic_inc(&rx_dropped);
@@ -158,6 +246,9 @@ static void on_esb_event(const struct esb_evt *event) {
         }
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
         stage_pending_replies();
+        if (HOP_COUNT > 1) {
+            k_work_reschedule(&scan_work, K_MSEC(peer_active ? active_lock_ms : idle_lock_ms));
+        }
 #endif
         break;
     }
@@ -167,10 +258,15 @@ static void on_esb_event(const struct esb_evt *event) {
         if (flush_error) {
             LOG_DBG("esb_flush_tx after TX_FAILED returned %d", flush_error);
         }
+#if !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+        if (HOP_COUNT > 1) {
+            atomic_inc(&fails_in_window);
+        }
+#endif
         break;
     }
     default:
-        break; /* TX_SUCCESS and any other event: nothing to do */
+        break;
     }
 }
 
@@ -206,7 +302,7 @@ static int esb_link_radio_setup(void) {
     if (set_error) {
         LOG_DBG("esb_set_prefixes returned %d", set_error);
     }
-    set_error = esb_set_rf_channel(rf_channel);
+    set_error = esb_set_rf_channel(hop_channels[hop_index]);
     if (set_error) {
         LOG_DBG("esb_set_rf_channel returned %d", set_error);
     }
@@ -252,11 +348,45 @@ int esb_link_init(esb_link_rx_callback_t callback) {
         return error;
     }
 
-    return esb_link_radio_setup();
+    /* Init the hop work before radio_setup starts RX, or an early packet's ISR
+     * reschedule would touch an uninitialized work. */
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    if (HOP_COUNT > 1) {
+        k_work_init_delayable(&scan_work, scan_work_fn);
+    }
+#else
+    if (HOP_COUNT > 1) {
+        k_work_init_delayable(&keepalive_work, keepalive_work_fn);
+    }
+#endif
+
+    error = esb_link_radio_setup();
+    if (error) {
+        return error;
+    }
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    if (HOP_COUNT > 1) {
+        k_work_reschedule(&scan_work, K_MSEC(idle_lock_ms));
+    }
+#else
+    if (HOP_COUNT > 1) {
+        k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
+    }
+#endif
+    return 0;
 }
 
 int esb_link_set_enabled(bool enabled) {
     if (!enabled) {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+        if (HOP_COUNT > 1) {
+            k_work_cancel_delayable(&scan_work);
+        }
+#else
+        if (HOP_COUNT > 1) {
+            k_work_cancel_delayable(&keepalive_work);
+        }
+#endif
         int stop_error = esb_stop_rx();
         if (stop_error) {
             LOG_DBG("esb_stop_rx returned %d", stop_error);
@@ -267,13 +397,27 @@ int esb_link_set_enabled(bool enabled) {
         }
         return 0;
     }
-    return (ESB_ROLE_MODE == ESB_MODE_PRX) ? esb_start_rx() : 0;
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    int rx_error = esb_start_rx();
+    if (HOP_COUNT > 1) {
+        k_work_reschedule(&scan_work, K_MSEC(idle_lock_ms));
+    }
+    return rx_error;
+#else
+    if (HOP_COUNT > 1) {
+        k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
+    }
+    return 0;
+#endif
 }
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
+    }
+    if (HOP_COUNT > 1) {
+        atomic_set(&data_sent_since_tick, 1); /* mark active so keepalive uses the fast rate */
     }
     struct esb_payload payload = {0};
     payload.pipe = 0;

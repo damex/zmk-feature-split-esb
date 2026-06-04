@@ -45,7 +45,7 @@ esb_link: esb_link {
     compatible = "zmk,split-esb";
     base-address = [E7 E7 E7 E7];
     prefix = <0xC2>;
-    rf-channel = <4>;
+    hop-channels = [04];
 };
 ```
 
@@ -53,7 +53,11 @@ esb_link: esb_link {
 |---|---|
 | `base-address` | 4-byte bytestring `[..]`, pipe 0 |
 | `prefix` | 1 byte, pipe 0 |
-| `rf-channel` | 0-100 (2400 + N MHz) |
+| `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz); 1 = fixed, 2+ = hopping set |
+| `hop-threshold` | peripheral failed keepalive windows before hopping (default 3) |
+| `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
+| `idle-keepalive-ms` | peripheral keepalive period when idle (default 128) |
+| `scan-dwell-ms` | central per-channel dwell while scanning (default 5) |
 | `tx-power-dbm` | boot TX power, dBm (default 0); raise for range |
 | `retransmit-count` | retransmits before drop (default 3) |
 | `retransmit-delay-us` | delay between retransmits (default 600) |
@@ -88,6 +92,12 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_SPLIT_ESB_TX_FIFO_SIZE` | 8 | radio TX FIFO depth |
 | `ZMK_SPLIT_ESB_RX_FIFO_SIZE` | 8 | radio RX FIFO depth |
 | `ZMK_SPLIT_ESB_PRIORITY` | 50 | transport registration priority |
+
+## Channel hopping
+
+List two or more channels in `hop-channels` and the link hops between them, stepping
+off any channel that gets noisy. One channel is a fixed link, no hopping. Both ends
+must carry the same list, so flash them as a set.
 
 ## Load order
 
