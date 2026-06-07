@@ -20,9 +20,10 @@ void hop_start(void);
 void hop_stop(void);
 
 /* Called per received payload in the radio ISR.
+ * rssi is the ESB sample magnitude (actual dBm is its negative).
  * Returns true for a control packet the caller must not queue: a keepalive on the
  * central, an epoch beacon on a peripheral. */
-bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length);
+bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi);
 
 /* Peripheral: a transmit exhausted its retransmits this window. */
 void hop_note_tx_failed(void);

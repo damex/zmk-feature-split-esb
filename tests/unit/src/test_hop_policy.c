@@ -76,21 +76,40 @@ ZTEST(hop_policy, test_hop_vote) {
 }
 
 ZTEST(hop_policy, test_accrue_loss) {
-    uint8_t link_loss[3] = {0, 5, 2};
-    /* pipe 0 has motion, pipe 1 is active without motion, pipe 2 is idle */
-    hop_policy_accrue_loss(link_loss, 3, (1u << 0), (1u << 0) | (1u << 1));
-    zassert_equal(link_loss[0], 0, "motion clears loss");
-    zassert_equal(link_loss[1], 6, "active without motion accrues");
-    zassert_equal(link_loss[2], 0, "idle pipe clears, never drives a hop");
+    uint8_t link_loss[3] = {0, 0, 5};
+    const int8_t rssi[3] = {-40, -97, 0}; /* pipe0 strong, pipe1 weak, pipe2 n/a */
+    const int8_t floor = -85;
+    /* pipe0 active+motion strong, pipe1 active+motion weak, pipe2 active with no motion */
+    hop_policy_accrue_loss(link_loss, 3, (1u << 0) | (1u << 1),
+                           (1u << 0) | (1u << 1) | (1u << 2), rssi, floor);
+    zassert_equal(link_loss[0], 0, "strong motion clears");
+    zassert_equal(link_loss[1], 3, "weak motion adds a graded penalty");
+    zassert_equal(link_loss[2], 5 + HOP_POLICY_MAX_LOSS_PENALTY, "no motion adds the max");
 
-    uint8_t saturated[1] = {UINT8_MAX};
-    hop_policy_accrue_loss(saturated, 1, 0, (1u << 0)); /* active, no motion */
-    zassert_equal(saturated[0], UINT8_MAX, "loss saturates, no wrap");
+    uint8_t idle[1] = {7};
+    const int8_t strong[1] = {-40};
+    hop_policy_accrue_loss(idle, 1, 0, 0, strong, floor); /* not active */
+    zassert_equal(idle[0], 0, "idle pipe clears, never drives a hop");
+
+    uint8_t sat[1] = {UINT8_MAX};
+    const int8_t weak[1] = {-120};
+    hop_policy_accrue_loss(sat, 1, (1u << 0), (1u << 0), weak, floor);
+    zassert_equal(sat[0], UINT8_MAX, "loss saturates, no wrap");
 }
 
 ZTEST(hop_policy, test_keepalive_is_active) {
     zassert_true(hop_policy_keepalive_is_active(ESB_KEEPALIVE_ACTIVE), "active byte");
     zassert_false(hop_policy_keepalive_is_active(ESB_KEEPALIVE_IDLE), "idle byte");
+}
+
+ZTEST(hop_policy, test_loss_penalty) {
+    const int8_t floor = -85;
+    zassert_equal(hop_policy_loss_penalty(-40, floor), 0, "strong: no penalty");
+    zassert_equal(hop_policy_loss_penalty(-85, floor), 0, "at floor: no penalty");
+    zassert_equal(hop_policy_loss_penalty(-90, floor), 1, "5 dB below: 1");
+    zassert_equal(hop_policy_loss_penalty(-97, floor), 3, "12 dB below: 3");
+    zassert_equal(hop_policy_loss_penalty(-120, floor), HOP_POLICY_MAX_LOSS_PENALTY,
+                  "deep fade: capped");
 }
 
 ZTEST(hop_policy, test_should_beacon) {

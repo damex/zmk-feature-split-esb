@@ -31,6 +31,13 @@ properties:
     type: int
     default: 32
     description: Peripheral keepalive period while data is flowing.
+  rssi-floor-dbm:
+    type: int
+    default: -85
+    description: |
+      Central hop trigger. A served peripheral whose motion arrives weaker than this (dBm)
+      counts the window as degraded, so the link hops toward a better-propagating channel.
+      Set near where the link actually fails, or it hops chasing a merely-distant peer.
   idle-keepalive-ms:
     type: int
     default: 128

@@ -30,6 +30,18 @@ bool hop_policy_keepalive_is_active(uint8_t byte) {
     return byte == ESB_KEEPALIVE_ACTIVE;
 }
 
+uint8_t hop_policy_loss_penalty(int8_t rssi_dbm, int8_t floor_dbm) {
+    if (rssi_dbm >= floor_dbm) {
+        return 0;
+    }
+    int below = (int)floor_dbm - (int)rssi_dbm;
+    int penalty = 1 + below / HOP_POLICY_RSSI_GRADE_STEP_DB;
+    if (penalty > HOP_POLICY_MAX_LOSS_PENALTY) {
+        penalty = HOP_POLICY_MAX_LOSS_PENALTY;
+    }
+    return (uint8_t)penalty;
+}
+
 uint8_t hop_policy_index_next(uint8_t index, size_t count) {
     assert(count > 0);
     return (uint8_t)(((size_t)index + 1U) % count);
@@ -52,15 +64,26 @@ bool hop_policy_hop_vote(const uint8_t *link_loss, const uint8_t *weights, size_
 }
 
 void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_mask,
-                            uint32_t active_mask) {
+                            uint32_t active_mask, const int8_t *rssi_dbm, int8_t floor_dbm) {
     assert(link_loss != NULL);
+    assert(rssi_dbm != NULL);
     for (size_t index = 0; index < count; index++) {
+        if (!(active_mask & (1u << index))) {
+            link_loss[index] = 0;
+            continue;
+        }
+        uint8_t penalty;
         if (motion_mask & (1u << index)) {
+            penalty = hop_policy_loss_penalty(rssi_dbm[index], floor_dbm);
+        } else {
+            penalty = HOP_POLICY_MAX_LOSS_PENALTY;
+        }
+        if (penalty == 0) {
             link_loss[index] = 0;
-        } else if ((active_mask & (1u << index)) && link_loss[index] < UINT8_MAX) {
-            link_loss[index]++;
-        } else if (!(active_mask & (1u << index))) {
-            link_loss[index] = 0;
+        } else if (link_loss[index] > UINT8_MAX - penalty) {
+            link_loss[index] = UINT8_MAX;
+        } else {
+            link_loss[index] = (uint8_t)(link_loss[index] + penalty);
         }
     }
 }

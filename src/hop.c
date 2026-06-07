@@ -33,10 +33,12 @@ static const uint8_t pipe_weights[] = {
 #define PERIPHERAL_COUNT ARRAY_SIZE(pipe_weights)
 static const uint16_t vote_threshold = DT_INST_PROP(0, hop_threshold);
 static const uint16_t decision_ms = DT_INST_PROP(0, idle_keepalive_ms);
+static const int8_t rssi_floor_dbm = DT_INST_PROP(0, rssi_floor_dbm);
 #define LOST_LIMIT (2 * HOP_COUNT)  /* silent windows before falling back to the anchor */
 #define BEACON_REPEAT_WINDOWS 4     /* re-announce a changed epoch for this many windows */
 static uint8_t hop_epoch;
-static uint8_t pipe_loss[PERIPHERAL_COUNT]; /* windows an active pipe's motion went missing */
+static uint8_t pipe_loss[PERIPHERAL_COUNT]; /* graded degradation, per pipe */
+static int8_t pipe_rssi[PERIPHERAL_COUNT];  /* last motion RSSI this window (dBm), per pipe */
 static atomic_t pipe_heard_mask;   /* any packet this window, bit per pipe, set in the ISR */
 static atomic_t pipe_motion_mask;  /* poll/motion packet this window, bit per pipe */
 static atomic_t pipe_active_mask;  /* peripheral polling (motion or active keepalive) */
@@ -122,7 +124,7 @@ static void decision_work_fn(struct k_work *work) {
     uint32_t heard = (uint32_t)atomic_set(&pipe_heard_mask, 0);
     uint32_t motion = (uint32_t)atomic_set(&pipe_motion_mask, 0);
     uint32_t active = (uint32_t)atomic_set(&pipe_active_mask, 0);
-    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active);
+    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, pipe_rssi, rssi_floor_dbm);
     if (heard != 0) {
         silent_run = 0;
     } else {
@@ -187,7 +189,7 @@ void hop_stop(void) {
 #endif
 }
 
-bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length) {
+bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi) {
     if (HOP_COUNT <= 1) {
         return false;
     }
@@ -200,13 +202,16 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length) {
                 atomic_or(&pipe_active_mask, BIT(pipe));
             }
         } else {
-            atomic_or(&pipe_motion_mask, BIT(pipe));
             atomic_or(&pipe_active_mask, BIT(pipe));
+            atomic_or(&pipe_motion_mask, BIT(pipe));
+            /* dBm (ESB gives the magnitude); graded into loss at the decision tick. */
+            pipe_rssi[pipe] = (int8_t)(-rssi);
         }
     }
     return keepalive; /* a keepalive marks liveness and isn't queued, motion is */
 #else
     ARG_UNUSED(pipe);
+    ARG_UNUSED(rssi);
     if (length == ESB_KEEPALIVE_LENGTH) {
         atomic_set(&beacon_epoch, data[0]); /* epoch beacon: adopted in keepalive_work, not queued */
         return true;
