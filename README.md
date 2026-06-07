@@ -2,7 +2,8 @@
 
 Enhanced ShockBurst (2.4 GHz) split transport for ZMK. One or more peripherals, one central.
 Packet-native: split messages map to ESB packets (a report's input events
-coalesce into one), carried over a lock-free SPSC RX path.
+coalesce into one, each packed to a compact on-air form), carried over a
+lock-free SPSC RX path.
 ESB hardware ACK + retransmit + CRC handle reliability.
 
 ## Install

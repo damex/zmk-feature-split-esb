@@ -12,6 +12,7 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_link.h"
+#include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -63,16 +64,17 @@ ZMK_SPLIT_TRANSPORT_CENTRAL_REGISTER(esb_central, &central_api, CONFIG_ZMK_SPLIT
 
 /* Runs in the esb_link dispatch thread (not the radio ISR). */
 static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
-    const size_t event_size = sizeof(struct zmk_split_transport_peripheral_event);
-    if (length == 0 || (length % event_size) != 0) {
-        LOG_WRN("Dropping packet with unexpected size %u", (unsigned int)length);
-        return;
-    }
     /* One packet may carry several coalesced events.
-     * Replay each in order. */
-    for (size_t offset = 0; offset < length; offset += event_size) {
+     * Decode and replay each in order. */
+    size_t offset = 0;
+    while (offset < length) {
         struct zmk_split_transport_peripheral_event event;
-        memcpy(&event, &data[offset], event_size);
+        size_t consumed = esb_wire_decode_event(&data[offset], length - offset, &event);
+        if (consumed == 0) {
+            LOG_WRN("Dropping packet, undecodable event at offset %u", (unsigned int)offset);
+            return;
+        }
+        offset += consumed;
         zmk_split_transport_central_peripheral_event_handler(&esb_central, pipe, event);
     }
 }

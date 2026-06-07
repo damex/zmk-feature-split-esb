@@ -19,6 +19,7 @@ if(CONFIG_ZMK_SPLIT_ESB)
       -fanalyzer
   )
   zephyr_library_sources(src/esb_link.c)
+  zephyr_library_sources(src/esb_wire.c)
   zephyr_library_sources(src/hop.c)
   zephyr_library_sources(src/hop_policy.c)
   zephyr_library_sources_ifdef(CONFIG_ZMK_SPLIT_ROLE_CENTRAL  src/central.c)

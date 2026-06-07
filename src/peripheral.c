@@ -16,6 +16,7 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_link.h"
+#include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -83,9 +84,16 @@ static int peripheral_flush_batch(void) {
     if (batch_count == 0) {
         return 0;
     }
-    int error = esb_link_send((const uint8_t *)batch,
-                              batch_count * sizeof(struct zmk_split_transport_peripheral_event),
-                              batch_wants_ack);
+    uint8_t wire[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
+    size_t length = 0;
+    for (size_t index = 0; index < batch_count; index++) {
+        size_t written = esb_wire_encode_event(&wire[length], sizeof(wire) - length, &batch[index]);
+        if (written == 0) {
+            break; /* next event would overflow the packet, send what fits */
+        }
+        length += written;
+    }
+    int error = esb_link_send(wire, length, batch_wants_ack);
     batch_count = 0;
     batch_wants_ack = false;
     return error;
@@ -97,7 +105,9 @@ static int peripheral_report_event(const struct zmk_split_transport_peripheral_e
         if (flush_error < 0) {
             return flush_error;
         }
-        return esb_link_send((const uint8_t *)event, sizeof(*event), event_wants_ack(event));
+        uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];
+        size_t length = esb_wire_encode_event(wire, sizeof(wire), event);
+        return esb_link_send(wire, length, event_wants_ack(event));
     }
     batch[batch_count] = *event;
     batch_count++;
