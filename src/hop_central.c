@@ -126,9 +126,11 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
             }
         } else {
             atomic_or(&pipe_active_mask, BIT(pipe));
-            atomic_or(&pipe_motion_mask, BIT(pipe));
-            /* dBm (ESB gives the magnitude); graded into loss at the decision tick. */
+            /* Negated ESB magnitude is the dBm value, graded into loss at the decision tick.
+             * Store it before the motion bit: the decision tick reads pipe_rssi only when
+             * that bit is set, so the value must be published first. */
             pipe_rssi[pipe] = (int8_t)(-rssi);
+            atomic_or(&pipe_motion_mask, BIT(pipe));
         }
     }
     return keepalive; /* a keepalive marks liveness and isn't queued, motion is */
