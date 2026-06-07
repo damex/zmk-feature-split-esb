@@ -64,6 +64,7 @@ More peripherals: add another child, each with the next `pipe` (1, 2, ...) and a
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
 | `hop-threshold` | bad windows before acting: central hop-vote sum, peripheral sweep streak (default 3) |
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
+| `rssi-floor-dbm` | central counts a served peripheral's motion weaker than this (dBm) as a degraded window (default -85) |
 | `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
 | `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
 | `retransmit-count` | retransmits before drop (default 3) |
@@ -103,8 +104,13 @@ Tunables (Kconfig, defaults shown):
 ## Channel hopping
 
 List two or more channels in `hop-channels` and the link hops between them, stepping
-off any channel that gets noisy. One channel is a fixed link, no hopping. Every
-peripheral must carry the central's list, so flash them as a set.
+off a channel that degrades. The central drives the hop: it counts a served
+peripheral's window bad when motion goes missing or arrives weaker than
+`rssi-floor-dbm`, and a weighted vote across peripherals (`hop-threshold`) moves the
+whole link to the next channel. A peripheral that loses the central sweeps the list
+to re-find it, sweeping faster the more its acked transmits retried. One channel is a
+fixed link, no hopping. Every peripheral must carry the central's list, so flash them
+as a set.
 
 ## Load order
 
