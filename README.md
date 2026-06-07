@@ -1,13 +1,13 @@
 # zmk-feature-split-esb
 
-Enhanced ShockBurst (2.4 GHz) split transport for ZMK. One peripheral, one central.
+Enhanced ShockBurst (2.4 GHz) split transport for ZMK. One or more peripherals, one central.
 Packet-native: split messages map to ESB packets (a report's input events
-coalesce into one), carried over a lock-free SPSC RX path; ESB hardware ACK +
-retransmit + CRC handle reliability.
+coalesce into one), carried over a lock-free SPSC RX path.
+ESB hardware ACK + retransmit + CRC handle reliability.
 
 ## Install
 
-Add it to your `config/west.yml`; `import: true` pulls the deps a vanilla ZMK
+Add it to your `config/west.yml`. `import: true` pulls the deps a vanilla ZMK
 workspace lacks (`zmk` and Zephyr come from your own manifest):
 ```yaml
   remotes:
@@ -25,7 +25,7 @@ west update
 west patch -sm zmk-feature-split-esb apply
 ```
 For a local checkout, build with `-DZMK_EXTRA_MODULES=<path>/zmk-feature-split-esb`
-instead; your workspace must then already provide `sdk-nrf` + `nrfxlib` with the
+instead. Your workspace must then already provide `sdk-nrf` + `nrfxlib` with the
 patches applied.
 
 ## Configure
@@ -37,9 +37,9 @@ CONFIG_ZMK_SPLIT_BLE=n
 CONFIG_ZMK_SPLIT_WIRED=n
 CONFIG_ZMK_SPLIT_ESB=y
 ```
-Central also sets `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`; peripheral leaves it unset.
+Central also sets `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`. Peripheral leaves it unset.
 
-Same link identity in a dtsi included by both sides:
+Same link identity in a dtsi included by the central and every peripheral:
 ```dts
 esb_link {
     compatible = "zmk,split-esb";
@@ -55,27 +55,27 @@ esb_link {
 };
 ```
 Each peripheral board points at its entry: `chosen { zmk,esb-self = &mouse; };`.
+More peripherals: add another child, each with the next `pipe` (1, 2, ...) and a unique `prefix`.
 
 | DT property | Value |
 |---|---|
 | `base-address` | 4-byte bytestring `[..]`, shared by all pipes |
-| `peripherals` | one child node per device: `pipe`, `prefix` (1 byte), `weight` |
-| `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz); 1 = fixed, 2+ = hopping set |
-| `hop-threshold` | peripheral failed keepalive windows before hopping (default 3) |
+| `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight` |
+| `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
+| `hop-threshold` | bad windows before acting: central hop-vote sum, peripheral sweep streak (default 3) |
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
-| `idle-keepalive-ms` | peripheral keepalive period when idle (default 128) |
-| `scan-dwell-ms` | central per-channel dwell while scanning (default 5) |
-| `tx-power-dbm` | boot TX power, dBm (default 0); raise for range |
+| `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
+| `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
 | `retransmit-count` | retransmits before drop (default 3) |
 | `retransmit-delay-us` | delay between retransmits (default 600) |
-| `use-fast-ramp-up` | shorter radio ramp-up; nRF52/nRF53; both sides must match |
-| `crc-bits` | CRC width 0/8/16 (default 16; both sides must match) |
-| `bitrate-kbps` | radio bitrate 1000/2000 (default 2000; both sides must match) |
+| `use-fast-ramp-up` | shorter radio ramp-up, nRF52/nRF53, all peripherals must match the central |
+| `crc-bits` | CRC width 0/8/16, all peripherals must match the central (default 16) |
+| `bitrate-kbps` | radio bitrate 1000/2000, all peripherals must match the central (default 2000) |
 | `lossy-codes` | optional list of `<INPUT_EV_* code>` pairs sent without ACK |
 
-Lossy-codes lists the input axes the peripheral fires-and-forgets. Reserve for
+Lossy-codes lists the input axes peripherals fire-and-forget. Reserve for
 high-rate, self-correcting axes (pointer motion). Non-input split events
-(key-position, sensor, battery) are always ACK'd; every input event is ACK'd
+(key-position, sensor, battery) are always ACK'd. Every input event is ACK'd
 unless its (type, code) is listed here. Omitted = fully lossless link. Example
 for a mouse:
 ```dts
@@ -103,8 +103,8 @@ Tunables (Kconfig, defaults shown):
 ## Channel hopping
 
 List two or more channels in `hop-channels` and the link hops between them, stepping
-off any channel that gets noisy. One channel is a fixed link, no hopping. Both ends
-must carry the same list, so flash them as a set.
+off any channel that gets noisy. One channel is a fixed link, no hopping. Every
+peripheral must carry the central's list, so flash them as a set.
 
 ## Load order
 

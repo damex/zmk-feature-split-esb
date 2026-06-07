@@ -68,7 +68,8 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
         LOG_WRN("Dropping packet with unexpected size %u", (unsigned int)length);
         return;
     }
-    /* One packet may carry several coalesced events; replay each in order. */
+    /* One packet may carry several coalesced events.
+     * Replay each in order. */
     for (size_t offset = 0; offset < length; offset += event_size) {
         struct zmk_split_transport_peripheral_event event;
         memcpy(&event, &data[offset], event_size);

@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 description: |
-  Shared ESB link identity for a single-peripheral ZMK ESB split. The central and
-  the peripheral must declare identical values to pair. Place this node in a dtsi
-  included by both sides.
+  Shared ESB link identity for a ZMK ESB split.
+  The central and every peripheral must declare identical values to pair.
+  Place this node in a dtsi included by the central and every peripheral.
 
 compatible: "zmk,split-esb"
 
@@ -17,24 +17,26 @@ properties:
     type: uint8-array
     required: true
     description: |
-      RF channels, each 0-100 (2400 + N MHz). One channel is fixed operation;
-      two or more hop between channels in list order.
+      RF channels, each 0-100 (2400 + N MHz).
+      One channel means fixed operation.
+      Two or more hop between channels in list order.
   hop-threshold:
     type: int
     default: 3
-    description: Peripheral consecutive failed keepalive windows before hopping to the next channel.
+    description: |
+      Bad windows before acting. Central: weighted link-loss sum across peripherals that
+      triggers a coordinated hop. Peripheral: consecutive failed keepalive windows that
+      trigger a channel sweep.
   hop-window-ms:
     type: int
     default: 32
-    description: Peripheral keepalive period and hop evaluation window while data is flowing.
+    description: Peripheral keepalive period while data is flowing.
   idle-keepalive-ms:
     type: int
     default: 128
-    description: Peripheral keepalive period when no data is flowing.
-  scan-dwell-ms:
-    type: int
-    default: 5
-    description: Central dwell per channel while scanning for the peripheral.
+    description: |
+      Peripheral keepalive period when no data is flowing. Also the central's hop-decision
+      window period.
   tx-power-dbm:
     type: int
     default: 0
@@ -50,25 +52,28 @@ properties:
   use-fast-ramp-up:
     type: boolean
     description: |
-      Shorter radio TX/RX ramp-up delay. nRF52/nRF53 only; both sides must match.
+      Shorter radio TX/RX ramp-up delay.
+      nRF52/nRF53 only.
+      All peripherals must match the central.
   crc-bits:
     type: int
     default: 16
     enum: [0, 8, 16]
-    description: CRC width in bits (0 disables CRC). Both sides must match.
+    description: CRC width in bits (0 disables CRC). All peripherals must match the central.
   bitrate-kbps:
     type: int
     default: 2000
     enum: [1000, 2000]
-    description: Radio bitrate in kbps. Both sides must match.
+    description: Radio bitrate in kbps. All peripherals must match the central.
   lossy-codes:
     type: array
     description: |
-      Input axes the peripheral sends without ACK. Each entry is two cells, an
-      INPUT_EV_* type and its INPUT_*_<NAME> code, e.g. <INPUT_EV_REL INPUT_REL_X>,
-      <INPUT_EV_REL INPUT_REL_Y>. Reserve for high-rate, self-correcting axes
-      (pointer motion); non-input split events (key-position, sensor, battery)
-      are always ACK'd, and every other input event is ACK'd unless listed.
+      Input axes the peripheral sends without ACK.
+      Each entry is two cells, an INPUT_EV_* type and its INPUT_*_<NAME> code,
+      e.g. <INPUT_EV_REL INPUT_REL_X>, <INPUT_EV_REL INPUT_REL_Y>.
+      Reserve for high-rate, self-correcting axes (pointer motion).
+      Non-input split events (key-position, sensor, battery) are always ACK'd, and
+      every other input event is ACK'd unless listed.
       Omit for fully lossless link.
 
 child-binding:

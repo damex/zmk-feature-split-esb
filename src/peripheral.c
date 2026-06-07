@@ -65,10 +65,11 @@ static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *e
 }
 
 /* Coalesce one report's per-axis events into a single packet: ZMK forwards each
- * axis as its own event (REL_X sync=0, REL_Y sync=1), doubling on-air packets at
- * high rate. Buffer input events and flush on the sync event (the report
- * boundary, us later, so no real latency added); non-input events flush the
- * batch and go alone. Single context (the input thread), so no lock. */
+ * axis as its own event (REL_X sync=0, REL_Y sync=1), doubling on-air packets at high rate.
+ * Buffer input events and flush on the sync event (the report boundary, us later, so no
+ * real latency added).
+ * Non-input events flush the batch and go alone.
+ * Single context (the input thread), so no lock. */
 #define PERIPHERAL_BATCH_MAX                                                                       \
     (CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD / sizeof(struct zmk_split_transport_peripheral_event))
 BUILD_ASSERT(PERIPHERAL_BATCH_MAX >= 2,

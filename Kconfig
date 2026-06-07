@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MIT
 
 menuconfig ZMK_SPLIT_ESB
-    bool "ZMK ESB split transport (single peripheral)"
+    bool "ZMK ESB split transport"
     depends on ZMK_SPLIT
     select ESB
     help
-      Enhanced ShockBurst (2.4 GHz) split transport for a single peripheral and a
-      single central. One ESB packet carries one complete split message; ESB
-      hardware ACK, retransmit and CRC provide reliability.
+      Enhanced ShockBurst (2.4 GHz) split transport for one or more peripherals and a
+      single central. One ESB packet carries one complete split message.
+      ESB hardware ACK, retransmit and CRC provide reliability.
 
 if ZMK_SPLIT_ESB
 

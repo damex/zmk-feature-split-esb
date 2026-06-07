@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Single-device ESB radio layer. One packet in, one out; reliability is ESB
- * hardware ACK + retransmit, so no framing, reassembly, software CRC or retry
- * table here. The reverse channel rides ACK payloads: the central stages a reply,
- * it goes out on the next received packet's ACK.
+ * Single-device ESB radio layer.
+ * One packet in, one out.
+ * Reliability is ESB hardware ACK + retransmit, so no framing, reassembly,
+ * software CRC or retry table here.
+ * The reverse channel rides ACK payloads: the central stages a reply, it goes
+ * out on the next received packet's ACK.
+ * Channel hopping lives in hop.c.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
@@ -19,6 +22,7 @@
 #include <esb.h>
 
 #include "esb_link.h"
+#include "hop.h"
 #include "hop_policy.h"
 
 LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -47,25 +51,6 @@ BUILD_ASSERT(DT_HAS_CHOSEN(zmk_esb_self), "peripheral needs a chosen zmk,esb-sel
 static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
 #endif
 
-static const uint8_t hop_channels[] = DT_INST_PROP(0, hop_channels);
-#define HOP_COUNT ARRAY_SIZE(hop_channels)
-BUILD_ASSERT(HOP_COUNT >= 1, "hop-channels needs at least one channel");
-static uint8_t hop_index;
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-static const uint16_t scan_dwell_ms = DT_INST_PROP(0, scan_dwell_ms);
-/* Two keepalive periods, so one missed keepalive doesn't trigger a scan. */
-#define LOCK_MISS_PERIODS 2
-static const uint16_t active_lock_ms = LOCK_MISS_PERIODS * DT_INST_PROP(0, hop_window_ms);
-static const uint16_t idle_lock_ms = LOCK_MISS_PERIODS * DT_INST_PROP(0, idle_keepalive_ms);
-#else
-static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
-static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
-static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
-static atomic_t fails_in_window;
-static atomic_t data_sent_since_tick;
-static uint8_t bad_windows; /* keepalive_work only */
-#endif
-
 static enum esb_crc esb_crc_from_bits(uint8_t bits) {
     switch (bits) {
     case 0:
@@ -90,8 +75,8 @@ static enum esb_bitrate esb_bitrate_from_kbps(uint16_t kbps) {
     }
 }
 
-/* NCS's CONFIG_ESB_MAX_PAYLOAD_LENGTH default (32) wins over ours on Kconfig parse
- * order; raise it in your .conf or the radio rejects oversized payloads. */
+/* NCS's CONFIG_ESB_MAX_PAYLOAD_LENGTH default (32) wins over ours on Kconfig parse order.
+ * Raise it in your .conf or the radio rejects oversized payloads. */
 BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
              "set CONFIG_ESB_MAX_PAYLOAD_LENGTH >= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD in your .conf");
 
@@ -108,9 +93,10 @@ struct esb_link_packet {
 };
 
 /* RX path: the radio ISR writes each payload straight into a lock-free SPSC ring
- * (no irq_lock, zero-copy slot) and signals the dispatch thread, which hands
- * packets to the role layer in thread context. Single producer (the ESB ISR),
- * single consumer (rx_thread), as the SPSC contract requires. */
+ * (no irq_lock, zero-copy slot) and signals the dispatch thread, which hands packets
+ * to the role layer in thread context.
+ * Single producer (the ESB ISR), single consumer (rx_thread), as the SPSC contract
+ * requires. */
 SPSC_DEFINE(rx_spsc, struct esb_link_packet, CONFIG_ZMK_SPLIT_ESB_RX_QUEUE_SIZE);
 static K_SEM_DEFINE(rx_sem, 0, 1);
 static atomic_t rx_dropped;
@@ -125,9 +111,8 @@ K_MSGQ_DEFINE(reply_queue, sizeof(struct esb_link_packet), CONFIG_ZMK_SPLIT_ESB_
 
 static esb_link_rx_callback_t rx_callback;
 
-/* Dedicated dispatch thread: drain the SPSC and hand each packet to the role
- * layer. Off the shared system workqueue so a high RX rate isn't gated by
- * unrelated work. */
+/* Dedicated dispatch thread: drain the SPSC and hand each packet to the role layer.
+ * Off the shared system workqueue so a high RX rate isn't gated by unrelated work. */
 static void rx_thread_fn(void *unused_a, void *unused_b, void *unused_c) {
     ARG_UNUSED(unused_a);
     ARG_UNUSED(unused_b);
@@ -158,8 +143,8 @@ uint8_t esb_link_source_ids(uint8_t *out_ids) {
     return (uint8_t)PERIPHERAL_COUNT;
 }
 
-/* Drain staged replies into the ACK FIFO so each rides the next ACK back to the
- * peripheral. Peek-then-remove keeps a reply queued if the ACK FIFO is full.
+/* Drain staged replies into the ACK FIFO so each rides the next ACK back to the peripheral.
+ * Peek-then-remove keeps a reply queued if the ACK FIFO is full.
  * ISR-only, so esb_write_payload has a single caller context (no lock needed). */
 static void stage_pending_replies(void) {
     struct esb_link_packet packet;
@@ -169,55 +154,10 @@ static void stage_pending_replies(void) {
         payload.length = packet.length;
         memcpy(payload.data, packet.data, packet.length);
         if (esb_write_payload(&payload) != 0) {
-            break; /* ACK FIFO full; retry on the next received packet */
+            break; /* ACK FIFO full, retry on the next received packet */
         }
         (void)k_msgq_get(&reply_queue, &packet, K_NO_WAIT);
     }
-}
-#endif
-
-/* Both ends hop the table in the same order, so they re-rendezvous within a sweep.
- * Leapfrog guard: HOP_COUNT * scan-dwell-ms < hop-threshold * hop-window-ms. */
-static void apply_hop_channel(void) {
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    esb_stop_rx();
-    esb_set_rf_channel(hop_channels[hop_index]);
-    esb_start_rx();
-#else
-    esb_set_rf_channel(hop_channels[hop_index]); /* PTX: no RX to stop */
-#endif
-}
-
-static void hop_next_channel(void) {
-    hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
-    apply_hop_channel();
-}
-
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-/* On lock-timeout expiry the peer is lost: step a channel, re-arm at scan-dwell
- * to sweep until RX returns. */
-static struct k_work_delayable scan_work;
-static void scan_work_fn(struct k_work *work) {
-    ARG_UNUSED(work);
-    hop_next_channel();
-    k_work_reschedule(&scan_work, K_MSEC(scan_dwell_ms));
-}
-#else
-/* Hop after hop-threshold consecutive windows with a TX failure. */
-static struct k_work_delayable keepalive_work;
-static void keepalive_work_fn(struct k_work *work) {
-    ARG_UNUSED(work);
-    bool window_failed = atomic_set(&fails_in_window, 0) > 0;
-    if (hop_policy_should_hop(&bad_windows, window_failed, hop_threshold)) {
-        hop_next_channel();
-    }
-    bool active = atomic_set(&data_sent_since_tick, 0) != 0;
-    struct esb_payload keepalive = {0};
-    keepalive.pipe = self_pipe;
-    keepalive.length = ESB_KEEPALIVE_LENGTH;
-    keepalive.data[KEEPALIVE_RATE_OFFSET] = active ? KEEPALIVE_RATE_ACTIVE : KEEPALIVE_RATE_IDLE;
-    (void)esb_write_payload(&keepalive);
-    k_work_reschedule(&keepalive_work, K_MSEC(active ? hop_window_ms : idle_keepalive_ms));
 }
 #endif
 
@@ -226,23 +166,15 @@ static void on_esb_event(const struct esb_evt *event) {
     switch (event->evt_id) {
     case ESB_EVENT_RX_RECEIVED: {
         bool received = false;
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-        bool peer_active = false;
-#endif
         struct esb_payload payload;
         while (esb_read_rx_payload(&payload) == 0) {
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-            if (hop_policy_marks_active(payload.length, payload.data[KEEPALIVE_RATE_OFFSET])) {
-                peer_active = true;
+            if (hop_consume_rx(payload.pipe, payload.data, payload.length)) {
+                continue; /* control packet (keepalive or beacon), not queued */
             }
-            if (hop_policy_is_keepalive(payload.length)) {
-                continue; /* keepalive: never queued */
-            }
-#endif
             struct esb_link_packet *slot = spsc_acquire(&rx_spsc);
             if (slot == NULL) {
                 atomic_inc(&rx_dropped);
-                continue; /* ring full; keep draining the radio FIFO */
+                continue; /* ring full, keep draining the radio FIFO */
             }
             slot->pipe = payload.pipe;
             slot->length = (uint8_t)MIN(payload.length, (int)sizeof(slot->data));
@@ -255,9 +187,6 @@ static void on_esb_event(const struct esb_evt *event) {
         }
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
         stage_pending_replies();
-        if (HOP_COUNT > 1) {
-            k_work_reschedule(&scan_work, K_MSEC(peer_active ? active_lock_ms : idle_lock_ms));
-        }
 #endif
         break;
     }
@@ -267,11 +196,7 @@ static void on_esb_event(const struct esb_evt *event) {
         if (flush_error) {
             LOG_DBG("esb_flush_tx after TX_FAILED returned %d", flush_error);
         }
-#if !IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-        if (HOP_COUNT > 1) {
-            atomic_inc(&fails_in_window);
-        }
-#endif
+        hop_note_tx_failed();
         break;
     }
     default:
@@ -294,8 +219,8 @@ static int hfclk_request(void) {
 }
 
 /* Push base addresses, prefix, channel, TX power into the radio.
- * set_* failures are logged and ignored; the radio starts on whatever
- * values it already held. */
+ * set_* failures are logged and ignored.
+ * The radio starts on whatever values it already held. */
 static int esb_link_radio_setup(void) {
     int set_error = esb_set_base_address_0(base_address);
     if (set_error) {
@@ -309,7 +234,7 @@ static int esb_link_radio_setup(void) {
     if (set_error) {
         LOG_DBG("esb_set_prefixes returned %d", set_error);
     }
-    set_error = esb_set_rf_channel(hop_channels[hop_index]);
+    set_error = esb_set_rf_channel(hop_current_channel());
     if (set_error) {
         LOG_DBG("esb_set_rf_channel returned %d", set_error);
     }
@@ -343,8 +268,8 @@ int esb_link_init(esb_link_rx_callback_t callback) {
     config.crc = esb_crc_from_bits(crc_bits);
     config.retransmit_count = retransmit_count;
     config.retransmit_delay = retransmit_delay_us;
-    /* Per-packet ACK is controlled by event_wants_ack() in peripheral.c; the
-     * reverse channel rides the ACKs that the peripheral does request. */
+    /* Per-packet ACK is controlled by event_wants_ack() in peripheral.c.
+     * The reverse channel rides the ACKs that the peripheral does request. */
     config.selective_auto_ack = true;
     config.tx_mode = ESB_TXMODE_AUTO;
     config.use_fast_ramp_up = use_fast_ramp_up;
@@ -355,45 +280,17 @@ int esb_link_init(esb_link_rx_callback_t callback) {
         return error;
     }
 
-    /* Init the hop work before radio_setup starts RX, or an early packet's ISR
-     * reschedule would touch an uninitialized work. */
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    if (HOP_COUNT > 1) {
-        k_work_init_delayable(&scan_work, scan_work_fn);
-    }
-#else
-    if (HOP_COUNT > 1) {
-        k_work_init_delayable(&keepalive_work, keepalive_work_fn);
-    }
-#endif
-
     error = esb_link_radio_setup();
     if (error) {
         return error;
     }
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-    if (HOP_COUNT > 1) {
-        k_work_reschedule(&scan_work, K_MSEC(idle_lock_ms));
-    }
-#else
-    if (HOP_COUNT > 1) {
-        k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
-    }
-#endif
+    hop_start();
     return 0;
 }
 
 int esb_link_set_enabled(bool enabled) {
     if (!enabled) {
-#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-        if (HOP_COUNT > 1) {
-            k_work_cancel_delayable(&scan_work);
-        }
-#else
-        if (HOP_COUNT > 1) {
-            k_work_cancel_delayable(&keepalive_work);
-        }
-#endif
+        hop_stop();
         int stop_error = esb_stop_rx();
         if (stop_error) {
             LOG_DBG("esb_stop_rx returned %d", stop_error);
@@ -406,14 +303,10 @@ int esb_link_set_enabled(bool enabled) {
     }
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     int rx_error = esb_start_rx();
-    if (HOP_COUNT > 1) {
-        k_work_reschedule(&scan_work, K_MSEC(idle_lock_ms));
-    }
+    hop_start();
     return rx_error;
 #else
-    if (HOP_COUNT > 1) {
-        k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
-    }
+    hop_start();
     return 0;
 #endif
 }
@@ -423,15 +316,20 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
-    if (HOP_COUNT > 1) {
-        atomic_set(&data_sent_since_tick, 1); /* mark active so keepalive uses the fast rate */
-    }
+    hop_note_data_sent();
     struct esb_payload payload = {0};
     payload.pipe = self_pipe;
     payload.noack = !ack;
     payload.length = (uint8_t)length;
     memcpy(payload.data, data, length);
     return esb_write_payload(&payload);
+}
+
+void esb_link_send_keepalive(void) {
+    struct esb_payload keepalive = {0};
+    keepalive.pipe = self_pipe;
+    keepalive.length = ESB_KEEPALIVE_LENGTH;
+    (void)esb_write_payload(&keepalive);
 }
 #endif
 
@@ -440,7 +338,7 @@ int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
-    struct esb_link_packet packet;
+    struct esb_link_packet packet = {0};
     packet.pipe = pipe;
     packet.length = (uint8_t)length;
     memcpy(packet.data, data, length);
