@@ -8,10 +8,8 @@
 
 #include "esb_wire.h"
 
-/* Tight wire layout for the high-rate input event: ZMK's struct pads it to 12 bytes
- * (uint16 code on a 2-byte boundary, int32 value on a 4-byte boundary), the union's
- * widest member. Packing the five fields drops it to 9, so a coalesced 2-axis motion
- * packet is 20 bytes on air instead of 26. */
+/* ZMK pads input_event to 12 bytes, the union's widest member.
+ * Packing its fields drops the on-air payload to 9. */
 struct __packed input_wire {
     uint8_t reg;
     uint8_t sync;
@@ -20,13 +18,14 @@ struct __packed input_wire {
     int32_t value;
 };
 BUILD_ASSERT(sizeof(struct input_wire) == 9, "input wire layout drifted");
+BUILD_ASSERT(1 + sizeof(struct input_wire) == ESB_WIRE_INPUT_EVENT_SIZE,
+             "ESB_WIRE_INPUT_EVENT_SIZE drifted from the encoded layout");
 
 #define WIRE_PAYLOAD(member)                                                                       \
     (uint8_t)sizeof(((struct zmk_split_transport_peripheral_event *)0)->data.member)
 
-/* On-air payload size per event type, direct-indexed (the type enum is dense from 0).
- * Input is the packed size, the others copy their union member verbatim.
- * A zero slot marks an unknown tag for the decoder. */
+/* On-air payload size per event type. Input is the packed size, others copy their
+ * union member verbatim. A zero slot marks an unknown tag for the decoder. */
 static const uint8_t payload_size[] = {
     [ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT] = WIRE_PAYLOAD(key_position_event),
     [ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_SENSOR_EVENT] = WIRE_PAYLOAD(sensor_event),

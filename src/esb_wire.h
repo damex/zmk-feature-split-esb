@@ -14,9 +14,13 @@
 
 #include <zmk/split/transport/types.h>
 
-/* Largest encoded event: tag plus the widest union member. */
 #define ESB_WIRE_MAX_EVENT_SIZE                                                                    \
     (1 + sizeof(((struct zmk_split_transport_peripheral_event *)0)->data))
+
+/* Encoded size of one input event (tag plus packed fields).
+ * The peripheral coalesces only input events, so this bounds how many fit in a packet.
+ * Pinned to the codec layout by a build assert in esb_wire.c. */
+#define ESB_WIRE_INPUT_EVENT_SIZE 10
 
 /* Append one encoded event to out (out_cap bytes free).
  * Returns bytes written (1 + payload), or 0 if the event does not fit. */

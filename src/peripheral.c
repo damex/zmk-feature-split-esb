@@ -71,8 +71,7 @@ static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *e
  * real latency added).
  * Non-input events flush the batch and go alone.
  * Single context (the input thread), so no lock. */
-#define PERIPHERAL_BATCH_MAX                                                                       \
-    (CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD / sizeof(struct zmk_split_transport_peripheral_event))
+#define PERIPHERAL_BATCH_MAX (CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD / ESB_WIRE_INPUT_EVENT_SIZE)
 BUILD_ASSERT(PERIPHERAL_BATCH_MAX >= 2,
              "ZMK_SPLIT_ESB_MAX_PAYLOAD too small to coalesce a 2-axis sample; raise it");
 
