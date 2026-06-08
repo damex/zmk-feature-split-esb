@@ -13,6 +13,14 @@ properties:
     type: uint8-array
     required: true
     description: 4-byte ESB base address, shared by all pipes.
+  address-length:
+    type: int
+    default: 5
+    enum: [3, 4, 5]
+    description: |
+      On-air address bytes (1 prefix plus base). 5 is standard ESB. Shorter trims a
+      byte per packet but weakens address selectivity. Uses the high base-address
+      bytes. All peripherals must match the central.
   hop-channels:
     type: uint8-array
     required: true

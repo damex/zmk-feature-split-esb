@@ -31,6 +31,7 @@ BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_split_esb),
              "a zmk,split-esb node (base-address/peripherals/hop-channels) is required");
 
 static const uint8_t base_address[] = DT_INST_PROP(0, base_address);
+static const uint8_t address_length = DT_INST_PROP(0, address_length);
 static const int8_t tx_power_dbm = DT_INST_PROP(0, tx_power_dbm);
 static const uint16_t retransmit_count = DT_INST_PROP(0, retransmit_count);
 static const uint16_t retransmit_delay_us = DT_INST_PROP(0, retransmit_delay_us);
@@ -226,7 +227,11 @@ static int hfclk_request(void) {
  * set_* failures are logged and ignored.
  * The radio starts on whatever values it already held. */
 static int esb_link_radio_setup(void) {
-    int set_error = esb_set_base_address_0(base_address);
+    int set_error = esb_set_address_length(address_length);
+    if (set_error) {
+        LOG_DBG("esb_set_address_length returned %d", set_error);
+    }
+    set_error = esb_set_base_address_0(base_address);
     if (set_error) {
         LOG_DBG("esb_set_base_address_0 returned %d", set_error);
     }
