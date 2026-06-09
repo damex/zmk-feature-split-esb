@@ -46,26 +46,104 @@ Module defaults it, but sdk-nrf default (32) can win on Kconfig parse order, so 
 it explicitly on every device. Build assert catches value too small for largest
 split message.
 
-Same link identity in a dtsi included by the central and every peripheral:
+DT side: shared dtsi every device includes, plus role-specific lines. Everything
+reports to the dongle (central). Two examples, by peripheral count and what each
+sources.
+
+### One peripheral: a mouse
+
+Pointer motion: input events, routed by one `zmk,input-split` per pipe.
+
+Shared (`esb_shared.dtsi`), every device:
 ```dts
-esb_link {
-    compatible = "zmk,split-esb";
-    base-address = [E7 E7 E7 E7];
-    hop-channels = [04];
-    peripherals {
-        mouse: peripheral_mouse {
-            pipe = <0>;
-            prefix = <0xE7>;
-            weight = <1>;
+/ {
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 E7 E7 E7];
+        hop-channels = [04];
+        peripherals {
+            mouse: peripheral_mouse {
+                pipe = <0>;
+                prefix = <0xE7>;
+                weight = <1>;
+            };
+        };
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        mouse_split: mouse_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    mouse_listener: mouse_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&mouse_split>;
+    };
+};
+```
+Dongle (central): enable listener.
+```dts
+#include "esb_shared.dtsi"
+&mouse_listener { status = "okay"; };
+```
+Mouse (peripheral): claim pipe, bind sensor.
+```dts
+#include "esb_shared.dtsi"
+/ { chosen { zmk,esb-self = &mouse; }; };
+&mouse_split { device = <&your_sensor>; };
+```
+Two mice, same shape: second child, second `mouse_split@1` and listener. Each mouse
+binds its own split, disables the others.
+
+### Two peripherals: a split keyboard
+
+Both halves are peripherals, report to the dongle, never to each other. Key positions
+ride the transport directly, no input-split. Left pipe 0, right pipe 1.
+
+Shared (`esb_shared.dtsi`):
+```dts
+/ {
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 E7 E7 E7];
+        hop-channels = [04];
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0xE7>;
+                weight = <1>;
+            };
+            right: peripheral_right {
+                pipe = <1>;
+                prefix = <0xC3>;
+                weight = <1>;
+            };
         };
     };
 };
 ```
-Each peripheral board points at its entry: `chosen { zmk,esb-self = &mouse; };`.
-
-More peripherals: add another child with next `pipe` (1, 2, ...) and unique `prefix`.
-`pipe` is the ZMK source id. Central tags each peripheral's events with it: on the
-central add one `zmk,input-split` (`reg` = pipe) per peripheral, enable its listener.
+Dongle (central): holds keymap and matrix transform spanning both halves, standard
+ZMK split. Key positions deliver natively, no per-key listener.
+```dts
+#include "esb_shared.dtsi"
+```
+Left half (peripheral): claim pipe 0, own kscan.
+```dts
+#include "esb_shared.dtsi"
+/ { chosen { zmk,esb-self = &left; }; };
+```
+Right half (peripheral): claim pipe 1.
+```dts
+#include "esb_shared.dtsi"
+/ { chosen { zmk,esb-self = &right; }; };
+```
+Keys deliver, but peripheral-count limit below applies: no global-behavior broadcast,
+no HID-indicator forwarding.
 
 | DT property | Value |
 |---|---|
