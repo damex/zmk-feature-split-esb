@@ -26,7 +26,7 @@ static const uint8_t pipe_weights[] = {
 static const uint16_t vote_threshold = DT_INST_PROP(0, hop_threshold);
 static const uint16_t decision_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static const int8_t rssi_floor_dbm = DT_INST_PROP(0, rssi_floor_dbm);
-#define LOST_LIMIT (2 * HOP_COUNT)  /* silent windows before falling back to the anchor */
+#define ANCHOR_FALLBACK_WINDOWS (2 * HOP_COUNT)
 #define BEACON_REPEAT_WINDOWS 4
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
@@ -94,7 +94,7 @@ static void decision_work_fn(struct k_work *work) {
     if (hop_policy_hop_vote(pipe_loss, pipe_weights, PERIPHERAL_COUNT, vote_threshold)) {
         hop_to_next_epoch();
     }
-    if (silent_windows >= LOST_LIMIT) {
+    if (silent_windows >= ANCHOR_FALLBACK_WINDOWS) {
         fall_back_to_anchor();
     }
     stage_beacon();
