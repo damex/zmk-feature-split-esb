@@ -136,17 +136,17 @@ ZTEST(hop_policy, test_loss_penalty) {
 }
 
 ZTEST(hop_policy, test_should_beacon) {
-    uint8_t announced = 0;
+    uint8_t beaconed = 0;
     uint8_t repeats = 0;
 
-    zassert_false(hop_policy_should_beacon(0, &announced, &repeats, 4), "unchanged idle epoch");
+    zassert_false(hop_policy_should_beacon(0, &beaconed, &repeats, 4), "unchanged idle epoch");
 
-    zassert_true(hop_policy_should_beacon(1, &announced, &repeats, 4), "change announces");
-    zassert_true(hop_policy_should_beacon(1, &announced, &repeats, 4), "repeat 2");
-    zassert_true(hop_policy_should_beacon(1, &announced, &repeats, 4), "repeat 3");
-    zassert_true(hop_policy_should_beacon(1, &announced, &repeats, 4), "repeat 4");
-    zassert_false(hop_policy_should_beacon(1, &announced, &repeats, 4), "repeats exhausted");
-    zassert_false(hop_policy_should_beacon(1, &announced, &repeats, 4), "stays quiet");
+    zassert_true(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "change announces");
+    zassert_true(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "repeat 2");
+    zassert_true(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "repeat 3");
+    zassert_true(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "repeat 4");
+    zassert_false(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "repeats exhausted");
+    zassert_false(hop_policy_should_beacon(1, &beaconed, &repeats, 4), "stays quiet");
 
-    zassert_true(hop_policy_should_beacon(2, &announced, &repeats, 4), "new change re-arms");
+    zassert_true(hop_policy_should_beacon(2, &beaconed, &repeats, 4), "new change re-arms");
 }

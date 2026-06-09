@@ -59,5 +59,5 @@ void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_ma
 /* Beacon scheduling: announce the epoch only while it is fresh.
  * A changed epoch arms repeat_windows announcements, then goes quiet, so a steady stream
  * never crowds commands out of the reverse channel. */
-bool hop_policy_should_beacon(uint8_t epoch, uint8_t *announced_epoch, uint8_t *repeats_left,
+bool hop_policy_should_beacon(uint8_t epoch, uint8_t *beaconed_epoch, uint8_t *repeats_left,
                               uint8_t repeat_windows);
