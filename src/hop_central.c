@@ -34,7 +34,7 @@ static int8_t pipe_rssi[PERIPHERAL_COUNT];
 static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
-static uint16_t silent_run;
+static uint16_t silent_windows;
 static uint8_t beaconed_epoch;
 static uint8_t beacon_repeats_left;
 
@@ -55,7 +55,7 @@ static void fall_back_to_anchor(void) {
     hop_epoch = 0;
     hop_index = hop_policy_channel_for_epoch(0, HOP_COUNT);
     apply_hop_channel();
-    silent_run = 0;
+    silent_windows = 0;
     clear_pipe_loss();
 }
 
@@ -87,14 +87,14 @@ static void decision_work_fn(struct k_work *work) {
     uint32_t active = (uint32_t)atomic_set(&pipe_active_mask, 0);
     hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, pipe_rssi, rssi_floor_dbm);
     if (heard != 0) {
-        silent_run = 0;
+        silent_windows = 0;
     } else {
-        silent_run++;
+        silent_windows++;
     }
     if (hop_policy_hop_vote(pipe_loss, pipe_weights, PERIPHERAL_COUNT, vote_threshold)) {
         hop_to_next_epoch();
     }
-    if (silent_run >= LOST_LIMIT) {
+    if (silent_windows >= LOST_LIMIT) {
         fall_back_to_anchor();
     }
     stage_beacon();
@@ -152,6 +152,6 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     __ASSERT_NO_MSG(status != NULL);
     status->channel = hop_current_channel();
     status->epoch = hop_epoch;
-    status->searching = silent_run > 0;
+    status->searching = silent_windows > 0;
     status->rssi_dbm = pipe_rssi[0];
 }
