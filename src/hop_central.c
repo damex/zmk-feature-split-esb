@@ -27,7 +27,7 @@ static const uint16_t vote_threshold = DT_INST_PROP(0, hop_threshold);
 static const uint16_t decision_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static const int8_t rssi_floor_dbm = DT_INST_PROP(0, rssi_floor_dbm);
 #define LOST_LIMIT (2 * HOP_COUNT)  /* silent windows before falling back to the anchor */
-#define BEACON_REPEAT_WINDOWS 4     /* re-announce a changed epoch for this many windows */
+#define BEACON_REPEAT_WINDOWS 4
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
 static int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
@@ -134,7 +134,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
             atomic_or(&pipe_motion_mask, BIT(pipe));
         }
     }
-    return keepalive; /* a keepalive marks liveness and isn't queued, motion is */
+    return keepalive;
 }
 
 /* TX result and data-sent are peripheral-side signals; no-ops on the central. */

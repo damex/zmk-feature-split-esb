@@ -13,7 +13,6 @@
 
 #define HOP_COUNT DT_INST_PROP_LEN(0, hop_channels)
 
-/* Current channel index: a role engine sets it, then calls apply_hop_channel. */
 extern uint8_t hop_index;
 
 void apply_hop_channel(void);
