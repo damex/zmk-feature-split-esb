@@ -67,6 +67,7 @@ More peripherals: add another child, each with the next `pipe` (1, 2, ...) and a
 | DT property | Value |
 |---|---|
 | `base-address` | 4-byte bytestring `[..]`, shared by all pipes |
+| `address-length` | on-air address bytes 3/4/5, shorter trims airtime, weakens selectivity, all devices must match (default 5) |
 | `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight` |
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
 | `hop-threshold` | bad windows before acting: central hop-vote sum, peripheral sweep streak (default 3) |
