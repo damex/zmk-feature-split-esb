@@ -209,6 +209,31 @@ Each step overrides the previous:
 
 Runtime-overridable keys: `esb/tx_power`, `esb/retransmit_count`, `esb/retransmit_delay`.
 
+## Status API
+
+Read-only link state for display widgets and diagnostics, declared in
+`include/zmk_split_esb.h`:
+
+```c
+#include <zmk_split_esb.h>
+
+struct zmk_split_esb_status status;
+zmk_split_esb_get_status(&status);
+```
+
+| Field | Meaning |
+|---|---|
+| `channel` | current RF channel |
+| `epoch` | hop generation |
+| `searching` | link degraded, hunting for the peer |
+| `rssi_dbm` | received signal: central reports worst sampled peripheral link, peripheral its central link |
+
+`rssi_dbm` reads 0 until the first packet arrives.
+
+Per-link signal on a multi-peripheral central: `zmk_split_esb_pipe_count()` plus
+`zmk_split_esb_pipe_rssi_dbm(pipe)`, indexed by ESB pipe. A peripheral has only
+index 0.
+
 ## Limitations
 
 `ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT` is 0 on an ESB-only central (ZMK derives it
