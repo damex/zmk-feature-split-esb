@@ -92,7 +92,7 @@ static esb_link_rx_callback_t rx_callback;
 
 /* Dedicated dispatch thread: drain the SPSC and hand each packet to the role layer.
  * Off the shared system workqueue so a high RX rate isn't gated by unrelated work. */
-static void rx_thread_fn(void *unused_a, void *unused_b, void *unused_c) {
+static FUNC_NORETURN void rx_thread_fn(void *unused_a, void *unused_b, void *unused_c) {
     ARG_UNUSED(unused_a);
     ARG_UNUSED(unused_b);
     ARG_UNUSED(unused_c);
