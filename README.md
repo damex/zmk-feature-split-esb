@@ -192,14 +192,19 @@ Tunables (Kconfig, defaults shown):
 
 ## Lost-event reconcile
 
-Key events are ACK'd, but the radio gives up after `retransmit-count` tries, so a
-press or release can still die in a bad-RF moment. Each peripheral keepalive
-carries its pressed-position bitmap; the central diffs it against its own view and
-replays the lost transitions. A stuck key heals within one keepalive period
-(`hop-window-ms` while typing, `idle-keepalive-ms` at idle). The live stream is
-healed too: an orphan release (lost press) drops before ZMK sees it, a repeated
-press synthesizes its lost release first. Keepalives run on single-channel links
-too. Positions 64 and above are not covered.
+Split events are deltas, the keepalive is the state: each peripheral keepalive
+carries a snapshot of its live state (activity, pressed-position bitmap, battery
+level). Events are ACK'd, but the radio gives up after `retransmit-count` tries,
+so a delta can still die in a bad-RF moment. The central reconciles its view
+against every snapshot and replays what was lost.
+
+A stuck key heals within one keepalive period (`hop-window-ms` while typing,
+`idle-keepalive-ms` at idle). The live stream is healed too: an orphan release
+(lost press) drops before ZMK sees it, a repeated press synthesizes its lost
+release first. Battery level raises `zmk_peripheral_battery_state_changed` on
+change. Central `.conf` needs `CONFIG_ZMK_BATTERY_REPORTING=y` for the event to
+exist. Keepalives run on single-channel links too. Positions 64 and above are
+not covered.
 
 ## Channel hopping
 
@@ -248,6 +253,11 @@ Per-link signal on a multi-peripheral central: `zmk_split_esb_pipe_count()` plus
 index 0.
 
 ## Limitations
+
+Peripheral battery levels raise `zmk_peripheral_battery_state_changed` on the
+central: ZMK's own handler sits behind `ZMK_SPLIT_BLE`, dead on an ESB-only
+build. Central `.conf` needs `CONFIG_ZMK_BATTERY_REPORTING=y` for the event to
+exist. Display widgets and indicators consume it as usual.
 
 `ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT` is 0 on an ESB-only central (ZMK derives it
 from BLE/wired counts). Events still deliver, but:

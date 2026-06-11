@@ -53,7 +53,7 @@ static void keepalive_work_fn(struct k_work *work) {
     }
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE,
-                            esb_link_keepalive_bitmap());
+                            esb_link_keepalive_bitmap(), esb_link_keepalive_battery_level());
     k_work_reschedule(&keepalive_work, K_MSEC(active ? hop_window_ms : idle_keepalive_ms));
 }
 

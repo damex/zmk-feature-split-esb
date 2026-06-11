@@ -32,13 +32,20 @@ int esb_link_set_enabled(bool enabled);
 int esb_link_send(const uint8_t *data, size_t length, bool ack);
 
 /* Peripheral only.
- * Send an acked keepalive: hop-engine state byte plus pressed-position bitmap. */
-void esb_link_send_keepalive(uint8_t state, const uint8_t *position_bitmap);
+ * Send the acked keepalive, this device's state snapshot: hop-engine state byte,
+ * pressed-position bitmap, battery level. */
+void esb_link_send_keepalive(uint8_t state, const uint8_t *position_bitmap,
+                             uint8_t battery_level);
 
 /* Peripheral only.
  * Role layer's live pressed-position bitmap (ESB_KEEPALIVE_BITMAP_BYTES), defined in
  * peripheral.c and read by the keepalive tick. */
 const uint8_t *esb_link_keepalive_bitmap(void);
+
+/* Peripheral only.
+ * Role layer's battery level for keepalives, ESB_KEEPALIVE_BATTERY_UNKNOWN when the
+ * device does not report battery. Defined in peripheral.c. */
+uint8_t esb_link_keepalive_battery_level(void);
 #endif
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
