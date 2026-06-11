@@ -114,4 +114,4 @@ child-binding:
       weight:
         type: int
         default: 1
-        description: Relative priority for airtime throttling and hop vote.
+        description: Relative weight in the central's hop vote.
