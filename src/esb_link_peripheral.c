@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <zephyr/devicetree.h>
+#include <zephyr/logging/log.h>
 
 #include <esb.h>
 
@@ -15,6 +16,8 @@
 #include "esb_link_internal.h"
 #include "hop.h"
 #include "hop_policy.h"
+
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(DT_HAS_CHOSEN(zmk_esb_self), "peripheral needs a chosen zmk,esb-self");
 static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
@@ -29,7 +32,11 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     payload.noack = !ack;
     payload.length = (uint8_t)length;
     memcpy(payload.data, data, length);
-    return esb_write_payload(&payload);
+    int error = esb_write_payload(&payload);
+    if (error) {
+        LOG_WRN("uplink event dropped, esb_write_payload returned %d", error);
+    }
+    return error;
 }
 
 void esb_link_send_keepalive(uint8_t state) {

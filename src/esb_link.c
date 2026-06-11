@@ -140,6 +140,7 @@ static void on_esb_event(const struct esb_evt *event) {
         break;
     case ESB_EVENT_TX_FAILED: {
         /* Retransmits exhausted: drop the packet, flush so the TX FIFO can advance. */
+        LOG_WRN("TX retransmits exhausted, flushing TX FIFO");
         int flush_error = esb_flush_tx();
         if (flush_error) {
             LOG_DBG("esb_flush_tx after TX_FAILED returned %d", flush_error);
