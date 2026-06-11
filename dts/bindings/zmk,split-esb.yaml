@@ -52,6 +52,13 @@ properties:
     description: |
       Peripheral keepalive period when no data is flowing. Also the central's hop-decision
       window period.
+  peripheral-timeout-ms:
+    type: int
+    default: 3000
+    description: |
+      Central declares a peripheral silent for this long stale and releases its held
+      state (keys, input-split buttons), the connectionless equivalent of a disconnect.
+      A keepalive from the returning peripheral re-syncs anything still held.
   tx-power-dbm:
     type: int
     default: 0

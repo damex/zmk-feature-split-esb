@@ -155,6 +155,7 @@ no HID-indicator forwarding.
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
 | `rssi-floor-dbm` | central counts a served peripheral's motion weaker than this (dBm) as a degraded window (default -85) |
 | `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
+| `peripheral-timeout-ms` | silence before the central releases a peripheral's held state (default 3000) |
 | `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
 | `retransmit-count` | retransmits before drop (default 3) |
 | `retransmit-delay-us` | delay between retransmits (default 600) |
@@ -200,6 +201,11 @@ replays the lost transitions. A stuck key heals within one keepalive period
 healed too: an orphan release (lost press) drops before ZMK sees it, a repeated
 press synthesizes its lost release first. Keepalives run on single-channel links
 too. Positions 64 and above are not covered.
+
+A peripheral silent past `peripheral-timeout-ms` (sleep, dead battery, out of
+range) gets its held keys and input-split buttons released, the connectionless
+equivalent of a disconnect. If it returns with a key still physically held, its
+first keepalive re-presses it.
 
 ## Channel hopping
 

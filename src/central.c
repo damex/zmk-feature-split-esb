@@ -4,18 +4,23 @@
 /*
  * ZMK ESB split central. Source id = ESB pipe.
  */
+#define DT_DRV_COMPAT zmk_split_esb
+
 #include <string.h>
 
+#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
 
+#include <zmk/pointing/input_split.h>
 #include <zmk/split/transport/central.h>
 #include <zmk/split/transport/types.h>
 
 #include "esb_keepalive.h"
 #include "esb_link.h"
+#include "esb_link_internal.h"
 #include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -89,6 +94,17 @@ K_MSGQ_DEFINE(central_event_msgq, sizeof(struct central_inbound),
 #define CENTRAL_PIPE_MAX 8 /* ESB hardware pipe count */
 static uint8_t tracked_positions[CENTRAL_PIPE_MAX][ESB_KEEPALIVE_BITMAP_BYTES];
 
+#define CENTRAL_INPUT_REG_MAX 32
+static const uint32_t peripheral_timeout_ms = DT_INST_PROP(0, peripheral_timeout_ms);
+
+/* Written on the RX thread, read by the staleness tick: single writer per slot,
+ * aligned loads, no lock needed. */
+static uint32_t pipe_last_heard_ms[CENTRAL_PIPE_MAX];
+static bool pipe_heard[CENTRAL_PIPE_MAX];
+static uint32_t pipe_seen_input_regs[CENTRAL_PIPE_MAX];
+
+static bool pipe_stale[CENTRAL_PIPE_MAX];
+
 static void forward_key_position(uint8_t source, uint32_t position, bool pressed) {
     struct zmk_split_transport_peripheral_event event = {
         .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
@@ -142,6 +158,49 @@ static void deliver_key_event(uint8_t source,
     zmk_split_transport_central_peripheral_event_handler(&esb_central, source, *event);
 }
 
+static void release_stale_pipe(uint8_t pipe) {
+    LOG_WRN("Releasing held state of silent peripheral %u", pipe);
+    static const uint8_t no_positions[ESB_KEEPALIVE_BITMAP_BYTES];
+    uint8_t *tracked = tracked_positions[pipe];
+    for (uint32_t position = esb_keepalive_bitmap_diff_next(tracked, no_positions, 0);
+         position < ESB_KEEPALIVE_POSITION_COUNT;
+         position = esb_keepalive_bitmap_diff_next(tracked, no_positions, position + 1)) {
+        esb_keepalive_bitmap_set(tracked, position, false);
+        forward_key_position(pipe, position, false);
+    }
+    if (IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)) {
+        for (uint8_t reg = 0; reg < CENTRAL_INPUT_REG_MAX; reg++) {
+            if ((pipe_seen_input_regs[pipe] & BIT(reg)) != 0) {
+                zmk_input_split_peripheral_disconnected(reg);
+            }
+        }
+    }
+}
+
+#define STALENESS_CHECK_PERIOD_MS 500
+
+static void staleness_work_fn(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(staleness_work, staleness_work_fn);
+
+static void staleness_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    uint32_t now = k_uptime_get_32();
+    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < CENTRAL_PIPE_MAX; pipe++) {
+        if (!pipe_heard[pipe]) {
+            continue;
+        }
+        if ((now - pipe_last_heard_ms[pipe]) <= peripheral_timeout_ms) {
+            pipe_stale[pipe] = false;
+            continue;
+        }
+        if (!pipe_stale[pipe]) {
+            pipe_stale[pipe] = true;
+            release_stale_pipe(pipe);
+        }
+    }
+    k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
+}
+
 static void central_event_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     struct central_inbound inbound;
@@ -162,6 +221,10 @@ static void central_event_work_fn(struct k_work *work) {
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
 static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
+    if (pipe < CENTRAL_PIPE_MAX) {
+        pipe_last_heard_ms[pipe] = k_uptime_get_32();
+        pipe_heard[pipe] = true;
+    }
     if (esb_keepalive_matches(data, (uint8_t)length)) {
         struct central_inbound inbound = {
             .source = pipe,
@@ -187,6 +250,9 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
         }
         offset += consumed;
         if (event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
+            if (pipe < CENTRAL_PIPE_MAX && event.data.input_event.reg < CENTRAL_INPUT_REG_MAX) {
+                pipe_seen_input_regs[pipe] |= BIT(event.data.input_event.reg);
+            }
             zmk_split_transport_central_peripheral_event_handler(&esb_central, pipe, event);
             continue;
         }
@@ -204,6 +270,7 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
 }
 
 static int central_init(void) {
+    k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
     return esb_link_init(central_on_rx);
 }
 
