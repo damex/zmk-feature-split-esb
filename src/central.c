@@ -14,6 +14,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
 
+#include <zmk/events/split_esb_peripheral_changed.h>
 #include <zmk/pointing/input_split.h>
 #include <zmk/split/transport/central.h>
 #include <zmk/split/transport/types.h>
@@ -31,6 +32,9 @@ BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_SP
              "central command does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
 
 static bool transport_enabled;
+static zmk_split_transport_central_status_changed_cb_t status_cb;
+
+static enum zmk_split_transport_connections_status central_connections_status(void);
 
 static int central_send_command(uint8_t source,
                                 struct zmk_split_transport_central_command command) {
@@ -50,14 +54,13 @@ static struct zmk_split_transport_status central_get_status(void) {
     return (struct zmk_split_transport_status){
         .available = true,
         .enabled = transport_enabled,
-        /* ESB is connectionless: no connection state to track, so always connected. */
-        .connections = ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED,
+        .connections = central_connections_status(),
     };
 }
 
 static int
 central_set_status_callback(zmk_split_transport_central_status_changed_cb_t callback) {
-    ARG_UNUSED(callback);
+    status_cb = callback;
     return 0;
 }
 
@@ -104,6 +107,27 @@ static bool pipe_heard[CENTRAL_PIPE_MAX];
 static uint32_t pipe_seen_input_regs[CENTRAL_PIPE_MAX];
 
 static bool pipe_stale[CENTRAL_PIPE_MAX];
+static bool pipe_connected[CENTRAL_PIPE_MAX];
+static enum zmk_split_transport_connections_status last_connections =
+    ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED;
+
+static enum zmk_split_transport_connections_status central_connections_status(void) {
+    uint8_t total = 0;
+    uint8_t connected = 0;
+    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < CENTRAL_PIPE_MAX; pipe++) {
+        total++;
+        if (pipe_connected[pipe]) {
+            connected++;
+        }
+    }
+    if (connected == 0) {
+        return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED;
+    }
+    if (connected < total) {
+        return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_SOME_CONNECTED;
+    }
+    return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED;
+}
 
 static void forward_key_position(uint8_t source, uint32_t position, bool pressed) {
     struct zmk_split_transport_peripheral_event event = {
@@ -186,16 +210,26 @@ static void staleness_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     uint32_t now = k_uptime_get_32();
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < CENTRAL_PIPE_MAX; pipe++) {
-        if (!pipe_heard[pipe]) {
-            continue;
+        if (pipe_heard[pipe]) {
+            if ((now - pipe_last_heard_ms[pipe]) <= peripheral_timeout_ms) {
+                pipe_stale[pipe] = false;
+            } else if (!pipe_stale[pipe]) {
+                pipe_stale[pipe] = true;
+                release_stale_pipe(pipe);
+            }
         }
-        if ((now - pipe_last_heard_ms[pipe]) <= peripheral_timeout_ms) {
-            pipe_stale[pipe] = false;
-            continue;
+        bool connected = pipe_heard[pipe] && !pipe_stale[pipe];
+        if (connected != pipe_connected[pipe]) {
+            pipe_connected[pipe] = connected;
+            raise_zmk_split_esb_peripheral_changed(
+                (struct zmk_split_esb_peripheral_changed){.source = pipe, .connected = connected});
         }
-        if (!pipe_stale[pipe]) {
-            pipe_stale[pipe] = true;
-            release_stale_pipe(pipe);
+    }
+    enum zmk_split_transport_connections_status connections = central_connections_status();
+    if (connections != last_connections) {
+        last_connections = connections;
+        if (status_cb != NULL) {
+            status_cb(&esb_central, central_get_status());
         }
     }
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
