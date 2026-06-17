@@ -12,8 +12,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
-#include <zmk/activity.h>
-#include <zmk/events/activity_state_changed.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
@@ -154,17 +152,3 @@ static int peripheral_init(void) {
 }
 
 SYS_INIT(peripheral_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
-
-#if IS_ENABLED(CONFIG_ZMK_SLEEP)
-/* Stop radio before poweroff so SYSTEM_OFF can't cut it mid-TX. */
-static int peripheral_sleep_listener(const zmk_event_t *eh) {
-    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
-    if (ev != NULL && ev->state == ZMK_ACTIVITY_SLEEP) {
-        (void)esb_link_set_enabled(false);
-    }
-    return 0;
-}
-
-ZMK_LISTENER(esb_peripheral_sleep, peripheral_sleep_listener);
-ZMK_SUBSCRIPTION(esb_peripheral_sleep, zmk_activity_state_changed);
-#endif
