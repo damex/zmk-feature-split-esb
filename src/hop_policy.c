@@ -123,22 +123,14 @@ size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count) {
 uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count) {
     assert(mask != NULL);
     assert(pool_count > 0);
-    size_t active = hop_policy_mask_active_count(mask, pool_count);
-    if (active == 0) {
-        return hop_policy_channel_for_epoch(epoch, pool_count);
-    }
-    size_t target = (size_t)(epoch % active);
-    size_t seen = 0;
-    for (size_t index = 0; index < pool_count; index++) {
-        if (!hop_policy_mask_get(mask, index)) {
-            continue;
-        }
-        if (seen == target) {
+    size_t base = (size_t)(epoch % pool_count);
+    for (size_t step = 0; step < pool_count; step++) {
+        size_t index = (base + step) % pool_count;
+        if (hop_policy_mask_get(mask, index)) {
             return (uint8_t)index;
         }
-        seen++;
     }
-    return hop_policy_channel_for_epoch(epoch, pool_count);
+    return (uint8_t)base;
 }
 
 bool hop_policy_hop_vote(const uint8_t *link_loss, const uint8_t *weights, size_t count,

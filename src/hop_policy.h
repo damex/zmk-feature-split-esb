@@ -60,8 +60,7 @@ size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count);
 uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
                                   const int8_t *rssi_dbm, int8_t floor_dbm, size_t count);
 
-/* Both ends derive the same channel from (epoch, mask).
- * Falls back to the unmasked mapping when no bit is active. */
+/* Both ends derive the same channel from (epoch, mask). */
 uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count);
 
 /* Central hop decision: weighted sum of per-peripheral link loss, true at threshold. */

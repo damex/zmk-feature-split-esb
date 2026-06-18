@@ -84,17 +84,31 @@ ZTEST(hop_policy, test_mask_get_and_count) {
 
 ZTEST(hop_policy, test_channel_for_epoch_masked) {
     const uint8_t all[1] = {0x0F}; /* pool of 4, all active */
-    zassert_equal(hop_policy_channel_for_epoch_masked(0, all, 4), 0, "all active matches unmasked");
-    zassert_equal(hop_policy_channel_for_epoch_masked(5, all, 4), 1, "epoch 5 of 4 active");
+    zassert_equal(hop_policy_channel_for_epoch_masked(0, all, 4), 0, "all active is identity");
+    zassert_equal(hop_policy_channel_for_epoch_masked(5, all, 4), 1, "epoch 5 -> base 1");
 
     const uint8_t two[1] = {0x05}; /* channels 0 and 2 active */
-    zassert_equal(hop_policy_channel_for_epoch_masked(0, two, 4), 0, "epoch 0 -> first active");
-    zassert_equal(hop_policy_channel_for_epoch_masked(1, two, 4), 2, "epoch 1 -> second active");
-    zassert_equal(hop_policy_channel_for_epoch_masked(2, two, 4), 0, "epoch 2 wraps to first active");
+    zassert_equal(hop_policy_channel_for_epoch_masked(0, two, 4), 0, "base 0 active, stays");
+    zassert_equal(hop_policy_channel_for_epoch_masked(1, two, 4), 2, "base 1 masked, probes to 2");
+    zassert_equal(hop_policy_channel_for_epoch_masked(2, two, 4), 2, "base 2 active, stays");
+    zassert_equal(hop_policy_channel_for_epoch_masked(3, two, 4), 0, "base 3 masked, probes wrap to 0");
 
     const uint8_t none[1] = {0x00};
     zassert_equal(hop_policy_channel_for_epoch_masked(1, none, 4),
-                  hop_policy_channel_for_epoch(1, 4), "empty mask falls back to unmasked");
+                  hop_policy_channel_for_epoch(1, 4), "all masked falls back to base");
+}
+
+ZTEST(hop_policy, test_masked_mapping_stable) {
+    const uint8_t all[1] = {0x0F};
+    const uint8_t masked[1] = {0x0D}; /* channel 1 masked */
+    zassert_equal(hop_policy_channel_for_epoch_masked(0, all, 4),
+                  hop_policy_channel_for_epoch_masked(0, masked, 4), "epoch 0 unchanged");
+    zassert_equal(hop_policy_channel_for_epoch_masked(2, all, 4),
+                  hop_policy_channel_for_epoch_masked(2, masked, 4), "epoch 2 unchanged");
+    zassert_equal(hop_policy_channel_for_epoch_masked(3, all, 4),
+                  hop_policy_channel_for_epoch_masked(3, masked, 4), "epoch 3 unchanged");
+    zassert_not_equal(hop_policy_channel_for_epoch_masked(1, all, 4),
+                      hop_policy_channel_for_epoch_masked(1, masked, 4), "only epoch 1 redirected");
 }
 
 ZTEST(hop_policy, test_hop_vote) {
