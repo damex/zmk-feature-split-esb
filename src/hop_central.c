@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Central hop engine: vote-driven coordinated hopping plus epoch beacons.
+ * Central hop engine: vote-driven coordinated hopping, epoch beacons, adaptive channel masking.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
+#include <string.h>
+
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk_split_esb.h>
@@ -18,6 +21,8 @@
 #include "hop_internal.h"
 #include "hop_policy.h"
 
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+
 #define ESB_PERIPHERALS DT_INST_CHILD(0, peripherals)
 #define PERIPHERAL_WEIGHT(node) [DT_PROP(node, pipe)] = DT_PROP(node, weight),
 static const uint8_t pipe_weights[] = {
@@ -27,9 +32,17 @@ static const uint8_t pipe_weights[] = {
 static const uint16_t vote_threshold = DT_INST_PROP(0, hop_threshold);
 static const uint16_t decision_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static const int8_t rssi_floor_dbm = DT_INST_PROP(0, rssi_floor_dbm);
+static const uint16_t mask_threshold = DT_INST_PROP(0, hop_mask_threshold);
+static const uint16_t restore_windows = DT_INST_PROP(0, hop_restore_windows);
+static const uint8_t min_active = DT_INST_PROP(0, hop_min_active);
 #define ANCHOR_FALLBACK_WINDOWS (2 * HOP_COUNT)
 #define BEACON_REPEAT_WINDOWS 4
 #define BEACON_RSSI_PERIOD_WINDOWS 4
+#define MASK_UPDATE_REPEAT_WINDOWS 4
+#define MASK_REFRESH_WINDOWS 32
+#define CHANNEL_BAD_DECAY 1
+BUILD_ASSERT(ESB_MASK_UPDATE_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "mask update does not fit in one ESB payload");
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
 static int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
@@ -40,6 +53,13 @@ static uint16_t silent_windows;
 static uint8_t beaconed_epoch;
 static uint8_t beacon_repeats_left;
 static uint8_t beacon_window;
+static uint8_t channel_bad[HOP_COUNT];
+static uint16_t channel_masked_windows[HOP_COUNT];
+static uint8_t active_mask[ESB_HOP_MASK_BYTES];
+static bool mask_ready;
+static uint8_t mask_version;
+static uint8_t mask_update_repeats;
+static uint16_t mask_window;
 
 static void clear_pipe_loss(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
@@ -47,16 +67,26 @@ static void clear_pipe_loss(void) {
     }
 }
 
+static void ensure_mask(void) {
+    if (mask_ready) {
+        return;
+    }
+    for (size_t channel = 0; channel < HOP_COUNT; channel++) {
+        hop_policy_mask_set(active_mask, channel, true);
+    }
+    mask_ready = true;
+}
+
 static void hop_to_next_epoch(void) {
     hop_epoch++;
-    hop_index = hop_policy_channel_for_epoch(hop_epoch, HOP_COUNT);
+    hop_index = hop_policy_channel_for_epoch_masked(hop_epoch, active_mask, HOP_COUNT);
     apply_hop_channel();
     clear_pipe_loss();
 }
 
 static void fall_back_to_anchor(void) {
     hop_epoch = 0;
-    hop_index = hop_policy_channel_for_epoch(0, HOP_COUNT);
+    hop_index = hop_policy_channel_for_epoch_masked(0, active_mask, HOP_COUNT);
     apply_hop_channel();
     silent_windows = 0;
     clear_pipe_loss();
@@ -73,8 +103,86 @@ static void stage_beacon(uint32_t heard) {
         if (!burst && !(heard & BIT(pipe))) {
             continue;
         }
-        struct esb_beacon beacon = {.epoch = hop_epoch, .rssi_dbm = pipe_rssi_dbm[pipe]};
+        struct esb_beacon beacon = {.tag = ESB_BEACON_TAG,
+                                    .epoch = hop_epoch,
+                                    .rssi_dbm = pipe_rssi_dbm[pipe],
+                                    .mask_version = mask_version};
         (void)esb_link_stage_reply(pipe, (const uint8_t *)&beacon, sizeof(beacon));
+    }
+}
+
+static void score_current_channel(uint32_t motion, uint32_t active) {
+    if (active == 0) {
+        return;
+    }
+    uint8_t penalty = hop_policy_window_penalty(motion, active, pipe_rssi_dbm, rssi_floor_dbm,
+                                                PERIPHERAL_COUNT);
+    uint8_t *score = &channel_bad[hop_index];
+    if (penalty == 0) {
+        *score = (*score > CHANNEL_BAD_DECAY) ? (uint8_t)(*score - CHANNEL_BAD_DECAY) : 0;
+    } else if (*score > UINT8_MAX - penalty) {
+        *score = UINT8_MAX;
+    } else {
+        *score = (uint8_t)(*score + penalty);
+    }
+}
+
+/* On a change, retune the current epoch under the new mask so the peripheral's
+ * matching recompute lands on the same channel.
+ * One change per window keeps it gradual. */
+static void recompute_mask(void) {
+    ensure_mask();
+    bool changed = false;
+    for (size_t channel = 0; channel < HOP_COUNT; channel++) {
+        if (hop_policy_mask_get(active_mask, channel)) {
+            continue;
+        }
+        if (++channel_masked_windows[channel] >= restore_windows) {
+            hop_policy_mask_set(active_mask, channel, true);
+            channel_bad[channel] = 0;
+            channel_masked_windows[channel] = 0;
+            changed = true;
+            LOG_INF("afh: ch %u back to retest", (unsigned)hop_channel_at((uint8_t)channel));
+        }
+    }
+    if (hop_policy_mask_active_count(active_mask, HOP_COUNT) > min_active) {
+        int worst = -1;
+        for (size_t channel = 0; channel < HOP_COUNT; channel++) {
+            if (hop_policy_mask_get(active_mask, channel) && channel_bad[channel] >= mask_threshold
+                && (worst < 0 || channel_bad[channel] > channel_bad[worst])) {
+                worst = (int)channel;
+            }
+        }
+        if (worst >= 0) {
+            hop_policy_mask_set(active_mask, (size_t)worst, false);
+            channel_masked_windows[worst] = 0;
+            changed = true;
+            LOG_INF("afh: ch %u masked, score %u, %u active", (unsigned)hop_channel_at((uint8_t)worst),
+                    (unsigned)channel_bad[worst],
+                    (unsigned)hop_policy_mask_active_count(active_mask, HOP_COUNT));
+        }
+    }
+    if (changed) {
+        mask_version++;
+        mask_update_repeats = MASK_UPDATE_REPEAT_WINDOWS;
+        hop_index = hop_policy_channel_for_epoch_masked(hop_epoch, active_mask, HOP_COUNT);
+        apply_hop_channel();
+    }
+}
+
+/* Slow refresh backs the post-change burst, so a peripheral that missed it still converges. */
+static void stage_mask_update(void) {
+    bool burst = mask_update_repeats > 0;
+    bool refresh = (++mask_window % MASK_REFRESH_WINDOWS) == 0;
+    if (burst) {
+        mask_update_repeats--;
+    } else if (!refresh) {
+        return;
+    }
+    struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG, .version = mask_version};
+    memcpy(update.mask, active_mask, ESB_HOP_MASK_BYTES);
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        (void)esb_link_stage_reply(pipe, (const uint8_t *)&update, ESB_MASK_UPDATE_LENGTH);
     }
 }
 
@@ -95,6 +203,8 @@ static void decision_work_fn(struct k_work *work) {
     uint32_t motion = (uint32_t)atomic_set(&pipe_motion_mask, 0);
     uint32_t active = (uint32_t)atomic_set(&pipe_active_mask, 0);
     hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, pipe_rssi_dbm, rssi_floor_dbm);
+    score_current_channel(motion, active);
+    recompute_mask();
     if (heard != 0) {
         silent_windows = 0;
     } else {
@@ -107,6 +217,7 @@ static void decision_work_fn(struct k_work *work) {
         fall_back_to_anchor();
     }
     stage_beacon(heard);
+    stage_mask_update();
     k_work_reschedule(&decision_work, K_MSEC(decision_ms));
 }
 

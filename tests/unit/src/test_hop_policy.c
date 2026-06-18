@@ -52,9 +52,11 @@ ZTEST(hop_policy, test_attempts_penalty) {
 }
 
 ZTEST(hop_policy, test_is_beacon) {
-    zassert_true(hop_policy_is_beacon(ESB_BEACON_LENGTH), "length 1 is beacon");
-    zassert_false(hop_policy_is_beacon(2), "length 2 is data");
-    zassert_false(hop_policy_is_beacon(8), "length 8 is data");
+    const uint8_t beacon[ESB_BEACON_LENGTH] = {ESB_BEACON_TAG, 0, 0, 0};
+    zassert_true(hop_policy_is_beacon(beacon, ESB_BEACON_LENGTH), "tagged, right length");
+    const uint8_t command[ESB_BEACON_LENGTH] = {0x01, 0, 0, 0};
+    zassert_false(hop_policy_is_beacon(command, ESB_BEACON_LENGTH), "wrong tag is not beacon");
+    zassert_false(hop_policy_is_beacon(beacon, 2), "wrong length is not beacon");
 }
 
 ZTEST(hop_policy, test_index_next_wraps) {
@@ -70,6 +72,29 @@ ZTEST(hop_policy, test_channel_for_epoch) {
     zassert_equal(hop_policy_channel_for_epoch(3, 3), 0, "wraps");
     zassert_equal(hop_policy_channel_for_epoch(7, 3), 1, NULL);
     zassert_equal(hop_policy_channel_for_epoch(5, 1), 0, "single channel always 0");
+}
+
+ZTEST(hop_policy, test_mask_get_and_count) {
+    const uint8_t mask[1] = {0x05}; /* bits 0 and 2 */
+    zassert_true(hop_policy_mask_get(mask, 0), "bit 0 set");
+    zassert_false(hop_policy_mask_get(mask, 1), "bit 1 clear");
+    zassert_true(hop_policy_mask_get(mask, 2), "bit 2 set");
+    zassert_equal(hop_policy_mask_active_count(mask, 4), 2, "two active in pool of 4");
+}
+
+ZTEST(hop_policy, test_channel_for_epoch_masked) {
+    const uint8_t all[1] = {0x0F}; /* pool of 4, all active */
+    zassert_equal(hop_policy_channel_for_epoch_masked(0, all, 4), 0, "all active matches unmasked");
+    zassert_equal(hop_policy_channel_for_epoch_masked(5, all, 4), 1, "epoch 5 of 4 active");
+
+    const uint8_t two[1] = {0x05}; /* channels 0 and 2 active */
+    zassert_equal(hop_policy_channel_for_epoch_masked(0, two, 4), 0, "epoch 0 -> first active");
+    zassert_equal(hop_policy_channel_for_epoch_masked(1, two, 4), 2, "epoch 1 -> second active");
+    zassert_equal(hop_policy_channel_for_epoch_masked(2, two, 4), 0, "epoch 2 wraps to first active");
+
+    const uint8_t none[1] = {0x00};
+    zassert_equal(hop_policy_channel_for_epoch_masked(1, none, 4),
+                  hop_policy_channel_for_epoch(1, 4), "empty mask falls back to unmasked");
 }
 
 ZTEST(hop_policy, test_hop_vote) {

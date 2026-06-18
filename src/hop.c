@@ -46,3 +46,7 @@ void apply_hop_channel(void) {
 uint8_t hop_current_channel(void) {
     return hop_channels[hop_index];
 }
+
+uint8_t hop_channel_at(uint8_t index) {
+    return hop_channels[index];
+}

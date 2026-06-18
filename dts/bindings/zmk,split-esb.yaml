@@ -23,11 +23,17 @@ properties:
       bytes. All peripherals must match the central.
   hop-channels:
     type: uint8-array
-    required: true
     description: |
-      RF channels, each 0-100 (2400 + N MHz).
+      Candidate RF channel pool, each 0-100 (2400 + N MHz).
+      Optional: defaults to the full 2.4 GHz band (0-80). The engine measures the pool
+      from live traffic and masks channels that perform badly, so this only bounds where
+      it may hop, not where it must. Narrow it to constrain the band or shrink the mask.
       One channel means fixed operation.
-      Two or more hop between channels in list order.
+    default: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+              20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+              38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+              56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
+              74, 75, 76, 77, 78, 79, 80]
   hop-threshold:
     type: int
     default: 6
@@ -35,6 +41,25 @@ properties:
       Graded loss before acting; a fully-lost window scores 4, so the default needs
       two bad windows. Central: weighted link-loss sum across peripherals that
       triggers a coordinated hop. Peripheral: sweep trigger for the failed-window streak.
+  hop-min-active:
+    type: int
+    default: 6
+    description: |
+      Floor on channels the central keeps active. Masking never drops below this, so a
+      single interferer can never strand the link without frequency diversity to escape to.
+  hop-mask-threshold:
+    type: int
+    default: 16
+    description: |
+      Accumulated per-channel bad score at which the central masks a channel out of the hop
+      set. Each bad window on the channel adds its graded penalty; each clean window decays it.
+      Higher is more patient. Echoes hop-threshold's accumulate-to-a-number shape.
+  hop-restore-windows:
+    type: int
+    default: 64
+    description: |
+      Decision windows a masked channel waits before the central re-admits it to retest.
+      A masked channel is not measured, so this paces blind retries. Higher thrashes less.
   hop-window-ms:
     type: int
     default: 32

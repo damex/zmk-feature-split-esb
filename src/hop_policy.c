@@ -38,8 +38,9 @@ uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts) {
     return (uint8_t)penalty;
 }
 
-bool hop_policy_is_beacon(uint8_t length) {
-    return length == ESB_BEACON_LENGTH;
+bool hop_policy_is_beacon(const uint8_t *data, uint8_t length) {
+    assert(data != NULL);
+    return length == ESB_BEACON_LENGTH && data[0] == ESB_BEACON_TAG;
 }
 
 bool hop_policy_keepalive_is_active(uint8_t byte) {
@@ -70,6 +71,74 @@ uint8_t hop_policy_index_next(uint8_t index, size_t count) {
 uint8_t hop_policy_channel_for_epoch(uint16_t epoch, size_t hop_count) {
     assert(hop_count > 0);
     return (uint8_t)(epoch % hop_count);
+}
+
+bool hop_policy_mask_get(const uint8_t *mask, size_t index) {
+    assert(mask != NULL);
+    return (mask[index / 8] & (uint8_t)(1u << (index % 8))) != 0;
+}
+
+void hop_policy_mask_set(uint8_t *mask, size_t index, bool active) {
+    assert(mask != NULL);
+    uint8_t bit = (uint8_t)(1u << (index % 8));
+    if (active) {
+        mask[index / 8] = (uint8_t)(mask[index / 8] | bit);
+    } else {
+        mask[index / 8] = (uint8_t)(mask[index / 8] & (uint8_t)~bit);
+    }
+}
+
+uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
+                                  const int8_t *rssi_dbm, int8_t floor_dbm, size_t count) {
+    assert(rssi_dbm != NULL);
+    uint8_t worst = 0;
+    for (size_t index = 0; index < count; index++) {
+        if (!(active_mask & (1u << index))) {
+            continue;
+        }
+        uint8_t penalty;
+        if (motion_mask & (1u << index)) {
+            penalty = hop_policy_loss_penalty(rssi_dbm[index], floor_dbm);
+        } else {
+            penalty = HOP_POLICY_MAX_LOSS_PENALTY;
+        }
+        if (penalty > worst) {
+            worst = penalty;
+        }
+    }
+    return worst;
+}
+
+size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count) {
+    assert(mask != NULL);
+    size_t count = 0;
+    for (size_t index = 0; index < pool_count; index++) {
+        if (hop_policy_mask_get(mask, index)) {
+            count++;
+        }
+    }
+    return count;
+}
+
+uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count) {
+    assert(mask != NULL);
+    assert(pool_count > 0);
+    size_t active = hop_policy_mask_active_count(mask, pool_count);
+    if (active == 0) {
+        return hop_policy_channel_for_epoch(epoch, pool_count);
+    }
+    size_t target = (size_t)(epoch % active);
+    size_t seen = 0;
+    for (size_t index = 0; index < pool_count; index++) {
+        if (!hop_policy_mask_get(mask, index)) {
+            continue;
+        }
+        if (seen == target) {
+            return (uint8_t)index;
+        }
+        seen++;
+    }
+    return hop_policy_channel_for_epoch(epoch, pool_count);
 }
 
 bool hop_policy_hop_vote(const uint8_t *link_loss, const uint8_t *weights, size_t count,

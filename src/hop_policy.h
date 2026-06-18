@@ -7,12 +7,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define ESB_BEACON_TAG 0xFE
 struct esb_beacon {
+    uint8_t tag;
     uint8_t epoch;
     int8_t rssi_dbm;
+    uint8_t mask_version;
 } __attribute__((packed));
 
-#define ESB_BEACON_LENGTH 2
+#define ESB_BEACON_LENGTH 4
 _Static_assert(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
 
 /* Keepalive state byte values: whether the peripheral is actively polling. */
@@ -41,12 +44,25 @@ bool hop_policy_should_hop(uint8_t *bad_windows, uint8_t penalty, uint16_t thres
 #define HOP_POLICY_TX_ATTEMPTS_GRADE_STEP 4
 uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts);
 
-bool hop_policy_is_beacon(uint8_t length);
+bool hop_policy_is_beacon(const uint8_t *data, uint8_t length);
 
 uint8_t hop_policy_index_next(uint8_t index, size_t count);
 
 /* Both ends derive the same channel index from the central's epoch. */
 uint8_t hop_policy_channel_for_epoch(uint16_t epoch, size_t hop_count);
+
+/* Active-channel bitmap over the pool: bit set means the channel is in use. */
+bool hop_policy_mask_get(const uint8_t *mask, size_t index);
+void hop_policy_mask_set(uint8_t *mask, size_t index, bool active);
+size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count);
+
+/* Zero when no pipe polls this window: an untested channel is neither blamed nor cleared. */
+uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
+                                  const int8_t *rssi_dbm, int8_t floor_dbm, size_t count);
+
+/* Both ends derive the same channel from (epoch, mask).
+ * Falls back to the unmasked mapping when no bit is active. */
+uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count);
 
 /* Central hop decision: weighted sum of per-peripheral link loss, true at threshold. */
 bool hop_policy_hop_vote(const uint8_t *link_loss, const uint8_t *weights, size_t count,
