@@ -35,7 +35,8 @@ static const int8_t rssi_floor_dbm = DT_INST_PROP(0, rssi_floor_dbm);
 static const uint16_t mask_threshold = DT_INST_PROP(0, hop_mask_threshold);
 static const uint16_t restore_windows = DT_INST_PROP(0, hop_restore_windows);
 static const uint8_t min_active = DT_INST_PROP(0, hop_min_active);
-#define ANCHOR_FALLBACK_WINDOWS (2 * HOP_COUNT)
+#define ANCHOR_FALLBACK_CAP 32 /* windows, covers a full-pool sweep */
+#define ANCHOR_FALLBACK_WINDOWS MIN(2 * HOP_COUNT, ANCHOR_FALLBACK_CAP)
 #define BEACON_REPEAT_WINDOWS 4
 #define BEACON_RSSI_PERIOD_WINDOWS 4
 #define MASK_UPDATE_REPEAT_WINDOWS 4
