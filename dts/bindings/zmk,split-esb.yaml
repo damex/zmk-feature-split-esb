@@ -25,15 +25,11 @@ properties:
     type: uint8-array
     description: |
       Candidate RF channel pool, each 0-100 (2400 + N MHz).
-      Optional: defaults to the full 2.4 GHz band (0-80). The engine measures the pool
-      from live traffic and masks channels that perform badly, so this only bounds where
-      it may hop, not where it must. Narrow it to constrain the band or shrink the mask.
-      One channel means fixed operation.
-    default: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-              20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-              38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
-              56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73,
-              74, 75, 76, 77, 78, 79, 80]
+      Optional. Default hops only the guard gaps between 802.11 2.4 GHz channels 1/6/11
+      (ESB 24-25, 49-50, 74-80), so the link stays off WiFi out of the box. The engine
+      measures the pool from live traffic and masks any channel that still performs badly.
+      Set explicitly to use a different band. One channel means fixed operation.
+    default: [24, 25, 49, 50, 74, 75, 76, 77, 78, 79, 80]
   hop-threshold:
     type: int
     default: 6
