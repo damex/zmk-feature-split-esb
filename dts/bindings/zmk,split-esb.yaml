@@ -32,11 +32,12 @@ properties:
     default: [24, 25, 49, 50, 74, 75, 76, 77, 78, 79, 80]
   hop-threshold:
     type: int
-    default: 6
+    default: 24
     description: |
-      Graded loss before acting; a fully-lost window scores 4, so the default needs
-      two bad windows. Central: weighted link-loss sum across peripherals that
-      triggers a coordinated hop. Peripheral: sweep trigger for the failed-window streak.
+      Graded loss before acting. A fully-lost window scores 4, so the default tolerates
+      five bad windows and hops on the sixth, riding out brief interference instead of
+      fleeing it. Central: weighted link-loss sum across peripherals that triggers a
+      coordinated hop. Peripheral: sweep trigger for the failed-window streak.
   hop-min-active:
     type: int
     default: 6
