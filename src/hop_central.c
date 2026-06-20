@@ -42,6 +42,13 @@ static const uint8_t min_active = DT_INST_PROP(0, hop_min_active);
 #define MASK_UPDATE_REPEAT_WINDOWS 4
 #define MASK_REFRESH_WINDOWS 32
 #define CHANNEL_BAD_DECAY 1
+/* One pipe silent this long, while others are served, gets anchor dips. */
+#define PIPE_LOST_WINDOWS ANCHOR_FALLBACK_WINDOWS
+/* Past here pipe is gone, not lost.
+ * Stop dipping so others run clean. */
+#define PIPE_ABSENT_WINDOWS (4 * PIPE_LOST_WINDOWS)
+/* Radio can't park, so dip to anchor one window in this many. */
+#define ANCHOR_VISIT_PERIOD 8
 BUILD_ASSERT(ESB_MASK_UPDATE_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "mask update does not fit in one ESB payload");
 static uint8_t hop_epoch;
@@ -51,6 +58,9 @@ static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
 static uint16_t silent_windows;
+static uint8_t pipe_silent[PERIPHERAL_COUNT];
+static uint16_t anchor_visit_window;
+static bool in_anchor_visit;
 static uint8_t beaconed_epoch;
 static uint8_t beacon_repeats_left;
 static uint8_t beacon_window;
@@ -65,6 +75,52 @@ static uint16_t mask_window;
 static void clear_pipe_loss(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         pipe_loss[pipe] = 0;
+    }
+}
+
+static bool pipe_is_lost(uint8_t pipe) {
+    return pipe_silent[pipe] >= PIPE_LOST_WINDOWS && pipe_silent[pipe] < PIPE_ABSENT_WINDOWS;
+}
+
+static void update_pipe_silence(uint32_t heard) {
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (heard & BIT(pipe)) {
+            pipe_silent[pipe] = 0;
+        } else if (pipe_silent[pipe] < UINT8_MAX) {
+            pipe_silent[pipe]++;
+        }
+    }
+}
+
+static void clear_silence_for_heard(uint32_t heard) {
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (heard & BIT(pipe)) {
+            pipe_silent[pipe] = 0;
+        }
+    }
+}
+
+static bool any_pipe_lost(void) {
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (pipe_is_lost(pipe)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Beacons the live epoch to lost pipes, so one camped on the anchor reads it
+ * from its poll ACK and rejoins the hop. */
+static void stage_anchor_beacon(void) {
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (!pipe_is_lost(pipe)) {
+            continue;
+        }
+        struct esb_beacon beacon = {.tag = ESB_BEACON_TAG,
+                                    .epoch = hop_epoch,
+                                    .rssi_dbm = pipe_rssi_dbm[pipe],
+                                    .mask_version = mask_version};
+        (void)esb_link_stage_reply(pipe, (const uint8_t *)&beacon, sizeof(beacon));
     }
 }
 
@@ -149,6 +205,9 @@ static void recompute_mask(void) {
     if (hop_policy_mask_active_count(active_mask, HOP_COUNT) > min_active) {
         int worst = -1;
         for (size_t channel = 0; channel < HOP_COUNT; channel++) {
+            if (channel == ESB_HOP_ANCHOR_INDEX) {
+                continue;
+            }
             if (hop_policy_mask_get(active_mask, channel) && channel_bad[channel] >= mask_threshold
                 && (worst < 0 || channel_bad[channel] > channel_bad[worst])) {
                 worst = (int)channel;
@@ -183,6 +242,9 @@ static void stage_mask_update(void) {
     struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG, .version = mask_version};
     memcpy(update.mask, active_mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (pipe_silent[pipe] >= PIPE_LOST_WINDOWS) {
+            continue; /* rejoins via anchor beacon, not a stale-channel mask reply */
+        }
         (void)esb_link_stage_reply(pipe, (const uint8_t *)&update, ESB_MASK_UPDATE_LENGTH);
     }
 }
@@ -203,9 +265,22 @@ static void decision_work_fn(struct k_work *work) {
     uint32_t heard = (uint32_t)atomic_set(&pipe_heard_mask, 0);
     uint32_t motion = (uint32_t)atomic_set(&pipe_motion_mask, 0);
     uint32_t active = (uint32_t)atomic_set(&pipe_active_mask, 0);
+
+    if (in_anchor_visit) {
+        /* Elapsed window sat on the anchor, not the live channel.
+         * Don't score it or fault served pipes for the gap.
+         * A lost pipe heard here has rejoined. */
+        in_anchor_visit = false;
+        apply_hop_channel();
+        clear_silence_for_heard(heard);
+        k_work_reschedule(&decision_work, K_MSEC(decision_ms));
+        return;
+    }
+
     hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, pipe_rssi_dbm, rssi_floor_dbm);
     score_current_channel(motion, active);
     recompute_mask();
+    update_pipe_silence(heard);
     if (heard != 0) {
         silent_windows = 0;
     } else {
@@ -216,6 +291,10 @@ static void decision_work_fn(struct k_work *work) {
     }
     if (silent_windows >= ANCHOR_FALLBACK_WINDOWS) {
         fall_back_to_anchor();
+    } else if (any_pipe_lost() && (++anchor_visit_window % ANCHOR_VISIT_PERIOD) == 0) {
+        in_anchor_visit = true;
+        stage_anchor_beacon();
+        apply_channel_index(ESB_HOP_ANCHOR_INDEX);
     }
     stage_beacon(heard);
     stage_mask_update();

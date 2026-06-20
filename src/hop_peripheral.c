@@ -19,6 +19,10 @@
 #include "hop_internal.h"
 #include "hop_policy.h"
 
+/* No-ack windows before camping on the anchor instead of single-stepping. */
+#define CAMP_BOUND_CAP 32 /* windows, bounds the bound on a large pool */
+#define CAMP_BOUND MIN(2 * HOP_COUNT, CAMP_BOUND_CAP)
+
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
@@ -27,6 +31,7 @@ static atomic_t data_sent_since_tick;
 static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
+static uint8_t lost_windows;
 static uint8_t adopted_epoch;
 static int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
@@ -79,11 +84,24 @@ static void keepalive_work_fn(struct k_work *work) {
             hop_index = hop_policy_channel_for_epoch_masked(epoch, active_mask, HOP_COUNT);
             apply_hop_channel();
             bad_windows = 0;
+            lost_windows = 0;
             atomic_set(&max_tx_attempts, 0);
         } else {
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
             uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
-            if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
+            if (atomic_get(&link_acked) != 0) {
+                lost_windows = 0;
+            } else if (lost_windows < UINT8_MAX) {
+                lost_windows++;
+            }
+            if (lost_windows >= CAMP_BOUND) {
+                /* Single-stepping rarely lands on a hopping central.
+                 * Wait on the anchor for its periodic dip instead. */
+                if (hop_index != ESB_HOP_ANCHOR_INDEX) {
+                    hop_index = ESB_HOP_ANCHOR_INDEX;
+                    apply_hop_channel();
+                }
+            } else if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
                 hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
                 apply_hop_channel();
             }

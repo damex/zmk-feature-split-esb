@@ -31,6 +31,14 @@ static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
 
 extern uint8_t hop_index;
 
+/* Reserved pool slot, never masked.
+ * Fixed rendezvous channel on a lost link, so both roles agree without sharing mask state. */
+#define ESB_HOP_ANCHOR_INDEX 0
+
 void apply_hop_channel(void);
+
+/* Retune to a given slot, leaving hop_index unchanged for a transient
+ * anchor visit that returns to the live channel. */
+void apply_channel_index(uint8_t index);
 
 uint8_t hop_channel_at(uint8_t index);

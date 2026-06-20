@@ -25,22 +25,26 @@ uint8_t hop_index;
  * and a DISABLED event landing there mid-reconfigure faults the device.
  * Skip the work when the channel is unchanged, so a redundant retune never tears down RX. */
 static uint8_t applied_index;
-void apply_hop_channel(void) {
-    if (hop_index == applied_index) {
+void apply_channel_index(uint8_t index) {
+    if (index == applied_index) {
         return;
     }
     unsigned int key = irq_lock();
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     esb_stop_rx();
-    int set_error = esb_set_rf_channel(hop_channels[hop_index]);
+    int set_error = esb_set_rf_channel(hop_channels[index]);
     esb_start_rx();
 #else
-    int set_error = esb_set_rf_channel(hop_channels[hop_index]);
+    int set_error = esb_set_rf_channel(hop_channels[index]);
 #endif
     irq_unlock(key);
     if (set_error == 0) {
-        applied_index = hop_index;
+        applied_index = index;
     }
+}
+
+void apply_hop_channel(void) {
+    apply_channel_index(hop_index);
 }
 
 uint8_t hop_current_channel(void) {
