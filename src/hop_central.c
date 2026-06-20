@@ -67,6 +67,8 @@ static uint8_t beacon_window;
 static uint8_t channel_bad[HOP_COUNT];
 static uint16_t channel_masked_windows[HOP_COUNT];
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
+static uint8_t pending_mask[ESB_HOP_MASK_BYTES];
+static bool pending_valid;
 static bool mask_ready;
 static uint8_t mask_version;
 static uint8_t mask_update_repeats;
@@ -130,11 +132,21 @@ static void ensure_mask(void) {
     }
     for (size_t channel = 0; channel < HOP_COUNT; channel++) {
         hop_policy_mask_set(active_mask, channel, true);
+        hop_policy_mask_set(pending_mask, channel, true);
     }
     mask_ready = true;
 }
 
+/* Mask swap rides the epoch transition: both ends switch in lockstep, not central-first. */
+static void commit_pending_mask(void) {
+    if (pending_valid) {
+        memcpy(active_mask, pending_mask, ESB_HOP_MASK_BYTES);
+        pending_valid = false;
+    }
+}
+
 static void hop_to_next_epoch(void) {
+    commit_pending_mask();
     hop_epoch++;
     hop_index = hop_policy_channel_for_epoch_masked(hop_epoch, active_mask, HOP_COUNT);
     apply_hop_channel();
@@ -142,6 +154,7 @@ static void hop_to_next_epoch(void) {
 }
 
 static void fall_back_to_anchor(void) {
+    commit_pending_mask();
     hop_epoch = 0;
     hop_index = hop_policy_channel_for_epoch_masked(0, active_mask, HOP_COUNT);
     apply_hop_channel();
@@ -184,49 +197,46 @@ static void score_current_channel(uint32_t motion, uint32_t active) {
     }
 }
 
-/* On a change, retune the current epoch under the new mask so the peripheral's
- * matching recompute lands on the same channel.
- * One change per window keeps it gradual. */
+/* Writes pending, not active: commit_pending_mask applies it at the next hop. */
 static void recompute_mask(void) {
     ensure_mask();
     bool changed = false;
     for (size_t channel = 0; channel < HOP_COUNT; channel++) {
-        if (hop_policy_mask_get(active_mask, channel)) {
+        if (hop_policy_mask_get(pending_mask, channel)) {
             continue;
         }
         if (++channel_masked_windows[channel] >= restore_windows) {
-            hop_policy_mask_set(active_mask, channel, true);
+            hop_policy_mask_set(pending_mask, channel, true);
             channel_bad[channel] = 0;
             channel_masked_windows[channel] = 0;
             changed = true;
             LOG_INF("afh: ch %u back to retest", (unsigned)hop_channel_at((uint8_t)channel));
         }
     }
-    if (hop_policy_mask_active_count(active_mask, HOP_COUNT) > min_active) {
+    if (hop_policy_mask_active_count(pending_mask, HOP_COUNT) > min_active) {
         int worst = -1;
         for (size_t channel = 0; channel < HOP_COUNT; channel++) {
             if (channel == ESB_HOP_ANCHOR_INDEX) {
                 continue;
             }
-            if (hop_policy_mask_get(active_mask, channel) && channel_bad[channel] >= mask_threshold
+            if (hop_policy_mask_get(pending_mask, channel) && channel_bad[channel] >= mask_threshold
                 && (worst < 0 || channel_bad[channel] > channel_bad[worst])) {
                 worst = (int)channel;
             }
         }
         if (worst >= 0) {
-            hop_policy_mask_set(active_mask, (size_t)worst, false);
+            hop_policy_mask_set(pending_mask, (size_t)worst, false);
             channel_masked_windows[worst] = 0;
             changed = true;
             LOG_INF("afh: ch %u masked, score %u, %u active", (unsigned)hop_channel_at((uint8_t)worst),
                     (unsigned)channel_bad[worst],
-                    (unsigned)hop_policy_mask_active_count(active_mask, HOP_COUNT));
+                    (unsigned)hop_policy_mask_active_count(pending_mask, HOP_COUNT));
         }
     }
     if (changed) {
         mask_version++;
+        pending_valid = true;
         mask_update_repeats = MASK_UPDATE_REPEAT_WINDOWS;
-        hop_index = hop_policy_channel_for_epoch_masked(hop_epoch, active_mask, HOP_COUNT);
-        apply_hop_channel();
     }
 }
 
@@ -239,8 +249,9 @@ static void stage_mask_update(void) {
     } else if (!refresh) {
         return;
     }
+    const uint8_t *mask = pending_valid ? pending_mask : active_mask;
     struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG, .version = mask_version};
-    memcpy(update.mask, active_mask, ESB_HOP_MASK_BYTES);
+    memcpy(update.mask, mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         if (pipe_silent[pipe] >= PIPE_LOST_WINDOWS) {
             continue; /* rejoins via anchor beacon, not a stale-channel mask reply */

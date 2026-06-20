@@ -77,10 +77,10 @@ static void keepalive_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     if (HOP_COUNT > 1) {
         ensure_mask();
-        bool mask_changed = adopt_staged_mask();
         uint8_t epoch = (uint8_t)atomic_get(&beacon_epoch);
-        if (epoch != adopted_epoch || mask_changed) {
+        if (epoch != adopted_epoch) {
             adopted_epoch = epoch;
+            adopt_staged_mask(); /* swap mask with the epoch, matching the central's commit */
             hop_index = hop_policy_channel_for_epoch_masked(epoch, active_mask, HOP_COUNT);
             apply_hop_channel();
             bad_windows = 0;
