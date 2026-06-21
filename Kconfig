@@ -59,9 +59,6 @@ config ZMK_SPLIT_ESB_PRIORITY
     int "Split transport registration priority"
     default 50
 
-config ESB_MAX_PAYLOAD_LENGTH
-    default ZMK_SPLIT_ESB_MAX_PAYLOAD
-
 module = ZMK_SPLIT_ESB
 module-str = ZMK ESB split transport
 source "subsys/logging/Kconfig.template.log_config"
