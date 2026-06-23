@@ -28,6 +28,8 @@ static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
 static uint8_t lost_windows;
+static uint8_t camp_anchor = ESB_HOP_ANCHOR_COUNT - 1;
+static uint16_t camp_dwell;
 static uint8_t adopted_epoch;
 static int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
@@ -81,6 +83,7 @@ static void keepalive_work_fn(struct k_work *work) {
             apply_hop_channel();
             bad_windows = 0;
             lost_windows = 0;
+            camp_dwell = 0;
             atomic_set(&max_tx_attempts, 0);
         } else {
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
@@ -92,10 +95,17 @@ static void keepalive_work_fn(struct k_work *work) {
             }
             if (lost_windows >= ESB_HOP_CAMP_WINDOWS) {
                 /* Single-stepping rarely lands on a hopping central.
-                 * Wait on the anchor for its periodic dip instead. */
-                if (hop_index != ESB_HOP_ANCHOR_INDEX) {
-                    hop_index = ESB_HOP_ANCHOR_INDEX;
-                    apply_hop_channel();
+                 * Camp an anchor for its periodic dip, rotating the set so one jammed
+                 * anchor cannot strand the rejoin. */
+                if (camp_dwell == 0) {
+                    camp_anchor = (uint8_t)((camp_anchor + 1) % ESB_HOP_ANCHOR_COUNT);
+                    camp_dwell = ESB_HOP_ANCHOR_DWELL_WINDOWS;
+                    if (hop_index != camp_anchor) {
+                        hop_index = camp_anchor;
+                        apply_hop_channel();
+                    }
+                } else {
+                    camp_dwell--;
                 }
             } else if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
                 hop_index = hop_policy_index_next(hop_index, HOP_COUNT);

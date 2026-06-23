@@ -32,9 +32,16 @@ static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
 
 extern uint8_t hop_index;
 
-/* Reserved pool slot, never masked.
- * Fixed rendezvous channel on a lost link, so both roles agree without sharing mask state. */
-#define ESB_HOP_ANCHOR_INDEX 0
+/* Lowest pool slots, never masked.
+ * Both roles cycle the set on a lost link. */
+#define ESB_HOP_ANCHOR_COUNT MIN((uint8_t)3, (uint8_t)HOP_COUNT)
+#define ESB_HOP_DIP_PERIOD 3
+#define ESB_HOP_DIP_ABSENT_PERIOD 6
+/* Outlasts the central's slowest full sweep so a dip is bound to land on the camped anchor.
+ * Held near one sweep, not multiples, so a jammed anchor is abandoned quickly. */
+#define ESB_HOP_ANCHOR_DWELL_WINDOWS                                                                 \
+    (((ESB_HOP_ANCHOR_COUNT + 1) * ESB_HOP_DIP_ABSENT_PERIOD *                                       \
+      DT_INST_PROP(0, idle_keepalive_ms)) / DT_INST_PROP(0, hop_window_ms))
 
 /* Rejoin timing, one source so the peripheral's camp and the central's loss detection
  * trip at the same wall-clock instant despite their different window periods.

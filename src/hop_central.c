@@ -39,17 +39,15 @@ static const uint16_t restore_windows = DT_INST_PROP(0, hop_restore_windows);
 static const uint8_t min_active = DT_INST_PROP(0, hop_min_active);
 #define ANCHOR_FALLBACK_CAP 32 /* windows, covers a full-pool sweep */
 #define ANCHOR_FALLBACK_WINDOWS MIN(2 * HOP_COUNT, ANCHOR_FALLBACK_CAP)
+/* Escape walks the live channel off a degraded spot.
+ * A struggling pipe is heard on an anchor dip and resets the count.
+ * A sleeping pipe never is, so the walk stops after one pool sweep, not forever. */
+#define SILENT_ESCAPE_LIMIT HOP_COUNT
 #define BEACON_REPEAT_WINDOWS 4
 #define BEACON_RSSI_PERIOD_WINDOWS 4
 #define MASK_UPDATE_REPEAT_WINDOWS 4
 #define MASK_REFRESH_WINDOWS 32
 #define CHANNEL_BAD_DECAY 1
-/* Dips slow here but never stop: a quiescent central never reaches the anchor on its own. */
-#define PIPE_ABSENT_MS 4000
-#define PIPE_ABSENT_WINDOWS                                                                         \
-    MAX(ESB_HOP_LOST_WINDOWS + 1, PIPE_ABSENT_MS / DT_INST_PROP(0, idle_keepalive_ms))
-#define ANCHOR_VISIT_PERIOD 3
-#define ANCHOR_ABSENT_PERIOD 16
 BUILD_ASSERT(ESB_MASK_UPDATE_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "mask update does not fit in one ESB payload");
 static uint8_t hop_epoch;
@@ -59,8 +57,10 @@ static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
 static uint16_t silent_windows;
+static uint8_t silent_escapes;
 static uint8_t pipe_silent[PERIPHERAL_COUNT];
 static uint16_t anchor_visit_window;
+static uint8_t rendezvous_anchor;
 static bool in_anchor_visit;
 static uint8_t beaconed_epoch;
 static uint8_t beacon_repeats_left;
@@ -83,10 +83,6 @@ static void clear_pipe_loss(void) {
 
 static bool pipe_needs_rendezvous(uint8_t pipe) {
     return pipe_silent[pipe] >= ESB_HOP_LOST_WINDOWS;
-}
-
-static bool pipe_recently_lost(uint8_t pipe) {
-    return pipe_needs_rendezvous(pipe) && pipe_silent[pipe] < PIPE_ABSENT_WINDOWS;
 }
 
 static void update_pipe_silence(uint32_t heard) {
@@ -116,9 +112,10 @@ static bool any_pipe_needs_rendezvous(void) {
     return false;
 }
 
-static bool any_pipe_recently_lost(void) {
+/* A still-served pipe pays dip jitter, so slow the rendezvous cadence only when one exists. */
+static bool any_pipe_served(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (pipe_recently_lost(pipe)) {
+        if (!pipe_needs_rendezvous(pipe)) {
             return true;
         }
     }
@@ -168,14 +165,12 @@ static void hop_to_next_epoch(void) {
     LOG_INF("hop: epoch %u channel %u", hop_epoch, hop_current_channel());
 }
 
-static void fall_back_to_anchor(void) {
-    commit_pending_mask();
-    hop_epoch = 0;
-    hop_index = hop_policy_channel_for_epoch_masked(0, active_mask, HOP_COUNT);
-    apply_hop_channel();
+/* Prolonged total silence: the live channel may have degraded with no active pipe
+ * to vote it down. Advance the epoch to escape it.
+ * Rejoin still rides the anchor dips. */
+static void escape_silent_channel(void) {
     silent_windows = 0;
-    clear_pipe_loss();
-    LOG_INF("hop: anchor fallback channel %u", hop_current_channel());
+    hop_to_next_epoch();
 }
 
 static void stage_beacon(uint32_t heard) {
@@ -232,7 +227,7 @@ static void recompute_mask(void) {
     if (hop_policy_mask_active_count(pending_mask, HOP_COUNT) > min_active) {
         int worst = -1;
         for (size_t channel = 0; channel < HOP_COUNT; channel++) {
-            if (channel == ESB_HOP_ANCHOR_INDEX) {
+            if (channel < ESB_HOP_ANCHOR_COUNT) {
                 continue;
             }
             if (hop_policy_mask_get(pending_mask, channel) && channel_bad[channel] >= mask_threshold
@@ -312,6 +307,7 @@ static void decision_work_fn(struct k_work *work) {
     update_pipe_silence(heard);
     if (heard != 0) {
         silent_windows = 0;
+        silent_escapes = 0;
     } else {
         silent_windows++;
     }
@@ -319,16 +315,18 @@ static void decision_work_fn(struct k_work *work) {
         hop_to_next_epoch();
     }
     uint16_t next_ms = decision_ms;
-    if (silent_windows >= ANCHOR_FALLBACK_WINDOWS) {
-        fall_back_to_anchor();
+    if (silent_windows >= ANCHOR_FALLBACK_WINDOWS && silent_escapes < SILENT_ESCAPE_LIMIT) {
+        silent_escapes++;
+        escape_silent_channel();
     } else if (any_pipe_needs_rendezvous()) {
-        uint16_t dip_period = any_pipe_recently_lost() ? ANCHOR_VISIT_PERIOD : ANCHOR_ABSENT_PERIOD;
+        uint16_t dip_period = any_pipe_served() ? ESB_HOP_DIP_ABSENT_PERIOD : ESB_HOP_DIP_PERIOD;
         if ((++anchor_visit_window % dip_period) == 0) {
+            rendezvous_anchor = (uint8_t)((rendezvous_anchor + 1) % ESB_HOP_ANCHOR_COUNT);
             in_anchor_visit = true;
             stage_anchor_beacon();
-            apply_channel_index(ESB_HOP_ANCHOR_INDEX);
+            apply_channel_index(rendezvous_anchor);
             next_ms = anchor_dwell_ms;
-            LOG_DBG("hop: anchor dip");
+            LOG_DBG("hop: anchor dip channel %u", (unsigned)hop_channel_at(rendezvous_anchor));
         }
     }
     stage_beacon(heard);
