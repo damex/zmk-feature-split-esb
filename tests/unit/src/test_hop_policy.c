@@ -112,6 +112,26 @@ ZTEST(hop_policy, test_worst_channel) {
     zassert_equal(hop_policy_worst_channel(bad, masked, 6, 2, 16), 2, "inactive channel 4 skipped");
 }
 
+ZTEST(hop_policy, test_window_penalty) {
+    int8_t rssi[2] = {-50, -50};
+    zassert_equal(hop_policy_window_penalty(0x1, 0x3, rssi, -85, 2), HOP_POLICY_MAX_LOSS_PENALTY,
+                  "active pipe with no motion scores max");
+    zassert_equal(hop_policy_window_penalty(0, 0, rssi, -85, 2), 0, "no active pipe is clean");
+    int8_t weak[1] = {-97};
+    zassert_equal(hop_policy_window_penalty(0x1, 0x1, weak, -85, 1), 3, "12 dB under floor grades to 3");
+}
+
+ZTEST(hop_policy, test_mask_set_round_trip) {
+    uint8_t mask[2] = {0};
+    hop_policy_mask_set(mask, 3, true);
+    hop_policy_mask_set(mask, 11, true);
+    zassert_true(hop_policy_mask_get(mask, 3), NULL);
+    zassert_true(hop_policy_mask_get(mask, 11), NULL);
+    zassert_false(hop_policy_mask_get(mask, 4), NULL);
+    hop_policy_mask_set(mask, 3, false);
+    zassert_false(hop_policy_mask_get(mask, 3), "clears the bit");
+}
+
 ZTEST(hop_policy, test_channel_for_epoch) {
     zassert_equal(hop_policy_channel_for_epoch(0, 3), 0, NULL);
     zassert_equal(hop_policy_channel_for_epoch(1, 3), 1, NULL);
