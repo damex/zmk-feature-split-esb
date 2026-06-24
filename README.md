@@ -147,7 +147,7 @@ no HID-indicator forwarding.
 
 | DT property | Value |
 |---|---|
-| `base-address` | 4-byte bytestring `[..]`, shared by all pipes |
+| `base-address` | 4-byte bytestring `[..]`, shared across pipes, vary bytes (all-same-byte syncs poorly) |
 | `address-length` | on-air address bytes 3/4/5, shorter trims airtime, weakens selectivity, all devices must match (default 5) |
 | `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight`, `reply-queue-depth` (central reverse-channel backlog for this pipe, default 8) |
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |

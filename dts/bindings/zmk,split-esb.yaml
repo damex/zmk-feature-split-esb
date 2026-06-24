@@ -12,7 +12,9 @@ properties:
   base-address:
     type: uint8-array
     required: true
-    description: 4-byte ESB base address, shared by all pipes.
+    description: |
+      4-byte ESB base address, shared across pipes. Vary bytes.
+      All-same-byte on-air address (base plus matching prefix) syncs poorly.
   address-length:
     type: int
     default: 5
@@ -141,7 +143,7 @@ child-binding:
       prefix:
         type: int
         required: true
-        description: 1-byte address prefix for this pipe.
+        description: 1-byte address prefix, distinct per pipe.
       weight:
         type: int
         default: 1
