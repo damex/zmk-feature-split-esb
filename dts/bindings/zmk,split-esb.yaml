@@ -25,17 +25,20 @@ properties:
     type: uint8-array
     description: |
       Candidate RF channel pool, each 0-100 (2400 + N MHz).
-      Optional. Default hops only the guard gaps between 802.11 2.4 GHz channels 1/6/11
-      (ESB 24-25, 49-50, 74-80), so the link stays off WiFi out of the box. The engine
-      measures the pool from live traffic and masks any channel that still performs badly.
-      Set explicitly to use a different band. One channel means fixed operation.
-    default: [24, 25, 49, 50, 74, 75, 76, 77, 78, 79, 80]
+      Optional. Default sits above 802.11 channel 11 (ESB 74-83, 2474-2483 MHz), the only
+      stretch WiFi 1/6/11 leaves clear even against 40 MHz channels, so the link stays off
+      WiFi out of the box. The engine measures the pool from live traffic and masks any
+      channel that still performs badly. Set explicitly to use a different band. One channel
+      means fixed operation.
+    default: [74, 75, 76, 77, 78, 79, 80, 81, 82, 83]
   hop-anchors:
     type: uint8-array
+    default: [76, 79, 82]
     description: |
       Rendezvous channels, a subset of hop-channels, kept unmaskable so a lost link always
       re-finds the central on known spectrum. Pick channels clear of local WiFi, since the
-      engine can never mask these. Omit to use the first three hop-channels entries.
+      engine can never mask these. Default 76, 79, 82, spread across the clean band above
+      WiFi channel 11.
   hop-threshold:
     type: int
     default: 24
