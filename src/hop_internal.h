@@ -37,19 +37,22 @@ extern uint8_t hop_index;
 #define ESB_HOP_ANCHOR_COUNT MIN((uint8_t)3, (uint8_t)HOP_COUNT)
 #define ESB_HOP_DIP_PERIOD 3
 #define ESB_HOP_DIP_ABSENT_PERIOD 6
+/* A stable channel is re-found by the peripheral's sweep, so a dip here only covers
+ * a sweep that never lands. */
+#define ESB_HOP_DIP_STABLE_PERIOD 32
 /* Outlasts the central's slowest full sweep so a dip is bound to land on the camped anchor.
  * Held near one sweep, not multiples, so a jammed anchor is abandoned quickly. */
 #define ESB_HOP_ANCHOR_DWELL_WINDOWS                                                                 \
     (((ESB_HOP_ANCHOR_COUNT + 1) * ESB_HOP_DIP_ABSENT_PERIOD *                                       \
       DT_INST_PROP(0, idle_keepalive_ms)) / DT_INST_PROP(0, hop_window_ms))
 
-/* Rejoin timing, one source so the peripheral's camp and the central's loss detection
- * trip at the same wall-clock instant despite their different window periods.
- * Pool-independent: single-stepping rarely finds a hopping central, so camp fast and let
- * the anchor dip do the rendezvous. */
 #define ESB_HOP_LOSS_DETECT_MS 256
-#define ESB_HOP_CAMP_WINDOWS DIV_ROUND_UP(ESB_HOP_LOSS_DETECT_MS, DT_INST_PROP(0, hop_window_ms))
 #define ESB_HOP_LOST_WINDOWS MAX(2, ESB_HOP_LOSS_DETECT_MS / DT_INST_PROP(0, idle_keepalive_ms))
+
+/* Dwell per channel covers one central decision tick plus the beacon it sends back. */
+#define ESB_HOP_SWEEP_DWELL_WINDOWS                                                                  \
+    (DIV_ROUND_UP(DT_INST_PROP(0, idle_keepalive_ms), DT_INST_PROP(0, hop_window_ms)) + 2)
+#define ESB_HOP_SWEEP_WINDOWS ((HOP_COUNT + 2) * ESB_HOP_SWEEP_DWELL_WINDOWS)
 
 void apply_hop_channel(void);
 

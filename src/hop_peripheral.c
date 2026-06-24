@@ -27,7 +27,7 @@ static atomic_t data_sent_since_tick;
 static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
-static uint8_t lost_windows;
+static uint16_t lost_windows;
 static uint8_t camp_anchor = ESB_HOP_ANCHOR_COUNT - 1;
 static uint16_t camp_dwell;
 static uint8_t adopted_epoch;
@@ -66,7 +66,7 @@ static bool adopt_staged_mask(void) {
 }
 
 /* Adopt the central's channel on a beacon epoch or mask change.
- * Otherwise sweep the full pool on a TX-fail streak to re-find the central.
+ * Otherwise sweep the pool to land on a stable central, then camp a hopping one.
  * The full pool is the rendezvous, so a stale mask still recovers.
  * Statically initialized for the same SYS_INIT-order reason as the central work. */
 static void keepalive_work_fn(struct k_work *work);
@@ -85,27 +85,33 @@ static void keepalive_work_fn(struct k_work *work) {
             lost_windows = 0;
             camp_dwell = 0;
             atomic_set(&max_tx_attempts, 0);
-        } else {
+        } else if (atomic_get(&link_acked) != 0) {
+            /* Connected: hop off a degrading channel. */
+            lost_windows = 0;
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
             uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
-            if (atomic_get(&link_acked) != 0) {
-                lost_windows = 0;
-            } else if (lost_windows < UINT8_MAX) {
+            if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
+                hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
+                apply_hop_channel();
+            }
+        } else {
+            atomic_set(&max_tx_attempts, 0);
+            bad_windows = 0;
+            if (lost_windows < UINT16_MAX) {
                 lost_windows++;
             }
-            if (lost_windows >= ESB_HOP_CAMP_WINDOWS) {
-                /* Single-stepping rarely lands on a hopping central.
-                 * Camp an anchor for its periodic dip, rotating the set so one jammed
-                 * anchor cannot strand the rejoin. */
+            if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
+                if (lost_windows % ESB_HOP_SWEEP_DWELL_WINDOWS == 0) {
+                    hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
+                    apply_hop_channel();
+                }
+            } else {
                 hop_policy_camp_step(&camp_anchor, &camp_dwell, ESB_HOP_ANCHOR_COUNT,
                                      ESB_HOP_ANCHOR_DWELL_WINDOWS);
                 if (hop_index != camp_anchor) {
                     hop_index = camp_anchor;
                     apply_hop_channel();
                 }
-            } else if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
-                hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
-                apply_hop_channel();
             }
         }
     }
