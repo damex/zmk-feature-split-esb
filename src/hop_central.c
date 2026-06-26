@@ -69,6 +69,8 @@ static uint8_t beacon_repeats_left;
 static uint8_t beacon_window;
 static uint8_t channel_bad[HOP_COUNT];
 static uint16_t channel_masked_windows[HOP_COUNT];
+static uint16_t channel_active_windows[HOP_COUNT];
+static uint8_t channel_retest_level[HOP_COUNT];
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static uint8_t pending_mask[ESB_HOP_MASK_BYTES];
 static uint8_t anchor_mask[ESB_HOP_MASK_BYTES];
@@ -223,9 +225,16 @@ static void recompute_mask(void) {
     bool changed = false;
     for (size_t channel = 0; channel < HOP_COUNT; channel++) {
         if (hop_policy_mask_get(pending_mask, channel)) {
+            /* Full restore period survived unmasked: proven clean. */
+            if (channel_active_windows[channel] < restore_windows) {
+                if (++channel_active_windows[channel] >= restore_windows) {
+                    channel_retest_level[channel] = 0;
+                }
+            }
             continue;
         }
-        if (++channel_masked_windows[channel] >= restore_windows) {
+        uint16_t retest = hop_policy_retest_threshold(restore_windows, channel_retest_level[channel]);
+        if (++channel_masked_windows[channel] >= retest) {
             hop_policy_mask_set(pending_mask, channel, true);
             channel_bad[channel] = 0;
             channel_masked_windows[channel] = 0;
@@ -239,6 +248,11 @@ static void recompute_mask(void) {
         if (worst < HOP_COUNT) {
             hop_policy_mask_set(pending_mask, worst, false);
             channel_masked_windows[worst] = 0;
+            if (channel_active_windows[worst] < restore_windows
+                && channel_retest_level[worst] < HOP_POLICY_RETEST_LEVEL_MAX) {
+                channel_retest_level[worst]++;
+            }
+            channel_active_windows[worst] = 0;
             changed = true;
             LOG_INF("afh: channel %u masked, score %u, %u active", (unsigned)hop_channel_at((uint8_t)worst),
                     (unsigned)channel_bad[worst],

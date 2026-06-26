@@ -166,6 +166,17 @@ size_t hop_policy_worst_channel(const uint8_t *channel_bad, const uint8_t *mask,
     return worst;
 }
 
+uint16_t hop_policy_retest_threshold(uint16_t base_windows, uint8_t level) {
+    if (level > HOP_POLICY_RETEST_LEVEL_MAX) {
+        level = HOP_POLICY_RETEST_LEVEL_MAX;
+    }
+    uint32_t threshold = (uint32_t)base_windows << level;
+    if (threshold > UINT16_MAX) {
+        return UINT16_MAX;
+    }
+    return (uint16_t)threshold;
+}
+
 uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count) {
     assert(mask != NULL);
     assert(pool_count > 0);

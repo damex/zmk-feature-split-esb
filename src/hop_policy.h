@@ -64,6 +64,10 @@ size_t hop_policy_worst_channel(const uint8_t *channel_bad, const uint8_t *mask,
                                 const uint8_t *anchor_mask, size_t pool_count,
                                 uint16_t mask_threshold);
 
+/* Back off a channel failing retest, else live link keeps landing on known-bad spectrum. */
+#define HOP_POLICY_RETEST_LEVEL_MAX 6
+uint16_t hop_policy_retest_threshold(uint16_t base_windows, uint8_t level);
+
 /* Zero when no pipe polls this window: an untested channel is neither blamed nor cleared. */
 uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
                                   const int8_t *rssi_dbm, int8_t floor_dbm, size_t count);

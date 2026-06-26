@@ -113,6 +113,16 @@ ZTEST(hop_policy, test_worst_channel) {
     zassert_equal(hop_policy_worst_channel(bad, masked, anchors, 6, 16), 2, "inactive channel 4 skipped");
 }
 
+ZTEST(hop_policy, test_retest_threshold) {
+    zassert_equal(hop_policy_retest_threshold(64, 0), 64, "level 0 is the base period");
+    zassert_equal(hop_policy_retest_threshold(64, 1), 128, "each level doubles");
+    zassert_equal(hop_policy_retest_threshold(64, 3), 512, "level 3 is 8x base");
+    zassert_equal(hop_policy_retest_threshold(64, HOP_POLICY_RETEST_LEVEL_MAX + 5),
+                  hop_policy_retest_threshold(64, HOP_POLICY_RETEST_LEVEL_MAX),
+                  "level saturates at the max");
+    zassert_equal(hop_policy_retest_threshold(60000, 4), UINT16_MAX, "overflow saturates");
+}
+
 ZTEST(hop_policy, test_window_penalty) {
     int8_t rssi[2] = {-50, -50};
     zassert_equal(hop_policy_window_penalty(0x1, 0x3, rssi, -85, 2), HOP_POLICY_MAX_LOSS_PENALTY,

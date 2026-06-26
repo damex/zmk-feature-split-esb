@@ -66,8 +66,10 @@ properties:
     type: int
     default: 64
     description: |
-      Decision windows a masked channel waits before the central re-admits it to retest.
-      A masked channel is not measured, so this paces blind retries. Higher thrashes less.
+      Base decision windows a masked channel waits before the central re-admits it to retest.
+      A masked channel is not measured, so this paces blind retries. A channel that keeps failing
+      retest backs off exponentially from this base, so persistent interferers stop pulling the
+      live link onto known-bad spectrum every period. Higher thrashes less.
   hop-window-ms:
     type: int
     default: 32
