@@ -4,7 +4,8 @@
 /*
  * Channel-hopping engine layered on the ESB transport.
  * Hop logic is a no-op when hop-channels lists a single channel.
- * Peripheral keepalive tick runs regardless: it carries the pressed-position bitmap.
+ * Peripheral keepalive tick runs regardless: it carries the peripheral state
+ * snapshot the central reconciles against.
  * Central: owns the epoch, votes to hop off a degrading channel.
  * Peripheral: adopts the epoch from beacons, sweeps to re-find it on loss.
  */

@@ -120,7 +120,7 @@ static void keepalive_work_fn(struct k_work *work) {
     bool searching = atomic_get(&link_acked) == 0;
     uint16_t period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
     esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE,
-                            esb_link_keepalive_bitmap());
+                            esb_link_keepalive_bitmap(), esb_link_keepalive_battery_level());
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
 

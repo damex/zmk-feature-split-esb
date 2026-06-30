@@ -14,6 +14,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
 
+#include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_esb_peripheral_changed.h>
 #include <zmk/pointing/input_split.h>
 #include <zmk/split/transport/central.h>
@@ -84,7 +85,10 @@ struct central_inbound {
     uint8_t kind;
     union {
         struct zmk_split_transport_peripheral_event event;
-        uint8_t position_bitmap[ESB_KEEPALIVE_BITMAP_BYTES];
+        struct {
+            uint8_t position_bitmap[ESB_KEEPALIVE_BITMAP_BYTES];
+            uint8_t battery_level;
+        } keepalive;
     } data;
 };
 
@@ -96,6 +100,7 @@ K_MSGQ_DEFINE(central_event_msgq, sizeof(struct central_inbound),
 
 #define CENTRAL_PIPE_MAX 8 /* ESB hardware pipe count */
 static uint8_t tracked_positions[CENTRAL_PIPE_MAX][ESB_KEEPALIVE_BITMAP_BYTES];
+static uint8_t tracked_battery_levels[CENTRAL_PIPE_MAX];
 
 #define CENTRAL_INPUT_REG_MAX 32
 static const uint32_t peripheral_timeout_ms = DT_INST_PROP(0, peripheral_timeout_ms);
@@ -231,16 +236,45 @@ static void staleness_work_fn(struct k_work *work) {
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
 }
 
+/* ZMK raises this only behind BLE-split Kconfig, dead on an ESB-only central. */
+static void reconcile_battery(uint8_t source, uint8_t level) {
+    if (source >= CENTRAL_PIPE_MAX || level == ESB_KEEPALIVE_BATTERY_UNKNOWN) {
+        return;
+    }
+    if (tracked_battery_levels[source] == level) {
+        return;
+    }
+    tracked_battery_levels[source] = level;
+    LOG_DBG("peripheral %u battery %u%%", source, level);
+    struct zmk_peripheral_battery_state_changed battery_event = {
+        .source = source,
+        .state_of_charge = level,
+    };
+    raise_zmk_peripheral_battery_state_changed(battery_event);
+}
+
 static void central_event_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     struct central_inbound inbound;
     while (k_msgq_get(&central_event_msgq, &inbound, K_NO_WAIT) == 0) {
         if (inbound.kind == CENTRAL_INBOUND_KEEPALIVE) {
-            replay_position_diff(inbound.source, inbound.data.position_bitmap, "Reconcile lost");
+            replay_position_diff(inbound.source, inbound.data.keepalive.position_bitmap,
+                                 "Reconcile lost");
+            if (IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING) &&
+                !IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)) {
+                reconcile_battery(inbound.source, inbound.data.keepalive.battery_level);
+            }
             continue;
         }
         if (inbound.data.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT) {
             deliver_key_event(inbound.source, &inbound.data.event);
+            continue;
+        }
+        if (inbound.data.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT &&
+            !IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)) {
+            if (IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)) {
+                reconcile_battery(inbound.source, inbound.data.event.data.battery_event.level);
+            }
             continue;
         }
         zmk_split_transport_central_peripheral_event_handler(&esb_central, inbound.source,
@@ -260,8 +294,9 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
             .source = pipe,
             .kind = CENTRAL_INBOUND_KEEPALIVE,
         };
-        memcpy(inbound.data.position_bitmap, esb_keepalive_bitmap(data),
+        memcpy(inbound.data.keepalive.position_bitmap, esb_keepalive_bitmap(data),
                ESB_KEEPALIVE_BITMAP_BYTES);
+        inbound.data.keepalive.battery_level = esb_keepalive_battery_level(data);
         if (k_msgq_put(&central_event_msgq, &inbound, K_NO_WAIT) < 0) {
             return; /* next keepalive retries */
         }
@@ -301,6 +336,10 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
 }
 
 static int central_init(void) {
+    /* Zero-init would swallow a first 0% report. */
+    for (uint8_t pipe = 0; pipe < CENTRAL_PIPE_MAX; pipe++) {
+        tracked_battery_levels[pipe] = ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
     return esb_link_init(central_on_rx);
 }

@@ -12,6 +12,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
+#include <zmk/battery.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
@@ -71,6 +72,15 @@ static uint8_t pressed_positions[ESB_KEEPALIVE_BITMAP_BYTES];
 
 const uint8_t *esb_link_keepalive_bitmap(void) {
     return pressed_positions;
+}
+
+uint8_t esb_link_keepalive_battery_level(void) {
+    if (!IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)) {
+        return ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
+    uint8_t level = zmk_battery_state_of_charge();
+    /* Zero is pre-first-sample, not 0% charge. */
+    return (level == 0) ? ESB_KEEPALIVE_BATTERY_UNKNOWN : level;
 }
 
 static int peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {
