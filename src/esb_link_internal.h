@@ -17,6 +17,8 @@
 #define ESB_LINK_ROLE_MODE ESB_MODE_PTX
 #endif
 
+#define ESB_LINK_PIPE_MAX 8 /* ESB hardware pipe count */
+
 struct esb_link_packet {
     uint8_t pipe;
     uint8_t length;
@@ -30,10 +32,10 @@ extern const uint8_t esb_link_pipe_count;
  * Peripheral: no-op. */
 int esb_link_role_start(void);
 
-/* Called in the radio ISR after the RX FIFO drains.
- * Central: drains staged replies into the ACK FIFO, each rides the next ACK out.
+/* Radio ISR after RX FIFO drains, pipes_seen a bit per RXed pipe.
+ * Central: drains those pipes' staged replies into ACK FIFO.
  * Peripheral: no-op. */
-void esb_link_role_rx_done(void);
+void esb_link_role_rx_done(uint8_t pipes_seen);
 
 void esb_link_mark_tx_event(void);
 uint32_t esb_link_tx_last_event_ms(void);

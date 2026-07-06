@@ -13,9 +13,11 @@ struct esb_beacon {
     uint8_t epoch;
     int8_t rssi_dbm;
     uint8_t mask_version;
+    uint8_t hid_modifiers;
+    uint8_t hid_indicators;
 } __attribute__((packed));
 
-#define ESB_BEACON_LENGTH 4
+#define ESB_BEACON_LENGTH 6
 _Static_assert(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
 
 /* Keepalive state byte values: whether the peripheral is actively polling. */

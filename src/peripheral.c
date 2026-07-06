@@ -16,6 +16,8 @@
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
+#include <zmk_split_esb.h>
+
 #include "esb_batch.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
@@ -141,8 +143,30 @@ static void peripheral_command_work_fn(struct k_work *work) {
 
 static K_WORK_DEFINE(peripheral_command_work, peripheral_command_work_fn);
 
+/* Written from radio ISR (beacon) and rx thread (HID-state packet). */
+static volatile uint8_t synced_hid_modifiers;
+static volatile uint8_t synced_hid_indicators;
+
+uint8_t zmk_split_esb_hid_modifiers(void) {
+    return synced_hid_modifiers;
+}
+
+uint8_t zmk_split_esb_hid_indicators(void) {
+    return synced_hid_indicators;
+}
+
+void esb_link_hid_state_store(uint8_t modifiers, uint8_t indicators) {
+    synced_hid_modifiers = modifiers;
+    synced_hid_indicators = indicators;
+}
+
 static void peripheral_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
     ARG_UNUSED(pipe);
+    if (esb_wire_is_hid_state(data, length)) {
+        const struct esb_wire_hid_state *packet = (const void *)data;
+        esb_link_hid_state_store(packet->modifiers, packet->indicators);
+        return;
+    }
     if (length != sizeof(struct zmk_split_transport_central_command)) {
         LOG_WRN("Dropping command with unexpected size %u", (unsigned int)length);
         LOG_HEXDUMP_DBG(data, length, "unexpected command payload");

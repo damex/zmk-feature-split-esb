@@ -22,8 +22,7 @@
 
 #define ESB_PERIPHERALS DT_INST_CHILD(0, peripherals)
 
-/* Per pipe, not shared: saturated ACK FIFO (powered-off peripheral) stalls only
- * its own queue, never head-of-line blocking the others. */
+/* Per pipe: offline peripheral backs up only its own replies. */
 #define REPLY_QUEUE_DEFINE(node)                                                                    \
     static struct k_msgq reply_queue_##node;                                                       \
     static char reply_buffer_##node[DT_PROP(node, reply_queue_depth) *                              \
@@ -81,20 +80,26 @@ void esb_link_set_idle(bool idle) {
     ARG_UNUSED(idle);
 }
 
-/* ISR-only, so esb_write_payload has a single caller context, no lock. */
-void esb_link_role_rx_done(void) {
+/* ISR-only, so esb_write_payload has a single caller context, no lock.
+ * ACK FIFO is shared across pipes: reply only for a pipe that just RXed, one write
+ * per RX, so an idle pipe never head-of-line blocks others and a dying one leaks a
+ * single slot. */
+void esb_link_role_rx_done(uint8_t pipes_seen) {
     for (uint8_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
+        if ((pipes_seen & BIT(pipe)) == 0) {
+            continue;
+        }
         struct esb_link_packet packet;
-        while (k_msgq_peek(reply_queue[pipe], &packet) == 0) {
-            struct esb_payload payload = {0};
-            payload.pipe = packet.pipe;
-            payload.length = packet.length;
-            if (packet.length > 0) {
-                memcpy(payload.data, packet.data, packet.length);
-            }
-            if (esb_write_payload(&payload) != 0) {
-                break; /* this pipe's ACK FIFO is full, retry on its next RX */
-            }
+        if (k_msgq_peek(reply_queue[pipe], &packet) != 0) {
+            continue;
+        }
+        struct esb_payload payload = {0};
+        payload.pipe = packet.pipe;
+        payload.length = packet.length;
+        if (packet.length > 0) {
+            memcpy(payload.data, packet.data, packet.length);
+        }
+        if (esb_write_payload(&payload) == 0) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
         }
     }

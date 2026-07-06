@@ -98,28 +98,27 @@ struct central_inbound {
 K_MSGQ_DEFINE(central_event_msgq, sizeof(struct central_inbound),
               CONFIG_ZMK_SPLIT_ESB_EVENT_QUEUE_SIZE, 4);
 
-#define CENTRAL_PIPE_MAX 8 /* ESB hardware pipe count */
-static uint8_t tracked_positions[CENTRAL_PIPE_MAX][ESB_KEEPALIVE_BITMAP_BYTES];
-static uint8_t tracked_battery_levels[CENTRAL_PIPE_MAX];
+static uint8_t tracked_positions[ESB_LINK_PIPE_MAX][ESB_KEEPALIVE_BITMAP_BYTES];
+static uint8_t tracked_battery_levels[ESB_LINK_PIPE_MAX];
 
 #define CENTRAL_INPUT_REG_MAX 32
 static const uint32_t peripheral_timeout_ms = DT_INST_PROP(0, peripheral_timeout_ms);
 
 /* Written on the RX thread, read by the staleness tick: single writer per slot,
  * aligned loads, no lock needed. */
-static uint32_t pipe_last_heard_ms[CENTRAL_PIPE_MAX];
-static bool pipe_heard[CENTRAL_PIPE_MAX];
-static uint32_t pipe_seen_input_regs[CENTRAL_PIPE_MAX];
+static uint32_t pipe_last_heard_ms[ESB_LINK_PIPE_MAX];
+static bool pipe_heard[ESB_LINK_PIPE_MAX];
+static uint32_t pipe_seen_input_regs[ESB_LINK_PIPE_MAX];
 
-static bool pipe_stale[CENTRAL_PIPE_MAX];
-static bool pipe_connected[CENTRAL_PIPE_MAX];
+static bool pipe_stale[ESB_LINK_PIPE_MAX];
+static bool pipe_connected[ESB_LINK_PIPE_MAX];
 static enum zmk_split_transport_connections_status last_connections =
     ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED;
 
 static enum zmk_split_transport_connections_status central_connections_status(void) {
     uint8_t total = 0;
     uint8_t connected = 0;
-    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < CENTRAL_PIPE_MAX; pipe++) {
+    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
         total++;
         if (pipe_connected[pipe]) {
             connected++;
@@ -146,7 +145,7 @@ static void forward_key_position(uint8_t source, uint32_t position, bool pressed
 }
 
 static void replay_position_diff(uint8_t source, const uint8_t *target, const char *reason) {
-    if (source >= CENTRAL_PIPE_MAX) {
+    if (source >= ESB_LINK_PIPE_MAX) {
         return;
     }
     uint8_t *tracked = tracked_positions[source];
@@ -165,7 +164,7 @@ static void deliver_key_event(uint8_t source,
                               const struct zmk_split_transport_peripheral_event *event) {
     uint32_t position = event->data.key_position_event.position;
     bool pressed = event->data.key_position_event.pressed;
-    if (source >= CENTRAL_PIPE_MAX || position >= ESB_KEEPALIVE_POSITION_COUNT) {
+    if (source >= ESB_LINK_PIPE_MAX || position >= ESB_KEEPALIVE_POSITION_COUNT) {
         zmk_split_transport_central_peripheral_event_handler(&esb_central, source, *event);
         return;
     }
@@ -208,7 +207,7 @@ static K_WORK_DELAYABLE_DEFINE(staleness_work, staleness_work_fn);
 static void staleness_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     uint32_t now = k_uptime_get_32();
-    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < CENTRAL_PIPE_MAX; pipe++) {
+    for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
         LOG_DBG("pipe %u heard=%d quiet=%ums connection=%d", (unsigned)pipe, (int)pipe_heard[pipe],
                 (unsigned)(now - pipe_last_heard_ms[pipe]), (int)pipe_connected[pipe]);
         if (pipe_heard[pipe]) {
@@ -238,7 +237,7 @@ static void staleness_work_fn(struct k_work *work) {
 
 /* ZMK raises this only behind BLE-split Kconfig, dead on an ESB-only central. */
 static void reconcile_battery(uint8_t source, uint8_t level) {
-    if (source >= CENTRAL_PIPE_MAX || level == ESB_KEEPALIVE_BATTERY_UNKNOWN) {
+    if (source >= ESB_LINK_PIPE_MAX || level == ESB_KEEPALIVE_BATTERY_UNKNOWN) {
         return;
     }
     if (tracked_battery_levels[source] == level) {
@@ -285,7 +284,7 @@ static void central_event_work_fn(struct k_work *work) {
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
 static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
-    if (pipe < CENTRAL_PIPE_MAX) {
+    if (pipe < ESB_LINK_PIPE_MAX) {
         pipe_last_heard_ms[pipe] = k_uptime_get_32();
         pipe_heard[pipe] = true;
     }
@@ -316,7 +315,7 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
         }
         offset += consumed;
         if (event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
-            if (pipe < CENTRAL_PIPE_MAX && event.data.input_event.reg < CENTRAL_INPUT_REG_MAX) {
+            if (pipe < ESB_LINK_PIPE_MAX && event.data.input_event.reg < CENTRAL_INPUT_REG_MAX) {
                 pipe_seen_input_regs[pipe] |= BIT(event.data.input_event.reg);
             }
             zmk_split_transport_central_peripheral_event_handler(&esb_central, pipe, event);
@@ -337,7 +336,7 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
 
 static int central_init(void) {
     /* Zero-init would swallow a first 0% report. */
-    for (uint8_t pipe = 0; pipe < CENTRAL_PIPE_MAX; pipe++) {
+    for (uint8_t pipe = 0; pipe < ESB_LINK_PIPE_MAX; pipe++) {
         tracked_battery_levels[pipe] = ESB_KEEPALIVE_BATTERY_UNKNOWN;
     }
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));

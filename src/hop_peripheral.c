@@ -142,6 +142,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         const struct esb_beacon *beacon = (const struct esb_beacon *)data;
         atomic_set(&beacon_epoch, beacon->epoch); /* adopted in keepalive_work, not queued */
         uplink_rssi_dbm = beacon->rssi_dbm;
+        esb_link_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
         return true;
     }
     if (esb_is_mask_update(data, length)) {

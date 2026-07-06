@@ -208,6 +208,13 @@ range) gets its held keys and input-split buttons released, the connectionless
 equivalent of a disconnect. If it returns with a key still physically held, its
 first keepalive re-presses it.
 
+## HID state
+
+Peripherals mirror central's held modifiers and host lock indicators (caps,
+num, scroll), for display widgets. Updates arrive on change, every beacon
+repeats them, a rejoining half catches up by itself. Indicators need
+`CONFIG_ZMK_HID_INDICATORS` on the central.
+
 ## Channel hopping
 
 List two or more channels in `hop-channels` and the link hops between them, stepping

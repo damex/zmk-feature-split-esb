@@ -50,6 +50,11 @@ const uint8_t *esb_link_keepalive_bitmap(void);
  * Battery level for keepalives, ESB_KEEPALIVE_BATTERY_UNKNOWN when not reported.
  * Defined in peripheral.c. */
 uint8_t esb_link_keepalive_battery_level(void);
+
+/* Peripheral only.
+ * Central HID snapshot, beacon and HID-state packet both land here.
+ * Defined in peripheral.c. */
+void esb_link_hid_state_store(uint8_t modifiers, uint8_t indicators);
 #endif
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)

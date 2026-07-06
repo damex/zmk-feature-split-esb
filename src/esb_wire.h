@@ -9,8 +9,11 @@
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include <zephyr/toolchain.h>
 
 #include <zmk/split/transport/types.h>
 
@@ -32,3 +35,19 @@ size_t esb_wire_encode_event(uint8_t *out, size_t out_cap,
  * is truncated. */
 size_t esb_wire_decode_event(const uint8_t *in, size_t avail,
                              struct zmk_split_transport_peripheral_event *event);
+
+#define ESB_WIRE_HID_STATE_TAG 0x4D
+
+struct esb_wire_hid_state {
+    uint8_t tag;
+    uint8_t modifiers;
+    uint8_t indicators;
+} __packed;
+
+static inline bool esb_wire_is_hid_state(const uint8_t *data, size_t length) {
+    if (length != sizeof(struct esb_wire_hid_state)) {
+        return false;
+    }
+    const struct esb_wire_hid_state *packet = (const void *)data;
+    return packet->tag == ESB_WIRE_HID_STATE_TAG;
+}

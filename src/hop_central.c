@@ -131,7 +131,9 @@ static void stage_beacon_to(uint8_t pipe) {
     struct esb_beacon beacon = {.tag = ESB_BEACON_TAG,
                                 .epoch = hop_epoch,
                                 .rssi_dbm = pipe_rssi_dbm[pipe],
-                                .mask_version = mask_version};
+                                .mask_version = mask_version,
+                                .hid_modifiers = zmk_split_esb_hid_modifiers(),
+                                .hid_indicators = zmk_split_esb_hid_indicators()};
     (void)esb_link_stage_reply(pipe, (const uint8_t *)&beacon, sizeof(beacon));
 }
 

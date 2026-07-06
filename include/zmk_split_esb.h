@@ -31,3 +31,12 @@ uint8_t zmk_split_esb_pipe_count(void);
  * Central: indexed by ESB pipe.
  * Peripheral: index 0 only. */
 int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe);
+
+/* Central: own HID state.
+ * Peripheral: last byte synced from central. */
+uint8_t zmk_split_esb_hid_modifiers(void);
+
+/* Host LED bits, zmk_hid_indicators_t layout, 0 when CONFIG_ZMK_HID_INDICATORS off.
+ * Central: own state.
+ * Peripheral: last byte synced from central. */
+uint8_t zmk_split_esb_hid_indicators(void);
