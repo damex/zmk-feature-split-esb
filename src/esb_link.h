@@ -67,4 +67,16 @@ uint8_t esb_link_source_ids(uint8_t *out_ids);
  * Queue one packet to ride peripheral `pipe`'s next ACK back to it.
  * Returns -ENOBUFS if the reply queue is full. */
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length);
+
+#define ESB_LINK_CONTROL_MAX_LENGTH 16
+
+enum esb_link_control {
+    ESB_LINK_CONTROL_BEACON,
+    ESB_LINK_CONTROL_MASK,
+    ESB_LINK_CONTROL_COUNT,
+};
+
+/* Central only. */
+int esb_link_latch_control(uint8_t pipe, enum esb_link_control kind, const uint8_t *data,
+                           size_t length);
 #endif

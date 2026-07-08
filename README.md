@@ -147,7 +147,7 @@ no HID-indicator forwarding.
 |---|---|
 | `base-address` | 4-byte bytestring `[..]`, shared across pipes, vary bytes (all-same-byte syncs poorly) |
 | `address-length` | on-air address bytes 3/4/5, shorter trims airtime, weakens selectivity, all devices must match (default 5) |
-| `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight`, `reply-queue-depth` (central reverse-channel backlog for this pipe, default 8) |
+| `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight`, `reply-queue-depth` (central command backlog for this pipe, default 8) |
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
 | `hop-anchors` | unmaskable rendezvous set, a subset of hop-channels, build assert enforces. Omit and the engine spreads three across the pool. Pick channels clear of local WiFi |
 | `hop-threshold` | graded loss before acting: central hop-vote sum, peripheral sweep streak; fully-lost window scores 4 (default 6) |
@@ -235,6 +235,10 @@ across `hop-channels`, so a custom pool still gets frequency-diverse anchors.
 The engine can never mask an anchor, so pick channels clear of local WiFi, otherwise the
 link rendezvouses on contended spectrum. The rest of the pool carries data, AFH drops the
 channels that perform badly.
+
+Beacon and mask update ride a per-pipe latch, not the command queue. Newest value
+overwrites the pending one. A peripheral back from a gap reads the live epoch, never a
+stale backlog. Commands keep the queue, `reply-queue-depth` deep.
 
 ## Power
 

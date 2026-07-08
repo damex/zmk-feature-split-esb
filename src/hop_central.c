@@ -50,8 +50,10 @@ static const uint8_t min_active = DT_INST_PROP(0, hop_min_active);
 #define MASK_UPDATE_REPEAT_WINDOWS 4
 #define MASK_REFRESH_WINDOWS 32
 #define CHANNEL_BAD_DECAY 1
-BUILD_ASSERT(ESB_MASK_UPDATE_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
-             "mask update does not fit in one ESB payload");
+BUILD_ASSERT(ESB_MASK_UPDATE_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
+             "mask update does not fit one control latch; raise ESB_LINK_CONTROL_MAX_LENGTH");
+BUILD_ASSERT(ESB_BEACON_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
+             "beacon does not fit one control latch; raise ESB_LINK_CONTROL_MAX_LENGTH");
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
 static int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
@@ -141,7 +143,8 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
                                 .mask_version = mask_version,
                                 .hid_modifiers = hid_modifiers,
                                 .hid_indicators = hid_indicators};
-    return esb_link_stage_reply(pipe, (const uint8_t *)&beacon, sizeof(beacon));
+    return esb_link_latch_control(pipe, ESB_LINK_CONTROL_BEACON, (const uint8_t *)&beacon,
+                                  sizeof(beacon));
 }
 
 static void stage_beacon_to(uint8_t pipe) {
@@ -295,7 +298,8 @@ static void stage_mask_update(void) {
         if (hop_pipe_needs_rendezvous(pipe)) {
             continue; /* rejoins via anchor beacon, not a stale-channel mask reply */
         }
-        (void)esb_link_stage_reply(pipe, (const uint8_t *)&update, ESB_MASK_UPDATE_LENGTH);
+        (void)esb_link_latch_control(pipe, ESB_LINK_CONTROL_MASK, (const uint8_t *)&update,
+                                     ESB_MASK_UPDATE_LENGTH);
     }
 }
 

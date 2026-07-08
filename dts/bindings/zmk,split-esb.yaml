@@ -156,5 +156,6 @@ child-binding:
         type: int
         default: 8
         description: |
-          Central's reverse-channel reply backlog for this peripheral. Raise it for
-          one that receives many commands.
+          Central's command backlog for this peripheral. Raise it for one that receives
+          many commands. Beacons and mask updates bypass it, each riding a per-pipe latch
+          that the newest value overwrites.

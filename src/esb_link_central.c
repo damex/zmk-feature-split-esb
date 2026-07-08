@@ -52,6 +52,34 @@ uint8_t esb_link_source_ids(uint8_t *out_ids) {
     return esb_link_pipe_count;
 }
 
+BUILD_ASSERT(ESB_LINK_CONTROL_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "control latch does not fit one ESB payload");
+
+struct control_slot {
+    uint8_t data[ESB_LINK_CONTROL_MAX_LENGTH];
+    uint8_t length;
+    bool pending;
+};
+static struct control_slot control_slots[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT];
+
+int esb_link_latch_control(uint8_t pipe, enum esb_link_control kind, const uint8_t *data,
+                           size_t length) {
+    __ASSERT_NO_MSG(data != NULL);
+    if (pipe >= REPLY_PIPE_COUNT || kind >= ESB_LINK_CONTROL_COUNT) {
+        return -EINVAL;
+    }
+    if (length == 0 || length > ESB_LINK_CONTROL_MAX_LENGTH) {
+        return -EMSGSIZE;
+    }
+    struct control_slot *slot = &control_slots[pipe][kind];
+    unsigned int key = irq_lock();
+    memcpy(slot->data, data, length);
+    slot->length = (uint8_t)length;
+    slot->pending = true;
+    irq_unlock(key);
+    return 0;
+}
+
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (pipe >= REPLY_PIPE_COUNT) {
         return -EINVAL;
@@ -79,6 +107,24 @@ void esb_link_set_idle(bool idle) {
     ARG_UNUSED(idle);
 }
 
+static bool write_pending_control(uint8_t pipe) {
+    for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
+        struct control_slot *slot = &control_slots[pipe][kind];
+        if (!slot->pending) {
+            continue;
+        }
+        struct esb_payload payload = {0};
+        payload.pipe = pipe;
+        payload.length = slot->length;
+        memcpy(payload.data, slot->data, slot->length);
+        if (esb_write_payload(&payload) == 0) {
+            slot->pending = false;
+        }
+        return true;
+    }
+    return false;
+}
+
 /* ISR-only, so esb_write_payload has a single caller context, no lock.
  * ACK FIFO is shared across pipes: reply only for a pipe that just RXed, one write
  * per RX, so an idle pipe never head-of-line blocks others and a dying one leaks a
@@ -86,6 +132,9 @@ void esb_link_set_idle(bool idle) {
 void esb_link_role_rx_done(uint8_t pipes_seen) {
     for (uint8_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
         if ((pipes_seen & BIT(pipe)) == 0) {
+            continue;
+        }
+        if (write_pending_control(pipe)) {
             continue;
         }
         struct esb_link_packet packet;
