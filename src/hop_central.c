@@ -87,7 +87,10 @@ static void clear_pipe_loss(void) {
     }
 }
 
-static bool pipe_needs_rendezvous(uint8_t pipe) {
+bool hop_pipe_needs_rendezvous(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return true;
+    }
     return pipe_silent[pipe] >= ESB_HOP_LOST_WINDOWS;
 }
 
@@ -111,7 +114,7 @@ static void clear_silence_for_heard(uint32_t heard) {
 
 static bool any_pipe_needs_rendezvous(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (pipe_needs_rendezvous(pipe)) {
+        if (hop_pipe_needs_rendezvous(pipe)) {
             return true;
         }
     }
@@ -121,7 +124,7 @@ static bool any_pipe_needs_rendezvous(void) {
 /* A still-served pipe pays dip jitter, so slow the rendezvous cadence only when one exists. */
 static bool any_pipe_served(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (!pipe_needs_rendezvous(pipe)) {
+        if (!hop_pipe_needs_rendezvous(pipe)) {
             return true;
         }
     }
@@ -149,7 +152,7 @@ static void stage_beacon_to(uint8_t pipe) {
  * from its poll ACK and rejoins the hop. */
 static void stage_anchor_beacon(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (pipe_needs_rendezvous(pipe)) {
+        if (hop_pipe_needs_rendezvous(pipe)) {
             stage_beacon_to(pipe);
         }
     }
@@ -289,7 +292,7 @@ static void stage_mask_update(void) {
     struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG, .version = mask_version};
     memcpy(update.mask, mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (pipe_needs_rendezvous(pipe)) {
+        if (hop_pipe_needs_rendezvous(pipe)) {
             continue; /* rejoins via anchor beacon, not a stale-channel mask reply */
         }
         (void)esb_link_stage_reply(pipe, (const uint8_t *)&update, ESB_MASK_UPDATE_LENGTH);
@@ -311,8 +314,8 @@ static void decision_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     uint32_t heard = (uint32_t)atomic_set(&pipe_heard_mask, 0);
 
-    /* Fixed channel ticks only to refresh the beacon's HID state. */
     if (HOP_COUNT <= 1) {
+        update_pipe_silence(heard);
         stage_beacon(heard);
         k_work_reschedule(&decision_work, K_MSEC(decision_ms));
         return;
@@ -339,7 +342,7 @@ static void decision_work_fn(struct k_work *work) {
     recompute_mask();
     uint32_t rejoining = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if ((heard & BIT(pipe)) && pipe_needs_rendezvous(pipe)) {
+        if ((heard & BIT(pipe)) && hop_pipe_needs_rendezvous(pipe)) {
             rejoining |= BIT(pipe);
         }
     }

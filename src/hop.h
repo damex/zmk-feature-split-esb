@@ -47,4 +47,6 @@ uint8_t hop_current_channel(void);
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators);
+
+bool hop_pipe_needs_rendezvous(uint8_t pipe);
 #endif

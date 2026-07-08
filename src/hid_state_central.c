@@ -25,6 +25,7 @@ LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static uint8_t sent_modifiers[ESB_LINK_PIPE_MAX];
 static uint8_t sent_indicators[ESB_LINK_PIPE_MAX];
+static bool sent_known[ESB_LINK_PIPE_MAX];
 
 static uint8_t hid_state_indicators(void) {
 #if defined(CONFIG_ZMK_HID_INDICATORS)
@@ -39,7 +40,13 @@ static void hid_state_work_fn(struct k_work *work) {
     uint8_t modifiers = (uint8_t)zmk_hid_get_explicit_mods();
     uint8_t indicators = hid_state_indicators();
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
-        if (sent_modifiers[pipe] == modifiers && sent_indicators[pipe] == indicators) {
+        if (hop_pipe_needs_rendezvous(pipe)) {
+            /* Rejoin beacon carries HID state the cache never saw. */
+            sent_known[pipe] = false;
+            continue;
+        }
+        if (sent_known[pipe] && sent_modifiers[pipe] == modifiers
+            && sent_indicators[pipe] == indicators) {
             continue;
         }
         int error = hop_stage_beacon(pipe, modifiers, indicators);
@@ -47,6 +54,7 @@ static void hid_state_work_fn(struct k_work *work) {
             LOG_DBG("HID state to pipe %u not staged (%d)", pipe, error);
             continue;
         }
+        sent_known[pipe] = true;
         sent_modifiers[pipe] = modifiers;
         sent_indicators[pipe] = indicators;
     }
