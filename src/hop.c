@@ -57,6 +57,17 @@ uint8_t hop_channel_at(uint8_t index) {
 
 BUILD_ASSERT(HOP_COUNT <= 1 || (ESB_HOP_ANCHOR_COUNT >= 1 && ESB_HOP_ANCHOR_COUNT <= HOP_COUNT),
              "hop-anchors is empty or larger than hop-channels");
+
+#define POOL_HAS_OR(node_id, prop, index, needle)                                                  \
+    || (DT_PROP_BY_IDX(node_id, prop, index) == (needle))
+#define POOL_HAS(needle) (0 DT_INST_FOREACH_PROP_ELEM_VARGS(0, hop_channels, POOL_HAS_OR, needle))
+#define ANCHOR_IN_POOL(node_id, prop, index)                                                       \
+    BUILD_ASSERT(POOL_HAS(DT_PROP_BY_IDX(node_id, prop, index)),                                   \
+                 "hop-anchors lists a channel absent from hop-channels");
+#if HOP_COUNT > 1
+DT_INST_FOREACH_PROP_ELEM(0, hop_anchors, ANCHOR_IN_POOL)
+#endif
+
 static uint8_t anchor_indices[ESB_HOP_ANCHOR_COUNT];
 static bool anchors_resolved;
 
