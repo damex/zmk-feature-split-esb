@@ -44,7 +44,6 @@ static int reply_queue_init(void) {
 }
 SYS_INIT(reply_queue_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
-/* Assumes peripheral pipes are contiguous from 0. */
 uint8_t esb_link_source_ids(uint8_t *out_ids) {
     __ASSERT_NO_MSG(out_ids != NULL);
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {

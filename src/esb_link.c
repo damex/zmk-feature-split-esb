@@ -47,6 +47,8 @@ static const uint8_t peripheral_prefixes[] = {
 };
 #define PERIPHERAL_COUNT ARRAY_SIZE(peripheral_prefixes)
 BUILD_ASSERT(PERIPHERAL_COUNT >= 1, "peripherals needs at least one entry");
+BUILD_ASSERT(PERIPHERAL_COUNT == DT_CHILD_NUM_STATUS_OKAY(ESB_PERIPHERALS),
+             "peripheral pipes must be 0..N-1, one per peripheral");
 const uint8_t esb_link_pipe_count = (uint8_t)PERIPHERAL_COUNT;
 
 static enum esb_crc esb_crc_from_bits(uint8_t bits) {
