@@ -35,12 +35,14 @@ properties:
     default: [74, 75, 76, 77, 78, 79, 80, 81, 82, 83]
   hop-anchors:
     type: uint8-array
-    default: [76, 79, 82]
     description: |
       Rendezvous channels, a subset of hop-channels, kept unmaskable so a lost link always
       re-finds the central on known spectrum. Pick channels clear of local WiFi, since the
-      engine can never mask these. Default 76, 79, 82, spread across the clean band above
-      WiFi channel 11.
+      engine can never mask these.
+      Every entry must appear in hop-channels.
+      Build assert rejects one that does not.
+      Omit and the engine spreads min(3, hop-channels length) anchors evenly over the pool,
+      so a custom pool needs no anchor list of its own.
   hop-threshold:
     type: int
     default: 24
