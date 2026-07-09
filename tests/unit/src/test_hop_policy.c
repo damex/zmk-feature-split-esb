@@ -64,9 +64,9 @@ ZTEST(hop_policy, test_attempts_penalty) {
 }
 
 ZTEST(hop_policy, test_is_beacon) {
-    const uint8_t beacon[ESB_BEACON_LENGTH] = {ESB_BEACON_TAG, 0, 0, 0};
+    const uint8_t beacon[ESB_BEACON_LENGTH] = {[0] = ESB_BEACON_TAG};
     zassert_true(hop_policy_is_beacon(beacon, ESB_BEACON_LENGTH), "tagged, right length");
-    const uint8_t command[ESB_BEACON_LENGTH] = {0x01, 0, 0, 0};
+    const uint8_t command[ESB_BEACON_LENGTH] = {[0] = 0x01};
     zassert_false(hop_policy_is_beacon(command, ESB_BEACON_LENGTH), "wrong tag is not beacon");
     zassert_false(hop_policy_is_beacon(beacon, 2), "wrong length is not beacon");
 }
@@ -125,6 +125,14 @@ ZTEST(hop_policy, test_worst_channel) {
     zassert_equal(hop_policy_worst_channel(bad, masked, anchors, 6, 16), 2, "inactive channel 4 skipped");
 }
 
+ZTEST(hop_policy, test_worst_channel_tie_takes_lowest) {
+    uint8_t mask[1] = {0x3F};
+    uint8_t anchors[1] = {0x00};
+    uint8_t tied[6] = {10, 30, 30, 10, 10, 10};
+    zassert_equal(hop_policy_worst_channel(tied, mask, anchors, 6, 16), 1,
+                  "equal scores keep the first channel found");
+}
+
 ZTEST(hop_policy, test_retest_threshold) {
     zassert_equal(hop_policy_retest_threshold(64, 0), 64, "level 0 is the base period");
     zassert_equal(hop_policy_retest_threshold(64, 1), 128, "each level doubles");
@@ -133,6 +141,7 @@ ZTEST(hop_policy, test_retest_threshold) {
                   hop_policy_retest_threshold(64, HOP_POLICY_RETEST_LEVEL_MAX),
                   "level saturates at the max");
     zassert_equal(hop_policy_retest_threshold(60000, 4), UINT16_MAX, "overflow saturates");
+    zassert_equal(hop_policy_retest_threshold(0, 5), 0, "zero base retests every window");
 }
 
 ZTEST(hop_policy, test_window_penalty) {
@@ -211,6 +220,19 @@ ZTEST(hop_policy, test_channel_for_epoch_masked) {
     const uint8_t none[1] = {0x00};
     zassert_equal(hop_policy_channel_for_epoch_masked(1, none, 4),
                   hop_policy_channel_for_epoch(1, 4), "all masked falls back to base");
+}
+
+ZTEST(hop_policy, test_channel_for_epoch_masked_multibyte) {
+    const uint8_t all[2] = {0xFF, 0x07};
+    zassert_equal(hop_policy_channel_for_epoch_masked(8, all, 11), 8, "high channel active, stays");
+
+    const uint8_t no_eight[2] = {0xFF, 0x06};
+    zassert_equal(hop_policy_channel_for_epoch_masked(8, no_eight, 11), 9,
+                  "masked high channel probes within the second byte");
+
+    const uint8_t no_ten[2] = {0xFF, 0x03};
+    zassert_equal(hop_policy_channel_for_epoch_masked(10, no_ten, 11), 0,
+                  "masked last channel wraps to the first byte");
 }
 
 ZTEST(hop_policy, test_masked_mapping_stable) {
