@@ -19,6 +19,7 @@
 #include <zmk_split_esb.h>
 
 #include "esb_batch.h"
+#include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_wire.h"
@@ -143,23 +144,19 @@ static void peripheral_command_work_fn(struct k_work *work) {
 
 static K_WORK_DEFINE(peripheral_command_work, peripheral_command_work_fn);
 
-#define SYNCED_HID_INDICATORS_SHIFT 8
-
 /* Single store, else reader mixes modifiers and indicators from two beacons. */
 static atomic_t synced_hid_state;
 
 uint8_t zmk_split_esb_hid_modifiers(void) {
-    return (uint8_t)atomic_get(&synced_hid_state);
+    return esb_hid_state_modifiers((uint16_t)atomic_get(&synced_hid_state));
 }
 
 uint8_t zmk_split_esb_hid_indicators(void) {
-    return (uint8_t)(atomic_get(&synced_hid_state) >> SYNCED_HID_INDICATORS_SHIFT);
+    return esb_hid_state_indicators((uint16_t)atomic_get(&synced_hid_state));
 }
 
 void esb_link_hid_state_store(uint8_t modifiers, uint8_t indicators) {
-    atomic_set(&synced_hid_state,
-               (atomic_val_t)modifiers |
-                   ((atomic_val_t)indicators << SYNCED_HID_INDICATORS_SHIFT));
+    atomic_set(&synced_hid_state, esb_hid_state_pack(modifiers, indicators));
 }
 
 static void peripheral_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
