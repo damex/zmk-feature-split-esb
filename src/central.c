@@ -241,6 +241,13 @@ static void staleness_work_fn(struct k_work *work) {
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
 }
 
+uint8_t esb_central_battery_level(uint8_t pipe) {
+    if (pipe >= ESB_LINK_PIPE_MAX) {
+        return ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
+    return tracked_battery_levels[pipe];
+}
+
 /* ZMK raises this only behind BLE-split Kconfig, dead on an ESB-only central. */
 static void reconcile_battery(uint8_t source, uint8_t level) {
     if (source >= ESB_LINK_PIPE_MAX || level == ESB_KEEPALIVE_BATTERY_UNKNOWN) {

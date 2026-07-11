@@ -8,6 +8,13 @@
 #include <stdint.h>
 
 #define ESB_BEACON_TAG 0xFE
+#define ESB_BEACON_PEER_COUNT 2
+
+struct esb_beacon_peer {
+    uint8_t battery;
+    int8_t rssi_dbm;
+} __attribute__((packed));
+
 struct esb_beacon {
     uint8_t tag;
     uint8_t epoch;
@@ -15,9 +22,10 @@ struct esb_beacon {
     uint8_t mask_version;
     uint8_t hid_modifiers;
     uint8_t hid_indicators;
+    struct esb_beacon_peer peers[ESB_BEACON_PEER_COUNT];
 } __attribute__((packed));
 
-#define ESB_BEACON_LENGTH 6
+#define ESB_BEACON_LENGTH (6 + ESB_BEACON_PEER_COUNT * 2)
 _Static_assert(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
 
 /* Keepalive state byte values: whether the peripheral is actively polling. */

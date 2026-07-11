@@ -133,6 +133,9 @@ static bool any_pipe_served(void) {
     return false;
 }
 
+BUILD_ASSERT(PERIPHERAL_COUNT <= ESB_BEACON_PEER_COUNT,
+             "more peripherals than the beacon roster holds; raise ESB_BEACON_PEER_COUNT");
+
 int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators) {
     if (pipe >= PERIPHERAL_COUNT) {
         return -EINVAL;
@@ -143,6 +146,10 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
                                 .mask_version = mask_version,
                                 .hid_modifiers = hid_modifiers,
                                 .hid_indicators = hid_indicators};
+    for (uint8_t peer = 0; peer < PERIPHERAL_COUNT; peer++) {
+        beacon.peers[peer].battery = esb_central_battery_level(peer);
+        beacon.peers[peer].rssi_dbm = pipe_rssi_dbm[peer];
+    }
     return esb_link_latch_control(pipe, ESB_LINK_CONTROL_BEACON, (const uint8_t *)&beacon,
                                   sizeof(beacon));
 }
@@ -459,6 +466,20 @@ uint8_t zmk_split_esb_pipe_count(void) {
 }
 
 int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return 0;
+    }
+    return pipe_rssi_dbm[pipe];
+}
+
+uint8_t zmk_split_esb_peer_battery(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
+    return esb_central_battery_level(pipe);
+}
+
+int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return 0;
     }

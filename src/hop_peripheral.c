@@ -14,6 +14,7 @@
 
 #include <zmk_split_esb.h>
 
+#include "esb_keepalive.h"
 #include "esb_link.h"
 #include "hop.h"
 #include "hop_internal.h"
@@ -38,6 +39,7 @@ static uint8_t adopted_mask_version;
 static uint8_t staged_mask[ESB_HOP_MASK_BYTES];
 static uint8_t staged_mask_version;
 static atomic_t mask_update_seen;
+static struct esb_beacon_peer peer_table[ESB_BEACON_PEER_COUNT];
 
 static void ensure_mask(void) {
     if (mask_ready) {
@@ -141,6 +143,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         atomic_set(&beacon_epoch, beacon->epoch); /* adopted in keepalive_work, not queued */
         uplink_rssi_dbm = beacon->rssi_dbm;
         esb_link_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
+        memcpy(peer_table, beacon->peers, sizeof(peer_table));
         return true;
     }
     if (HOP_COUNT <= 1) {
@@ -198,4 +201,24 @@ int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe) {
         return 0;
     }
     return uplink_rssi_dbm;
+}
+
+uint8_t zmk_split_esb_peer_battery(uint8_t pipe) {
+    if (pipe >= ESB_BEACON_PEER_COUNT) {
+        return ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
+    unsigned int key = irq_lock();
+    uint8_t battery = peer_table[pipe].battery;
+    irq_unlock(key);
+    return battery;
+}
+
+int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe) {
+    if (pipe >= ESB_BEACON_PEER_COUNT) {
+        return 0;
+    }
+    unsigned int key = irq_lock();
+    int8_t rssi = peer_table[pipe].rssi_dbm;
+    irq_unlock(key);
+    return rssi;
 }
