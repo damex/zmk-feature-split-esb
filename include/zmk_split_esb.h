@@ -32,6 +32,16 @@ uint8_t zmk_split_esb_pipe_count(void);
  * Peripheral: index 0 only. */
 int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe);
 
+/* Battery of any peripheral by ESB pipe, 0xFF when unknown.
+ * Central: tracked from keepalives.
+ * Peripheral: relayed by the central beacon. */
+uint8_t zmk_split_esb_peer_battery(uint8_t pipe);
+
+/* Central-measured RSSI of any peripheral by ESB pipe, 0 before first sample.
+ * Central: own measurement.
+ * Peripheral: relayed by the central beacon. */
+int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe);
+
 /* Central: own HID state.
  * Peripheral: last byte synced from central. */
 uint8_t zmk_split_esb_hid_modifiers(void);

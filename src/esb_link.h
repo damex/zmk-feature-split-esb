@@ -68,6 +68,8 @@ uint8_t esb_link_source_ids(uint8_t *out_ids);
  * Returns -ENOBUFS if the reply queue is full. */
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length);
 
+uint8_t esb_central_battery_level(uint8_t pipe);
+
 #define ESB_LINK_CONTROL_MAX_LENGTH 16
 
 enum esb_link_control {
