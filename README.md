@@ -166,8 +166,16 @@ no HID-indicator forwarding.
 Lossy-codes lists the input axes peripherals fire-and-forget. Reserve for
 high-rate, self-correcting axes (pointer motion). Non-input split events
 (key-position, sensor, battery) are always ACK'd. Every input event is ACK'd
-unless its (type, code) is listed here. Omitted = fully lossless link. Example
-for a mouse:
+unless its (type, code) is listed here. Omitted = fully lossless link.
+
+Sensor rotation is cumulative on air: a peripheral sends its running total and
+the central forwards the difference, so motion lost with a dropped packet
+arrives with the next one. Totals also ride every keepalive, so rotation
+converges within one keepalive period even when the last event of a burst is
+lost. A gap past 180 degrees (reboot, long outage) resyncs the baseline
+instead of replaying it.
+
+Example for a mouse:
 ```dts
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 &esb_link {
@@ -193,9 +201,9 @@ Tunables (Kconfig, defaults shown):
 
 Split events are deltas, the keepalive is the state: each peripheral keepalive
 carries a snapshot of its live state (activity, pressed-position bitmap, battery
-level). Events are ACK'd, but the radio gives up after `retransmit-count` tries,
-so a delta can still die in a bad-RF moment. The central reconciles its view
-against every snapshot and replays what was lost.
+level, cumulative sensor totals). Events are ACK'd, but the radio gives up after
+`retransmit-count` tries, so a delta can still die in a bad-RF moment. The
+central reconciles its view against every snapshot and replays what was lost.
 
 A stuck key heals within one keepalive period (`hop-window-ms` while typing,
 `idle-keepalive-ms` at idle). The live stream is healed too: an orphan release

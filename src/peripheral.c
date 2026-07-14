@@ -7,12 +7,14 @@
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <zephyr/devicetree.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk/battery.h>
+#include <zmk/sensors.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
@@ -22,6 +24,7 @@
 #include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
+#include "esb_sensor_sync.h"
 #include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -73,17 +76,65 @@ static struct esb_batch batch;
 
 static uint8_t pressed_positions[ESB_KEEPALIVE_BITMAP_BYTES];
 
-const uint8_t *esb_link_keepalive_bitmap(void) {
-    return pressed_positions;
-}
-
-uint8_t esb_link_keepalive_battery_level(void) {
+static uint8_t keepalive_battery_level(void) {
     if (!IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)) {
         return ESB_KEEPALIVE_BATTERY_UNKNOWN;
     }
     uint8_t level = zmk_battery_state_of_charge();
     /* Zero is pre-first-sample, not 0% charge. */
     return (level == 0) ? ESB_KEEPALIVE_BATTERY_UNKNOWN : level;
+}
+
+#if ZMK_KEYMAP_HAS_SENSORS
+BUILD_ASSERT(ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "keepalive with sensor totals does not fit one ESB payload");
+
+static int64_t sensor_total_udeg[ZMK_KEYMAP_SENSORS_LEN];
+
+static const int64_t *keepalive_sensor_totals(void) {
+    return sensor_total_udeg;
+}
+
+static uint8_t keepalive_sensor_count(void) {
+    return ZMK_KEYMAP_SENSORS_LEN;
+}
+
+static void sensor_event_to_total(struct zmk_split_transport_peripheral_event *event) {
+    uint8_t sensor_index = event->data.sensor_event.sensor_index;
+
+    if (sensor_index >= ARRAY_SIZE(sensor_total_udeg)) {
+        return;
+    }
+    struct sensor_value value = event->data.sensor_event.channel_data.value;
+    sensor_total_udeg[sensor_index] += esb_sensor_udeg(value.val1, value.val2);
+    value.val1 = esb_sensor_udeg_val1(sensor_total_udeg[sensor_index]);
+    value.val2 = esb_sensor_udeg_val2(sensor_total_udeg[sensor_index]);
+    event->data.sensor_event.channel_data.value = value;
+}
+#else
+static const int64_t *keepalive_sensor_totals(void) {
+    return NULL;
+}
+
+static uint8_t keepalive_sensor_count(void) {
+    return 0;
+}
+
+static void sensor_event_to_total(struct zmk_split_transport_peripheral_event *event) {
+    ARG_UNUSED(event);
+}
+#endif
+
+uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state) {
+    uint8_t sensor_count = keepalive_sensor_count();
+    uint8_t length = (uint8_t)ESB_KEEPALIVE_LENGTH(sensor_count);
+
+    if (out_size < length) {
+        return 0;
+    }
+    esb_keepalive_encode(out, out_size, state, pressed_positions, keepalive_battery_level(),
+                         keepalive_sensor_totals(), sensor_count);
+    return length;
 }
 
 static int peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {
@@ -95,6 +146,12 @@ static int peripheral_report_event(const struct zmk_split_transport_peripheral_e
          * keepalive reconcile heals the miss. */
         esb_keepalive_bitmap_set(pressed_positions, event->data.key_position_event.position,
                                  event->data.key_position_event.pressed);
+    }
+    struct zmk_split_transport_peripheral_event sensor_total;
+    if (event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_SENSOR_EVENT) {
+        sensor_total = *event;
+        sensor_event_to_total(&sensor_total);
+        event = &sensor_total;
     }
     uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];
     size_t length = esb_wire_encode_event(wire, sizeof(wire), event);

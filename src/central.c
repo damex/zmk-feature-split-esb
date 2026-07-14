@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include <zephyr/devicetree.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -17,6 +18,7 @@
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_esb_peripheral_changed.h>
 #include <zmk/pointing/input_split.h>
+#include <zmk/sensors.h>
 #include <zmk/split/central.h>
 #include <zmk/split/transport/central.h>
 #include <zmk/split/transport/types.h>
@@ -24,6 +26,7 @@
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
+#include "esb_sensor_sync.h"
 #include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -86,14 +89,20 @@ enum central_inbound_kind {
     CENTRAL_INBOUND_KEEPALIVE = 1,
 };
 
+#if ZMK_KEYMAP_HAS_SENSORS
+#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN)
+#else
+#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(0)
+#endif
+
 struct central_inbound {
     uint8_t source;
     uint8_t kind;
     union {
         struct zmk_split_transport_peripheral_event event;
         struct {
-            uint8_t position_bitmap[ESB_KEEPALIVE_BITMAP_BYTES];
-            uint8_t battery_level;
+            uint8_t data[KEEPALIVE_COPY_LENGTH];
+            uint8_t length;
         } keepalive;
     } data;
 };
@@ -120,6 +129,58 @@ static bool pipe_stale[ESB_LINK_PIPE_MAX];
 static bool pipe_connected[ESB_LINK_PIPE_MAX];
 static enum zmk_split_transport_connections_status last_connections =
     ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED;
+
+#if ZMK_KEYMAP_HAS_SENSORS
+/* System-workqueue only: event drain, keepalive reconcile, staleness reset.
+ * Keepalives carry the whole array per pipe, non-owned slots zero.
+ * Shared per-sensor tracks would fight across pipes. */
+static struct esb_sensor_track sensor_tracks[ESB_LINK_PIPE_MAX][ZMK_KEYMAP_SENSORS_LEN];
+
+static bool sensor_delta_value(uint8_t source, uint8_t sensor_index, int64_t total_udeg,
+                               struct sensor_value *value) {
+    if (source >= ESB_LINK_PIPE_MAX || sensor_index >= ZMK_KEYMAP_SENSORS_LEN) {
+        return false;
+    }
+    int64_t delta_udeg = 0;
+    if (!esb_sensor_track_delta(&sensor_tracks[source][sensor_index], total_udeg, &delta_udeg)) {
+        return false;
+    }
+    value->val1 = esb_sensor_udeg_val1(delta_udeg);
+    value->val2 = esb_sensor_udeg_val2(delta_udeg);
+    return true;
+}
+
+static bool sensor_event_to_delta(uint8_t source,
+                                  struct zmk_split_transport_peripheral_event *event) {
+    struct sensor_value value = event->data.sensor_event.channel_data.value;
+    if (!sensor_delta_value(source, event->data.sensor_event.sensor_index,
+                            esb_sensor_udeg(value.val1, value.val2), &value)) {
+        return false;
+    }
+    event->data.sensor_event.channel_data.value = value;
+    return true;
+}
+
+static void sensor_tracks_reset(uint8_t source) {
+    if (source >= ESB_LINK_PIPE_MAX) {
+        return;
+    }
+    for (size_t sensor_index = 0; sensor_index < ZMK_KEYMAP_SENSORS_LEN; sensor_index++) {
+        sensor_tracks[source][sensor_index].valid = false;
+    }
+}
+#else
+static bool sensor_event_to_delta(uint8_t source,
+                                  struct zmk_split_transport_peripheral_event *event) {
+    ARG_UNUSED(source);
+    ARG_UNUSED(event);
+    return true;
+}
+
+static void sensor_tracks_reset(uint8_t source) {
+    ARG_UNUSED(source);
+}
+#endif
 
 static enum zmk_split_transport_connections_status central_connections_status(void) {
     uint8_t total = 0;
@@ -222,6 +283,9 @@ static void staleness_work_fn(struct k_work *work) {
             } else if (!pipe_stale[pipe]) {
                 pipe_stale[pipe] = true;
                 release_stale_pipe(pipe);
+                /* Rebooted peripheral restarts totals near zero.
+                 * Baseline re-adopts instead of replaying the gap. */
+                sensor_tracks_reset(pipe);
             }
         }
         bool connected = pipe_heard[pipe] && !pipe_stale[pipe];
@@ -265,17 +329,51 @@ static void reconcile_battery(uint8_t source, uint8_t level) {
     raise_zmk_peripheral_battery_state_changed(battery_event);
 }
 
+#if ZMK_KEYMAP_HAS_SENSORS
+static void reconcile_sensor_totals(uint8_t source, const uint8_t *keepalive, uint8_t length) {
+    uint8_t sensor_count = esb_keepalive_sensor_count(length);
+
+    for (uint8_t sensor_index = 0; sensor_index < sensor_count; sensor_index++) {
+        struct sensor_value value = {0};
+        if (!sensor_delta_value(source, sensor_index,
+                                esb_keepalive_sensor_total_udeg(keepalive, sensor_index),
+                                &value)) {
+            continue;
+        }
+        LOG_WRN("Reconcile lost rotation: sensor %u from %u", (unsigned int)sensor_index,
+                (unsigned int)source);
+        struct zmk_split_transport_peripheral_event event = {
+            .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_SENSOR_EVENT,
+            .data.sensor_event = {
+                .channel_data = {.value = value, .channel = SENSOR_CHAN_ROTATION},
+                .sensor_index = sensor_index,
+            },
+        };
+        zmk_split_transport_central_peripheral_event_handler(&esb_central, source, event);
+    }
+}
+#else
+static void reconcile_sensor_totals(uint8_t source, const uint8_t *keepalive, uint8_t length) {
+    ARG_UNUSED(source);
+    ARG_UNUSED(keepalive);
+    ARG_UNUSED(length);
+}
+#endif
+
 static void central_event_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     struct central_inbound inbound;
     while (k_msgq_get(&central_event_msgq, &inbound, K_NO_WAIT) == 0) {
         if (inbound.kind == CENTRAL_INBOUND_KEEPALIVE) {
-            replay_position_diff(inbound.source, inbound.data.keepalive.position_bitmap,
+            const uint8_t *keepalive = inbound.data.keepalive.data;
+
+            replay_position_diff(inbound.source, esb_keepalive_bitmap(keepalive),
                                  "Reconcile lost");
             if (IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING) &&
                 !IS_ENABLED(CONFIG_ZMK_SPLIT_BLE_CENTRAL_BATTERY_LEVEL_FETCHING)) {
-                reconcile_battery(inbound.source, inbound.data.keepalive.battery_level);
+                reconcile_battery(inbound.source, esb_keepalive_battery_level(keepalive));
             }
+            reconcile_sensor_totals(inbound.source, keepalive, inbound.data.keepalive.length);
             continue;
         }
         if (inbound.data.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT) {
@@ -287,6 +385,10 @@ static void central_event_work_fn(struct k_work *work) {
             if (IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)) {
                 reconcile_battery(inbound.source, inbound.data.event.data.battery_event.level);
             }
+            continue;
+        }
+        if (inbound.data.event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_SENSOR_EVENT &&
+            !sensor_event_to_delta(inbound.source, &inbound.data.event)) {
             continue;
         }
         zmk_split_transport_central_peripheral_event_handler(&esb_central, inbound.source,
@@ -306,9 +408,10 @@ static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
             .source = pipe,
             .kind = CENTRAL_INBOUND_KEEPALIVE,
         };
-        memcpy(inbound.data.keepalive.position_bitmap, esb_keepalive_bitmap(data),
-               ESB_KEEPALIVE_BITMAP_BYTES);
-        inbound.data.keepalive.battery_level = esb_keepalive_battery_level(data);
+        /* Totals beyond local sensors truncate with the copy.
+         * Count derives from the copied length. */
+        inbound.data.keepalive.length = (uint8_t)MIN(length, KEEPALIVE_COPY_LENGTH);
+        memcpy(inbound.data.keepalive.data, data, inbound.data.keepalive.length);
         if (k_msgq_put(&central_event_msgq, &inbound, K_NO_WAIT) < 0) {
             return; /* next keepalive retries */
         }

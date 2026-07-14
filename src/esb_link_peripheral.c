@@ -24,9 +24,6 @@
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-BUILD_ASSERT(ESB_KEEPALIVE_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
-             "keepalive does not fit in one ESB payload");
-
 BUILD_ASSERT(DT_HAS_CHOSEN(zmk_esb_self), "peripheral needs a chosen zmk,esb-self");
 static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
 
@@ -122,12 +119,13 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     return error;
 }
 
-void esb_link_send_keepalive(uint8_t state, const uint8_t *position_bitmap,
-                             uint8_t battery_level) {
+void esb_link_send_keepalive(uint8_t state) {
     struct esb_payload keepalive = {0};
     keepalive.pipe = self_pipe;
-    keepalive.length = ESB_KEEPALIVE_LENGTH;
-    esb_keepalive_encode(keepalive.data, state, position_bitmap, battery_level);
+    keepalive.length = esb_link_keepalive_fill(keepalive.data, sizeof(keepalive.data), state);
+    if (keepalive.length == 0) {
+        return;
+    }
     (void)submit_payload(&keepalive);
 }
 
