@@ -243,13 +243,16 @@ static void score_current_channel(uint32_t motion, uint32_t active) {
 }
 
 /* Writes pending, not active: commit_pending_mask applies it at the next hop. */
-static void recompute_mask(void) {
+static void recompute_mask(uint32_t active) {
     ensure_mask();
     bool changed = false;
     for (size_t channel = 0; channel < HOP_COUNT; channel++) {
         if (hop_policy_mask_get(pending_mask, channel)) {
-            /* Full restore period survived unmasked: proven clean. */
-            if (channel_active_windows[channel] < restore_windows) {
+            /* Restore period served live resets the retest backoff.
+             * Unvisited pool time proves nothing, a loitering bad channel
+             * would reset its own escalation. */
+            bool served = channel == hop_index && active != 0;
+            if (served && channel_active_windows[channel] < restore_windows) {
                 if (++channel_active_windows[channel] >= restore_windows) {
                     channel_retest_level[channel] = 0;
                 }
@@ -350,7 +353,7 @@ static void decision_work_fn(struct k_work *work) {
     LOG_DBG("hop: heard=%02x motion=%02x active=%02x", (unsigned)heard, (unsigned)motion,
             (unsigned)active);
     score_current_channel(motion, active);
-    recompute_mask();
+    recompute_mask(active);
     uint32_t rejoining = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         if ((heard & BIT(pipe)) && hop_pipe_needs_rendezvous(pipe)) {
