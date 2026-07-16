@@ -19,29 +19,44 @@
 #define SURVEY_PASS_GAP_MS 5
 #define SURVEY_SILENT_DBM INT8_MIN
 #define SURVEY_RSSI_SETTLE_US 15
+#define SURVEY_EVENT_TIMEOUT_US 200
+
+static bool wait_radio_event(nrf_radio_event_t event) {
+    for (uint32_t elapsed_us = 0; elapsed_us < SURVEY_EVENT_TIMEOUT_US; elapsed_us++) {
+        if (nrf_radio_event_check(NRF_RADIO, event)) {
+            return true;
+        }
+        k_busy_wait(1);
+    }
+    return false;
+}
+
+static void radio_disable(void) {
+    nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_DISABLED);
+    nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_DISABLE);
+    (void)wait_radio_event(NRF_RADIO_EVENT_DISABLED);
+}
 
 static int8_t sample_channel_dbm(uint8_t channel) {
     nrf_radio_frequency_set(NRF_RADIO, 2400 + channel);
     nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_READY);
     nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RXEN);
-    while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_READY)) {
-    }
-    k_busy_wait(SURVEY_RSSI_SETTLE_US);
     int8_t peak_dbm = SURVEY_SILENT_DBM;
-    for (uint8_t sample = 0; sample < SURVEY_SAMPLES_PER_PASS; sample++) {
-        nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND);
-        nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RSSISTART);
-        while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND)) {
-        }
-        int8_t dbm = hop_policy_rssi_to_dbm((int8_t)nrf_radio_rssi_sample_get(NRF_RADIO));
-        if (dbm > peak_dbm) {
-            peak_dbm = dbm;
+    if (wait_radio_event(NRF_RADIO_EVENT_READY)) {
+        k_busy_wait(SURVEY_RSSI_SETTLE_US);
+        for (uint8_t sample = 0; sample < SURVEY_SAMPLES_PER_PASS; sample++) {
+            nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND);
+            nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RSSISTART);
+            if (!wait_radio_event(NRF_RADIO_EVENT_RSSIEND)) {
+                break;
+            }
+            int8_t dbm = hop_policy_rssi_to_dbm((int8_t)nrf_radio_rssi_sample_get(NRF_RADIO));
+            if (dbm > peak_dbm) {
+                peak_dbm = dbm;
+            }
         }
     }
-    nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_DISABLED);
-    nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_DISABLE);
-    while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_DISABLED)) {
-    }
+    radio_disable();
     return peak_dbm;
 }
 
