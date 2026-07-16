@@ -5,10 +5,12 @@
  * Boot-time energy sweep over the hop pool, raw RADIO registers.
  * ESB owns the radio afterwards, so this runs only before esb_init.
  */
+#include <zephyr/irq.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/util.h>
 
+#include <cmsis_core.h>
 #include <hal/nrf_radio.h>
 
 #include "esb_survey.h"
@@ -63,6 +65,12 @@ static int8_t sample_channel_dbm(uint8_t channel) {
 void esb_survey_run(const uint8_t *channels, size_t count, int8_t *energy_dbm) {
     __ASSERT_NO_MSG(channels != NULL);
     __ASSERT_NO_MSG(energy_dbm != NULL);
+    /* Bootloader chain can hand over RADIO IRQ armed (ESB DFU endpoint).
+     * An event would then vector into a missing handler and fault.
+     * Power cycle clears inherited INTEN before any event can fire. */
+    irq_disable(RADIO_IRQn);
+    NVIC_ClearPendingIRQ(RADIO_IRQn);
+    nrf_radio_power_set(NRF_RADIO, false);
     nrf_radio_power_set(NRF_RADIO, true);
     nrf_radio_mode_set(NRF_RADIO, NRF_RADIO_MODE_NRF_1MBIT);
     for (size_t index = 0; index < count; index++) {
