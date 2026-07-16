@@ -18,6 +18,7 @@
 #define SURVEY_SAMPLES_PER_PASS 8
 #define SURVEY_PASS_GAP_MS 5
 #define SURVEY_SILENT_DBM INT8_MIN
+#define SURVEY_RSSI_SETTLE_US 15
 
 static int8_t sample_channel_dbm(uint8_t channel) {
     nrf_radio_frequency_set(NRF_RADIO, 2400 + channel);
@@ -25,6 +26,7 @@ static int8_t sample_channel_dbm(uint8_t channel) {
     nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RXEN);
     while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_READY)) {
     }
+    k_busy_wait(SURVEY_RSSI_SETTLE_US);
     int8_t peak_dbm = SURVEY_SILENT_DBM;
     for (uint8_t sample = 0; sample < SURVEY_SAMPLES_PER_PASS; sample++) {
         nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND);
