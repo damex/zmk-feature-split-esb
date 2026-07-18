@@ -119,65 +119,76 @@ static void adopt_staged_mask(void) {
  * Statically initialized for the same SYS_INIT-order reason as the central work. */
 static void keepalive_work_fn(struct k_work *work);
 static struct k_work_delayable keepalive_work = Z_WORK_DELAYABLE_INITIALIZER(keepalive_work_fn);
+static void adopt_epoch(uint8_t epoch) {
+    adopted_epoch = epoch;
+    adopt_staged_mask(); /* swap mask with the epoch, matching the central's commit */
+    hop_index = hop_policy_channel_for_epoch_masked(epoch, active_mask, HOP_COUNT);
+    apply_hop_channel();
+    bad_windows = 0;
+    lost_windows = 0;
+    camp_dwell = 0;
+    degrade_undo_armed = false;
+    atomic_set(&max_tx_attempts, 0);
+}
+
+static void connected_window(void) {
+    lost_windows = 0;
+    degrade_undo_armed = false;
+    uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
+    if (attempts > 0) {
+        attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
+        uint8_t budget = hop_policy_adaptive_retransmits(
+            attempts_ewma_x10, ADAPTIVE_RETRANSMITS_MIN, retransmit_ceiling);
+        if (budget != applied_retransmits && esb_set_retransmit_count(budget) == 0) {
+            applied_retransmits = budget;
+        }
+    }
+    uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
+    if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
+        degrade_undo_index = hop_index;
+        degrade_undo_armed = true;
+        hop_index = hop_policy_index_next_active(hop_index, active_mask, HOP_COUNT);
+        apply_hop_channel();
+    }
+}
+
+static void lost_window(void) {
+    atomic_set(&max_tx_attempts, 0);
+    bad_windows = 0;
+    if (lost_windows < UINT16_MAX) {
+        lost_windows++;
+    }
+    if (degrade_undo_armed) {
+        degrade_undo_armed = false;
+        hop_index = degrade_undo_index;
+        apply_hop_channel();
+    } else if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
+        if (lost_windows % ESB_HOP_SWEEP_DWELL_WINDOWS == 0) {
+            hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
+            apply_hop_channel();
+        }
+    } else {
+        hop_policy_camp_step(&camp_anchor, &camp_dwell, ESB_HOP_ANCHOR_COUNT,
+                             ESB_HOP_ANCHOR_DWELL_WINDOWS);
+        uint8_t anchor_index = hop_anchor_index_at(camp_anchor);
+        if (hop_index != anchor_index) {
+            hop_index = anchor_index;
+            apply_hop_channel();
+        }
+    }
+}
+
 static void keepalive_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     if (HOP_COUNT > 1) {
         ensure_mask();
         uint8_t epoch = (uint8_t)atomic_get(&beacon_epoch);
         if (epoch != adopted_epoch) {
-            adopted_epoch = epoch;
-            adopt_staged_mask(); /* swap mask with the epoch, matching the central's commit */
-            hop_index = hop_policy_channel_for_epoch_masked(epoch, active_mask, HOP_COUNT);
-            apply_hop_channel();
-            bad_windows = 0;
-            lost_windows = 0;
-            camp_dwell = 0;
-            degrade_undo_armed = false;
-            atomic_set(&max_tx_attempts, 0);
+            adopt_epoch(epoch);
         } else if (atomic_get(&link_acked) != 0) {
-            /* Connected: hop off a degrading channel. */
-            lost_windows = 0;
-            degrade_undo_armed = false;
-            uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
-            if (attempts > 0) {
-                attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
-                uint8_t budget = hop_policy_adaptive_retransmits(
-                    attempts_ewma_x10, ADAPTIVE_RETRANSMITS_MIN, retransmit_ceiling);
-                if (budget != applied_retransmits && esb_set_retransmit_count(budget) == 0) {
-                    applied_retransmits = budget;
-                }
-            }
-            uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
-            if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
-                degrade_undo_index = hop_index;
-                degrade_undo_armed = true;
-                hop_index = hop_policy_index_next_active(hop_index, active_mask, HOP_COUNT);
-                apply_hop_channel();
-            }
+            connected_window();
         } else {
-            atomic_set(&max_tx_attempts, 0);
-            bad_windows = 0;
-            if (lost_windows < UINT16_MAX) {
-                lost_windows++;
-            }
-            if (degrade_undo_armed) {
-                degrade_undo_armed = false;
-                hop_index = degrade_undo_index;
-                apply_hop_channel();
-            } else if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
-                if (lost_windows % ESB_HOP_SWEEP_DWELL_WINDOWS == 0) {
-                    hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
-                    apply_hop_channel();
-                }
-            } else {
-                hop_policy_camp_step(&camp_anchor, &camp_dwell, ESB_HOP_ANCHOR_COUNT,
-                                     ESB_HOP_ANCHOR_DWELL_WINDOWS);
-                uint8_t anchor_index = hop_anchor_index_at(camp_anchor);
-                if (hop_index != anchor_index) {
-                    hop_index = anchor_index;
-                    apply_hop_channel();
-                }
-            }
+            lost_window();
         }
         if (atomic_get(&link_acked) != 0) {
             retain_link_state();
