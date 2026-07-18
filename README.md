@@ -153,7 +153,7 @@ no HID-indicator forwarding.
 | `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight`, `reply-queue-depth` (central command backlog for this pipe, default 8) |
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
 | `hop-anchors` | unmaskable rendezvous set, a subset of hop-channels, build assert enforces. Omit and the engine spreads three across the pool. Pick channels clear of local WiFi |
-| `hop-threshold` | graded loss before acting: central hop-vote sum, peripheral sweep streak; fully-lost window scores 4 (default 6) |
+| `hop-threshold` | graded loss before acting: central hop-vote sum, peripheral sweep streak; fully-lost window scores 4 (default 24) |
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
 | `rssi-floor-dbm` | central counts a served peripheral's motion weaker than this (dBm) as a degraded window (default -85) |
 | `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
