@@ -163,7 +163,7 @@ no HID-indicator forwarding.
 | `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
 | `peripheral-timeout-ms` | silence before the central releases a peripheral's held state (default 3000) |
 | `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
-| `retransmit-count` | retransmits before drop (default 3) |
+| `retransmit-count` | retransmit ceiling before drop, peripheral adapts 2..ceiling from link quality (default 12) |
 | `retransmit-delay-us` | delay between retransmits (default 600) |
 | `use-fast-ramp-up` | shorter radio ramp-up, nRF52/nRF53, all peripherals must match the central |
 | `crc-bits` | CRC width 0/8/16, all peripherals must match the central (default 16) |

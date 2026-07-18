@@ -41,6 +41,25 @@ uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts) {
     return (uint8_t)penalty;
 }
 
+uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample) {
+    int32_t sample_x10 = (int32_t)sample * 10;
+    int32_t delta = (sample_x10 - (int32_t)ewma_x10) / (1 << HOP_POLICY_ATTEMPTS_EWMA_SHIFT);
+    return (uint16_t)((int32_t)ewma_x10 + delta);
+}
+
+uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, uint8_t count_max) {
+    assert(count_min <= count_max);
+    if (ewma_x10 <= HOP_POLICY_RETRY_EWMA_LOW_X10) {
+        return count_min;
+    }
+    if (ewma_x10 >= HOP_POLICY_RETRY_EWMA_HIGH_X10) {
+        return count_max;
+    }
+    uint32_t span = HOP_POLICY_RETRY_EWMA_HIGH_X10 - HOP_POLICY_RETRY_EWMA_LOW_X10;
+    uint32_t into = (uint32_t)ewma_x10 - HOP_POLICY_RETRY_EWMA_LOW_X10;
+    return (uint8_t)(count_min + (into * (uint32_t)(count_max - count_min)) / span);
+}
+
 bool hop_policy_is_beacon(const uint8_t *data, uint8_t length) {
     assert(data != NULL);
     return length == ESB_BEACON_LENGTH && data[0] == ESB_BEACON_TAG;

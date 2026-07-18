@@ -109,8 +109,11 @@ properties:
     description: Boot TX output power, dBm. Radio rounds to nearest supported level.
   retransmit-count:
     type: int
-    default: 3
-    description: Hardware retransmit attempts before an unacked packet is dropped.
+    default: 12
+    description: |
+      Hardware retransmit ceiling before an unacked packet is dropped. The peripheral
+      adapts the live count between 2 and this from its attempts EWMA, so a clean link
+      keeps low tail latency and a degraded one spends the full budget.
   retransmit-delay-us:
     type: int
     default: 600

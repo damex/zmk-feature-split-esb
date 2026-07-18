@@ -12,6 +12,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 
+#include <esb.h>
+
 #include <zmk_split_esb.h>
 
 #include "esb_keepalive.h"
@@ -23,6 +25,11 @@
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
              "hop-threshold above 255 never fires, sweep streak saturates at UINT8_MAX");
+
+#define ADAPTIVE_RETRANSMITS_MIN 2
+static const uint8_t retransmit_ceiling = DT_INST_PROP(0, retransmit_count);
+static uint16_t attempts_ewma_x10 = 10;
+static uint8_t applied_retransmits = DT_INST_PROP(0, retransmit_count);
 static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
@@ -128,6 +135,14 @@ static void keepalive_work_fn(struct k_work *work) {
             /* Connected: hop off a degrading channel. */
             lost_windows = 0;
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
+            if (attempts > 0) {
+                attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
+                uint8_t budget = hop_policy_adaptive_retransmits(
+                    attempts_ewma_x10, ADAPTIVE_RETRANSMITS_MIN, retransmit_ceiling);
+                if (budget != applied_retransmits && esb_set_retransmit_count(budget) == 0) {
+                    applied_retransmits = budget;
+                }
+            }
             uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
             if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
                 hop_index = hop_policy_index_next_active(hop_index, active_mask, HOP_COUNT);

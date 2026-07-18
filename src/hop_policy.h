@@ -55,6 +55,15 @@ bool hop_policy_should_hop(uint8_t *bad_windows, uint8_t penalty, uint16_t thres
 #define HOP_POLICY_TX_ATTEMPTS_GRADE_STEP 4
 uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts);
 
+#define HOP_POLICY_ATTEMPTS_EWMA_SHIFT 2
+uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
+
+/* Retransmit budget from the attempts EWMA: count_min at or below the low
+ * breakpoint, count_max at or above the high one, linear between. */
+#define HOP_POLICY_RETRY_EWMA_LOW_X10 15
+#define HOP_POLICY_RETRY_EWMA_HIGH_X10 45
+uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, uint8_t count_max);
+
 bool hop_policy_is_beacon(const uint8_t *data, uint8_t length);
 
 uint8_t hop_policy_index_next(uint8_t index, size_t count);

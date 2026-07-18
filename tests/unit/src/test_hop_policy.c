@@ -327,6 +327,29 @@ ZTEST(hop_policy, test_should_beacon) {
     zassert_true(hop_policy_should_beacon(2, &beaconed, &repeats, 4), "new change re-arms");
 }
 
+ZTEST(hop_policy, test_ewma_update) {
+    zassert_equal(hop_policy_ewma_update(10, 1), 10, "clean sample holds steady");
+    zassert_equal(hop_policy_ewma_update(10, 5), 20, "bad sample pulls up by a quarter");
+    zassert_equal(hop_policy_ewma_update(40, 1), 33, "clean sample decays");
+
+    uint16_t ewma = 10;
+    for (uint8_t window = 0; window < 32; window++) {
+        ewma = hop_policy_ewma_update(ewma, 8);
+    }
+    zassert_within(ewma, 80, 3, "converges to the sample");
+}
+
+ZTEST(hop_policy, test_adaptive_retransmits) {
+    zassert_equal(hop_policy_adaptive_retransmits(10, 2, 12), 2, "clean link floors");
+    zassert_equal(hop_policy_adaptive_retransmits(HOP_POLICY_RETRY_EWMA_LOW_X10, 2, 12), 2,
+                  "low breakpoint floors");
+    zassert_equal(hop_policy_adaptive_retransmits(HOP_POLICY_RETRY_EWMA_HIGH_X10, 2, 12), 12,
+                  "high breakpoint saturates");
+    zassert_equal(hop_policy_adaptive_retransmits(60, 2, 12), 12, "worse than high saturates");
+    zassert_equal(hop_policy_adaptive_retransmits(30, 2, 12), 7, "midpoint interpolates");
+    zassert_equal(hop_policy_adaptive_retransmits(30, 3, 3), 3, "degenerate range is total");
+}
+
 ZTEST(hop_policy, test_index_next_active) {
     uint8_t mask[1] = {0x0D};
 
