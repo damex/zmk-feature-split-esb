@@ -87,7 +87,7 @@ static void keepalive_work_fn(struct k_work *work) {
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
             uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
             if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
-                hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
+                hop_index = hop_policy_index_next_active(hop_index, active_mask, HOP_COUNT);
                 apply_hop_channel();
             }
         } else {

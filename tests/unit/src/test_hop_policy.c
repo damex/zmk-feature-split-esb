@@ -327,6 +327,20 @@ ZTEST(hop_policy, test_should_beacon) {
     zassert_true(hop_policy_should_beacon(2, &beaconed, &repeats, 4), "new change re-arms");
 }
 
+ZTEST(hop_policy, test_index_next_active) {
+    uint8_t mask[1] = {0x0D};
+
+    zassert_equal(hop_policy_index_next_active(0, mask, 4), 2, "skips masked slot 1");
+    zassert_equal(hop_policy_index_next_active(2, mask, 4), 3, "steps to next active");
+    zassert_equal(hop_policy_index_next_active(3, mask, 4), 0, "wraps to slot 0");
+
+    uint8_t solo[1] = {0x04};
+    zassert_equal(hop_policy_index_next_active(2, solo, 4), 2, "sole active returns itself");
+
+    uint8_t empty[1] = {0x00};
+    zassert_equal(hop_policy_index_next_active(1, empty, 4), 1, "empty mask returns index");
+}
+
 ZTEST(hop_policy, test_survey_mask) {
     uint8_t mask[1] = {0x3F};
     uint8_t anchor_mask[1] = {0x01};

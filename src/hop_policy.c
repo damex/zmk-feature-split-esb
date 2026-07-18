@@ -183,6 +183,18 @@ uint16_t hop_policy_retest_threshold(uint16_t base_windows, uint8_t level) {
     return (uint16_t)threshold;
 }
 
+uint8_t hop_policy_index_next_active(uint8_t index, const uint8_t *mask, size_t count) {
+    assert(mask != NULL);
+    assert(count > 0);
+    for (size_t step = 1; step <= count; step++) {
+        size_t candidate = ((size_t)index + step) % count;
+        if (hop_policy_mask_get(mask, candidate)) {
+            return (uint8_t)candidate;
+        }
+    }
+    return index;
+}
+
 uint8_t hop_policy_channel_for_epoch_masked(uint16_t epoch, const uint8_t *mask, size_t pool_count) {
     assert(mask != NULL);
     assert(pool_count > 0);
