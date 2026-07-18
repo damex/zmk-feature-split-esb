@@ -466,7 +466,7 @@ static int central_init(void) {
     if (clock_error) {
         return clock_error;
     }
-    hop_survey();
+    hop_boot_mask();
     return esb_link_init(central_on_rx);
 }
 

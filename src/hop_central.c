@@ -465,7 +465,7 @@ void hop_stop(void) {
     k_work_cancel_delayable(&decision_work);
 }
 
-void hop_survey(void) {
+void hop_boot_mask(void) {
     if (HOP_COUNT <= 1) {
         return;
     }

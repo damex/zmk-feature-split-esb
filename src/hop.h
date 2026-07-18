@@ -53,9 +53,9 @@ bool hop_pipe_needs_rendezvous(uint8_t pipe);
 uint32_t hop_pipe_quiet_ms(uint8_t pipe);
 bool hop_pipe_heard(uint8_t pipe);
 
-/* Boot energy sweep seeds the channel mask.
+/* Boot mask from persisted spectrum and an energy sweep.
  * Radio must be idle: run before esb_link_init, HFCLK running. */
-void hop_survey(void);
+void hop_boot_mask(void);
 #else
 /* Resume last-acked channel state from retained RAM.
  * Run before esb_link_init, so the radio tunes to it. */
