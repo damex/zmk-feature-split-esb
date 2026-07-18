@@ -28,6 +28,7 @@
 #include "esb_link.h"
 #include "esb_sensor_sync.h"
 #include "esb_wire.h"
+#include "hop.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -238,6 +239,7 @@ static void peripheral_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
 }
 
 static int peripheral_init(void) {
+    hop_restore();
     return esb_link_init(peripheral_on_rx);
 }
 

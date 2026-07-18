@@ -51,6 +51,49 @@ static void ensure_mask(void) {
     mask_ready = true;
 }
 
+#define HOP_RETAINED_MAGIC 0x484F5031
+
+struct hop_retained {
+    uint32_t magic;
+    uint8_t hop_index;
+    uint8_t epoch;
+    uint8_t mask[ESB_HOP_MASK_BYTES];
+    uint8_t checksum;
+};
+static __noinit struct hop_retained retained_link;
+
+static uint8_t retained_checksum(const struct hop_retained *retained) {
+    uint8_t sum = (uint8_t)(retained->hop_index ^ retained->epoch);
+    for (size_t byte = 0; byte < ESB_HOP_MASK_BYTES; byte++) {
+        sum ^= retained->mask[byte];
+    }
+    return sum;
+}
+
+static void retain_link_state(void) {
+    retained_link.hop_index = hop_index;
+    retained_link.epoch = adopted_epoch;
+    memcpy(retained_link.mask, active_mask, ESB_HOP_MASK_BYTES);
+    retained_link.checksum = retained_checksum(&retained_link);
+    retained_link.magic = HOP_RETAINED_MAGIC;
+}
+
+void hop_restore(void) {
+    if (HOP_COUNT <= 1) {
+        return;
+    }
+    if (retained_link.magic != HOP_RETAINED_MAGIC ||
+        retained_link.checksum != retained_checksum(&retained_link) ||
+        retained_link.hop_index >= HOP_COUNT) {
+        return;
+    }
+    ensure_mask();
+    memcpy(active_mask, retained_link.mask, ESB_HOP_MASK_BYTES);
+    adopted_epoch = retained_link.epoch;
+    atomic_set(&beacon_epoch, adopted_epoch);
+    hop_index = retained_link.hop_index;
+}
+
 /* Read under the lock the radio ISR stages with. */
 static void adopt_staged_mask(void) {
     if (atomic_get(&mask_update_seen) == 0) {
@@ -110,6 +153,9 @@ static void keepalive_work_fn(struct k_work *work) {
                     apply_hop_channel();
                 }
             }
+        }
+        if (atomic_get(&link_acked) != 0) {
+            retain_link_state();
         }
     }
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
