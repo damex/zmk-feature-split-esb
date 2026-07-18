@@ -11,7 +11,10 @@
 #include <esb.h>
 
 #include <zephyr/init.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
+
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static int esb_config_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg) {
     const char *next;
@@ -38,8 +41,15 @@ SETTINGS_STATIC_HANDLER_DEFINE(esb_config, "esb", NULL, esb_config_set, NULL, NU
 
 /* After peripheral_init brings the radio up, so a restored value applies live. */
 static int esb_config_init(void) {
-    settings_subsys_init();
-    settings_load_subtree("esb");
-    return 0;
+    int error = settings_subsys_init();
+    if (error < 0) {
+        LOG_ERR("settings init failed (%d)", error);
+        return error;
+    }
+    error = settings_load_subtree("esb");
+    if (error < 0) {
+        LOG_ERR("esb settings load failed (%d)", error);
+    }
+    return error;
 }
 SYS_INIT(esb_config_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
