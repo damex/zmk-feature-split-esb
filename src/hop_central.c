@@ -58,7 +58,7 @@ BUILD_ASSERT(ESB_BEACON_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
              "beacon does not fit one control latch; raise ESB_LINK_CONTROL_MAX_LENGTH");
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
-static int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
+static volatile int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
 static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
@@ -235,11 +235,11 @@ static void stage_beacon(uint32_t heard) {
     }
 }
 
-static void score_current_channel(uint32_t motion, uint32_t active) {
+static void score_current_channel(uint32_t motion, uint32_t active, const int8_t *rssi_dbm) {
     if (active == 0) {
         return;
     }
-    uint8_t penalty = hop_policy_window_penalty(motion, active, pipe_rssi_dbm, rssi_floor_dbm,
+    uint8_t penalty = hop_policy_window_penalty(motion, active, rssi_dbm, rssi_floor_dbm,
                                                 PERIPHERAL_COUNT);
     hop_policy_score_update(&channel_bad[hop_index], penalty, CHANNEL_BAD_DECAY);
 }
@@ -351,10 +351,14 @@ static void decision_work_fn(struct k_work *work) {
         return;
     }
 
-    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, pipe_rssi_dbm, rssi_floor_dbm);
+    int8_t rssi_snapshot[PERIPHERAL_COUNT];
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        rssi_snapshot[pipe] = pipe_rssi_dbm[pipe];
+    }
+    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, rssi_snapshot, rssi_floor_dbm);
     LOG_DBG("hop: heard=%02x motion=%02x active=%02x", (unsigned)heard, (unsigned)motion,
             (unsigned)active);
-    score_current_channel(motion, active);
+    score_current_channel(motion, active, rssi_snapshot);
     recompute_mask(active);
     uint32_t rejoining = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {

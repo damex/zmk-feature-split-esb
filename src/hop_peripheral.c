@@ -34,7 +34,7 @@ static uint16_t lost_windows;
 static uint8_t camp_anchor = ESB_HOP_ANCHOR_COUNT - 1;
 static uint16_t camp_dwell;
 static uint8_t adopted_epoch;
-static int8_t uplink_rssi_dbm;
+static volatile int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 static uint8_t staged_mask[ESB_HOP_MASK_BYTES];
