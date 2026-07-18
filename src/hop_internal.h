@@ -21,10 +21,9 @@
 #define ESB_MASK_UPDATE_TAG 0xFD
 struct esb_mask_update {
     uint8_t tag;
-    uint8_t version;
     uint8_t mask[ESB_HOP_MASK_BYTES];
 } __attribute__((packed));
-#define ESB_MASK_UPDATE_LENGTH (2 + ESB_HOP_MASK_BYTES)
+#define ESB_MASK_UPDATE_LENGTH (1 + ESB_HOP_MASK_BYTES)
 
 static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
     return length == ESB_MASK_UPDATE_LENGTH && data[0] == ESB_MASK_UPDATE_TAG;

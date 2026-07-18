@@ -81,7 +81,6 @@ static uint8_t pending_mask[ESB_HOP_MASK_BYTES];
 static uint8_t anchor_mask[ESB_HOP_MASK_BYTES];
 static bool pending_valid;
 static bool mask_ready;
-static uint8_t mask_version;
 static uint8_t mask_update_repeats;
 static uint16_t mask_window;
 
@@ -145,7 +144,6 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
     struct esb_beacon beacon = {.tag = ESB_BEACON_TAG,
                                 .epoch = hop_epoch,
                                 .rssi_dbm = pipe_rssi_dbm[pipe],
-                                .mask_version = mask_version,
                                 .hid_modifiers = hid_modifiers,
                                 .hid_indicators = hid_indicators};
     for (uint8_t peer = 0; peer < PERIPHERAL_COUNT; peer++) {
@@ -288,7 +286,6 @@ static void recompute_mask(uint32_t active) {
         }
     }
     if (changed) {
-        mask_version++;
         pending_valid = true;
         mask_update_repeats = MASK_UPDATE_REPEAT_WINDOWS;
     }
@@ -304,7 +301,7 @@ static void stage_mask_update(void) {
         return;
     }
     const uint8_t *mask = pending_valid ? pending_mask : active_mask;
-    struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG, .version = mask_version};
+    struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG};
     memcpy(update.mask, mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         if (hop_pipe_needs_rendezvous(pipe)) {
@@ -441,7 +438,6 @@ void hop_survey(void) {
     /* Pre-traffic: adopt in place, esb_link_init tunes to hop_current_channel.
      * Epoch bump makes a peripheral re-adopt, staying at 0 reads as no change. */
     memcpy(active_mask, pending_mask, ESB_HOP_MASK_BYTES);
-    mask_version++;
     mask_update_repeats = MASK_UPDATE_REPEAT_WINDOWS;
     hop_epoch++;
     hop_index = hop_policy_channel_for_epoch_masked(hop_epoch, active_mask, HOP_COUNT);
