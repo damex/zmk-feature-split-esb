@@ -307,6 +307,9 @@ int esb_link_set_enabled(bool enabled) {
         return acquire_error;
     }
     int start_error = esb_link_role_start();
+    if (start_error) {
+        return start_error;
+    }
     hop_start();
-    return start_error;
+    return 0;
 }
