@@ -123,8 +123,6 @@ static const uint32_t peripheral_timeout_ms = DT_INST_PROP(0, peripheral_timeout
 
 /* Written on the RX thread, read by the staleness tick: single writer per slot,
  * aligned loads, no lock needed. */
-static uint32_t pipe_last_heard_ms[ESB_LINK_PIPE_MAX];
-static bool pipe_heard[ESB_LINK_PIPE_MAX];
 static uint32_t pipe_seen_input_regs[ESB_LINK_PIPE_MAX];
 
 static bool pipe_stale[ESB_LINK_PIPE_MAX];
@@ -275,12 +273,13 @@ static K_WORK_DELAYABLE_DEFINE(staleness_work, staleness_work_fn);
 
 static void staleness_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint32_t now = k_uptime_get_32();
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
-        LOG_DBG("pipe %u heard=%d quiet=%ums connection=%d", (unsigned)pipe, (int)pipe_heard[pipe],
-                (unsigned)(now - pipe_last_heard_ms[pipe]), (int)pipe_connected[pipe]);
-        if (pipe_heard[pipe]) {
-            if ((now - pipe_last_heard_ms[pipe]) <= peripheral_timeout_ms) {
+        uint32_t quiet_ms = hop_pipe_quiet_ms(pipe);
+        bool heard = hop_pipe_heard(pipe);
+        LOG_DBG("pipe %u heard=%d quiet=%ums connection=%d", (unsigned)pipe, (int)heard,
+                (unsigned)quiet_ms, (int)pipe_connected[pipe]);
+        if (heard) {
+            if (quiet_ms <= peripheral_timeout_ms) {
                 pipe_stale[pipe] = false;
             } else if (!pipe_stale[pipe]) {
                 pipe_stale[pipe] = true;
@@ -290,7 +289,7 @@ static void staleness_work_fn(struct k_work *work) {
                 sensor_tracks_reset(pipe);
             }
         }
-        bool connected = pipe_heard[pipe] && !pipe_stale[pipe];
+        bool connected = heard && !pipe_stale[pipe];
         if (connected != pipe_connected[pipe]) {
             pipe_connected[pipe] = connected;
             raise_zmk_split_esb_peripheral_changed(
@@ -401,10 +400,6 @@ static void central_event_work_fn(struct k_work *work) {
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
 static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
-    if (pipe < ESB_LINK_PIPE_MAX) {
-        pipe_last_heard_ms[pipe] = k_uptime_get_32();
-        pipe_heard[pipe] = true;
-    }
     if (esb_keepalive_matches(data, (uint8_t)length)) {
         struct central_inbound inbound = {
             .source = pipe,

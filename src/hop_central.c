@@ -65,7 +65,9 @@ static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
 static uint16_t silent_windows;
 static uint8_t silent_escapes;
-static uint8_t pipe_silent[PERIPHERAL_COUNT];
+static volatile uint32_t pipe_last_heard_ms[PERIPHERAL_COUNT];
+static volatile bool pipe_ever_heard[PERIPHERAL_COUNT];
+static uint32_t pipe_was_lost_mask;
 static uint16_t anchor_visit_window;
 static uint8_t rendezvous_anchor;
 static uint16_t windows_since_hop;
@@ -140,29 +142,25 @@ static void clear_pipe_loss(void) {
     }
 }
 
+uint32_t hop_pipe_quiet_ms(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return UINT32_MAX;
+    }
+    return k_uptime_get_32() - pipe_last_heard_ms[pipe];
+}
+
+bool hop_pipe_heard(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return false;
+    }
+    return pipe_ever_heard[pipe];
+}
+
 bool hop_pipe_needs_rendezvous(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return true;
     }
-    return pipe_silent[pipe] >= ESB_HOP_LOST_WINDOWS;
-}
-
-static void update_pipe_silence(uint32_t heard) {
-    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (heard & BIT(pipe)) {
-            pipe_silent[pipe] = 0;
-        } else if (pipe_silent[pipe] < UINT8_MAX) {
-            pipe_silent[pipe]++;
-        }
-    }
-}
-
-static void clear_silence_for_heard(uint32_t heard) {
-    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (heard & BIT(pipe)) {
-            pipe_silent[pipe] = 0;
-        }
-    }
+    return hop_pipe_quiet_ms(pipe) >= ESB_HOP_LOSS_DETECT_MS;
 }
 
 static bool any_pipe_needs_rendezvous(void) {
@@ -379,7 +377,6 @@ static void decision_work_fn(struct k_work *work) {
     uint32_t heard = (uint32_t)atomic_set(&pipe_heard_mask, 0);
 
     if (HOP_COUNT <= 1) {
-        update_pipe_silence(heard);
         stage_beacon(heard);
         k_work_reschedule(&decision_work, K_MSEC(decision_ms));
         return;
@@ -394,7 +391,6 @@ static void decision_work_fn(struct k_work *work) {
          * A lost pipe heard here has rejoined. */
         in_anchor_visit = false;
         apply_hop_channel();
-        clear_silence_for_heard(heard);
         k_work_reschedule(&decision_work, K_MSEC(decision_ms));
         return;
     }
@@ -410,11 +406,16 @@ static void decision_work_fn(struct k_work *work) {
     recompute_mask(active);
     uint32_t rejoining = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if ((heard & BIT(pipe)) && hop_pipe_needs_rendezvous(pipe)) {
+        if ((heard & BIT(pipe)) && (pipe_was_lost_mask & BIT(pipe)) != 0) {
             rejoining |= BIT(pipe);
         }
     }
-    update_pipe_silence(heard);
+    pipe_was_lost_mask = 0;
+    for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (hop_pipe_needs_rendezvous(pipe)) {
+            pipe_was_lost_mask |= BIT(pipe);
+        }
+    }
     if (heard != 0) {
         silent_windows = 0;
         silent_escapes = 0;
@@ -514,6 +515,8 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
     }
     /* Beacon refresh reads it on a fixed channel too. */
     atomic_or(&pipe_heard_mask, BIT(pipe));
+    pipe_last_heard_ms[pipe] = k_uptime_get_32();
+    pipe_ever_heard[pipe] = true;
     if (HOP_COUNT <= 1) {
         return false;
     }

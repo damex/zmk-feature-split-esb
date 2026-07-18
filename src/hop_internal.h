@@ -46,7 +46,6 @@ extern uint8_t hop_index;
       DT_INST_PROP(0, idle_keepalive_ms)) / DT_INST_PROP(0, hop_window_ms))
 
 #define ESB_HOP_LOSS_DETECT_MS 256
-#define ESB_HOP_LOST_WINDOWS MAX(2, ESB_HOP_LOSS_DETECT_MS / DT_INST_PROP(0, idle_keepalive_ms))
 
 /* Dwell per channel covers one central decision tick plus the beacon it sends back. */
 #define ESB_HOP_SWEEP_DWELL_WINDOWS                                                                  \
