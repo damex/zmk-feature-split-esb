@@ -51,20 +51,14 @@ static void ensure_mask(void) {
     mask_ready = true;
 }
 
-/* Read under the lock the radio ISR stages with.
- * True only when the mask actually changed.
- * Content compare, not version: central reboot resets version numbering. */
-static bool adopt_staged_mask(void) {
+/* Read under the lock the radio ISR stages with. */
+static void adopt_staged_mask(void) {
     if (atomic_get(&mask_update_seen) == 0) {
-        return false;
+        return;
     }
     unsigned int key = irq_lock();
-    bool changed = memcmp(active_mask, staged_mask, ESB_HOP_MASK_BYTES) != 0;
-    if (changed) {
-        memcpy(active_mask, staged_mask, ESB_HOP_MASK_BYTES);
-    }
+    memcpy(active_mask, staged_mask, ESB_HOP_MASK_BYTES);
     irq_unlock(key);
-    return changed;
 }
 
 /* Adopt the central's channel on a beacon epoch or mask change.
