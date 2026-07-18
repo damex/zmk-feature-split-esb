@@ -14,11 +14,13 @@ struct zmk_split_esb_status {
     uint8_t epoch;
     bool searching;
     int8_t rssi_dbm;
+    uint16_t attempts_ewma_x10;
 };
 
 /* Lock-free snapshot of local link state.
  * rssi_dbm is received signal, never own transmit.
- * Central: worst sampled peripheral link.
+ * attempts_ewma_x10 is delivery cost, 10 = every packet on first try.
+ * Central: worst sampled peripheral link, attempts 0 (no transmit path).
  * Peripheral: own central link. */
 void zmk_split_esb_get_status(struct zmk_split_esb_status *status);
 

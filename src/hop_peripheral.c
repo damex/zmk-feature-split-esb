@@ -243,6 +243,7 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     status->epoch = adopted_epoch;
     status->searching = atomic_get(&link_acked) == 0;
     status->rssi_dbm = uplink_rssi_dbm;
+    status->attempts_ewma_x10 = attempts_ewma_x10;
 }
 
 uint8_t zmk_split_esb_pipe_count(void) {
