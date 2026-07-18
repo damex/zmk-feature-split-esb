@@ -21,6 +21,8 @@
 #include "hop_policy.h"
 
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
+BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
+             "hop-threshold above 255 never fires, sweep streak saturates at UINT8_MAX");
 static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
