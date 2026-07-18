@@ -13,6 +13,7 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
 
 #include <zmk/events/battery_state_changed.h>
@@ -457,6 +458,15 @@ static int central_init(void) {
         tracked_battery_levels[pipe] = ESB_KEEPALIVE_BATTERY_UNKNOWN;
     }
     k_work_reschedule(&staleness_work, K_MSEC(STALENESS_CHECK_PERIOD_MS));
+    if (IS_ENABLED(CONFIG_SETTINGS)) {
+        int settings_error = settings_subsys_init();
+        if (settings_error == 0) {
+            settings_error = settings_load_subtree("esb_hop");
+        }
+        if (settings_error < 0) {
+            LOG_WRN("hop mask restore skipped (%d)", settings_error);
+        }
+    }
     int clock_error = esb_link_hfclk_acquire();
     if (clock_error) {
         return clock_error;

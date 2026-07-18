@@ -12,6 +12,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk_split_esb.h>
@@ -83,6 +84,55 @@ static bool pending_valid;
 static bool mask_ready;
 static uint8_t mask_update_repeats;
 static uint16_t mask_window;
+static uint8_t persisted_mask[ESB_HOP_MASK_BYTES];
+static bool persisted_mask_valid;
+
+#define MASK_SAVE_DEBOUNCE_SEC 60
+#define MASK_STORE_LENGTH (1 + ESB_HOP_MASK_BYTES)
+
+#if defined(CONFIG_SETTINGS)
+static int hop_mask_settings_set(const char *name, size_t len, settings_read_cb read_cb,
+                                 void *cb_arg) {
+    const char *next;
+    if (!settings_name_steq(name, "mask", &next) || next != NULL) {
+        return -ENOENT;
+    }
+    uint8_t stored[MASK_STORE_LENGTH];
+    if (len != sizeof(stored)) {
+        return -EINVAL;
+    }
+    if (read_cb(cb_arg, stored, sizeof(stored)) < 0) {
+        return -EIO;
+    }
+    uint8_t pool_count = stored[0];
+    if (pool_count != HOP_COUNT) {
+        return 0;
+    }
+    memcpy(persisted_mask, &stored[1], ESB_HOP_MASK_BYTES);
+    persisted_mask_valid = true;
+    return 0;
+}
+SETTINGS_STATIC_HANDLER_DEFINE(esb_hop, "esb_hop", NULL, hop_mask_settings_set, NULL, NULL);
+
+static void mask_save_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    uint8_t stored[MASK_STORE_LENGTH];
+    stored[0] = HOP_COUNT;
+    memcpy(&stored[1], active_mask, ESB_HOP_MASK_BYTES);
+    int error = settings_save_one("esb_hop/mask", stored, sizeof(stored));
+    if (error < 0) {
+        LOG_DBG("mask save failed (%d)", error);
+    }
+}
+static K_WORK_DELAYABLE_DEFINE(mask_save_work, mask_save_work_fn);
+
+static void schedule_mask_save(void) {
+    k_work_reschedule(&mask_save_work, K_SECONDS(MASK_SAVE_DEBOUNCE_SEC));
+}
+#else
+static void schedule_mask_save(void) {
+}
+#endif /* CONFIG_SETTINGS */
 
 static void clear_pipe_loss(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
@@ -288,6 +338,7 @@ static void recompute_mask(uint32_t active) {
     if (changed) {
         pending_valid = true;
         mask_update_repeats = MASK_UPDATE_REPEAT_WINDOWS;
+        schedule_mask_save();
     }
 }
 
@@ -418,20 +469,28 @@ void hop_survey(void) {
         return;
     }
     ensure_mask();
+    if (persisted_mask_valid) {
+        for (size_t channel = 0; channel < HOP_COUNT; channel++) {
+            if (!hop_policy_mask_get(persisted_mask, channel) &&
+                !hop_policy_mask_get(anchor_mask, channel)) {
+                hop_policy_mask_set(pending_mask, channel, false);
+            }
+        }
+    }
     uint8_t channels[HOP_COUNT];
     int8_t energy_dbm[HOP_COUNT];
     for (uint8_t index = 0; index < HOP_COUNT; index++) {
         channels[index] = hop_channel_at(index);
     }
     esb_survey_run(channels, HOP_COUNT, energy_dbm);
-    size_t masked = hop_policy_survey_mask(energy_dbm, HOP_COUNT, anchor_mask, min_active,
-                                           survey_threshold_dbm, pending_mask);
-    if (masked == 0) {
+    (void)hop_policy_survey_mask(energy_dbm, HOP_COUNT, anchor_mask, min_active,
+                                 survey_threshold_dbm, pending_mask);
+    if (hop_policy_mask_active_count(pending_mask, HOP_COUNT) == HOP_COUNT) {
         return;
     }
     for (size_t channel = 0; channel < HOP_COUNT; channel++) {
         if (!hop_policy_mask_get(pending_mask, channel)) {
-            LOG_INF("survey: channel %u busy (%d dBm), masked",
+            LOG_INF("boot: channel %u masked (%d dBm)",
                     (unsigned)hop_channel_at((uint8_t)channel), (int)energy_dbm[channel]);
         }
     }
