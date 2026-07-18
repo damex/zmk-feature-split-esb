@@ -191,7 +191,6 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
     }
     struct esb_beacon beacon = {.tag = ESB_BEACON_TAG,
                                 .epoch = hop_epoch,
-                                .rssi_dbm = pipe_rssi_dbm[pipe],
                                 .hid_modifiers = hid_modifiers,
                                 .hid_indicators = hid_indicators};
     for (uint8_t peer = 0; peer < PERIPHERAL_COUNT; peer++) {
