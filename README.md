@@ -154,8 +154,12 @@ no HID-indicator forwarding.
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
 | `hop-anchors` | unmaskable rendezvous set, a subset of hop-channels, build assert enforces. Omit and the engine spreads three across the pool. Pick channels clear of local WiFi |
 | `hop-threshold` | graded loss before acting: central hop-vote sum, peripheral sweep streak; fully-lost window scores 4 (default 24) |
+| `hop-min-active` | floor of unmasked channels the engine keeps hoppable (default 6) |
+| `hop-mask-threshold` | per-channel bad score at which the central masks it, clean windows decay (default 16) |
+| `hop-restore-windows` | base windows a masked channel waits before retest, repeat offenders back off further (default 64) |
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
 | `rssi-floor-dbm` | central counts a served peripheral's motion weaker than this (dBm) as a degraded window (default -85) |
+| `survey-threshold-dbm` | boot survey masks pool channels sampling at or above this ambient energy, anchors exempt (default -65) |
 | `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
 | `peripheral-timeout-ms` | silence before the central releases a peripheral's held state (default 3000) |
 | `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
