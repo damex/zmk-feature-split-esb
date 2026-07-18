@@ -40,6 +40,8 @@ static uint8_t bad_windows;
 static uint16_t lost_windows;
 static uint8_t camp_anchor = ESB_HOP_ANCHOR_COUNT - 1;
 static uint16_t camp_dwell;
+static uint8_t degrade_undo_index;
+static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
 static volatile int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
@@ -130,10 +132,12 @@ static void keepalive_work_fn(struct k_work *work) {
             bad_windows = 0;
             lost_windows = 0;
             camp_dwell = 0;
+            degrade_undo_armed = false;
             atomic_set(&max_tx_attempts, 0);
         } else if (atomic_get(&link_acked) != 0) {
             /* Connected: hop off a degrading channel. */
             lost_windows = 0;
+            degrade_undo_armed = false;
             uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
             if (attempts > 0) {
                 attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
@@ -145,6 +149,8 @@ static void keepalive_work_fn(struct k_work *work) {
             }
             uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
             if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
+                degrade_undo_index = hop_index;
+                degrade_undo_armed = true;
                 hop_index = hop_policy_index_next_active(hop_index, active_mask, HOP_COUNT);
                 apply_hop_channel();
             }
@@ -154,7 +160,11 @@ static void keepalive_work_fn(struct k_work *work) {
             if (lost_windows < UINT16_MAX) {
                 lost_windows++;
             }
-            if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
+            if (degrade_undo_armed) {
+                degrade_undo_armed = false;
+                hop_index = degrade_undo_index;
+                apply_hop_channel();
+            } else if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
                 if (lost_windows % ESB_HOP_SWEEP_DWELL_WINDOWS == 0) {
                     hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
                     apply_hop_channel();
