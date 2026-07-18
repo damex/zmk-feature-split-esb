@@ -251,6 +251,21 @@ The engine can never mask an anchor, so pick channels clear of local WiFi, other
 link rendezvouses on contended spectrum. The rest of the pool carries data, AFH drops the
 channels that perform badly.
 
+The central seeds its boot mask before the radio starts: the mask learned last
+session (persisted to settings under `esb_hop/mask`) plus an ambient energy sweep
+over the pool, anchors exempt. A rebooted dongle lands off busy spectrum at once.
+Stale entries heal through the retest ladder.
+
+A peripheral resumes its last-acked channel from retained RAM after a reboot or
+wake, so the first keystroke does not pay for a sweep. On a degrading uplink it
+steps to the next unmasked channel, steps back once if the new one stays silent,
+and only then enters the full sweep.
+
+The peripheral also adapts its retransmit budget to delivery cost: an attempts EWMA
+scales the count between 2 and `retransmit-count`, so a clean link keeps low tail
+latency and a dirty one spends the whole ceiling. `zmk_split_esb_status` exposes the
+EWMA (`attempts_ewma_x10`, 10 = first-try delivery) for widgets.
+
 Beacon and mask update ride a per-pipe latch, not the command queue. Newest value
 overwrites the pending one. A peripheral back from a gap reads the live epoch, never a
 stale backlog. Commands keep the queue, `reply-queue-depth` deep.
