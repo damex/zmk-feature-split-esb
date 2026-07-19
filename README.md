@@ -19,7 +19,7 @@ workspace lacks (`zmk` and Zephyr come from your own manifest):
   projects:
     - name: zmk-feature-split-esb
       remote: damex
-      revision: v0.3.6
+      revision: v0.5.1
       import: true
 ```
 Then update and apply the Kconfig fixes `sdk-nrf` needs on ZMK's Zephyr:
