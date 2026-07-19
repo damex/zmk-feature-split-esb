@@ -48,7 +48,21 @@ static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 static uint8_t staged_mask[ESB_HOP_MASK_BYTES];
 static atomic_t mask_update_seen;
-static struct esb_beacon_peer peer_table[ESB_BEACON_PEER_COUNT];
+static volatile uint16_t peer_table[ESB_BEACON_PEER_COUNT];
+
+#define PEER_RSSI_SHIFT 8
+
+static uint16_t peer_pack(uint8_t battery, int8_t rssi_dbm) {
+    return (uint16_t)(battery | ((uint8_t)rssi_dbm << PEER_RSSI_SHIFT));
+}
+
+static uint8_t peer_unpack_battery(uint16_t entry) {
+    return (uint8_t)entry;
+}
+
+static int8_t peer_unpack_rssi_dbm(uint16_t entry) {
+    return (int8_t)(entry >> PEER_RSSI_SHIFT);
+}
 
 static void ensure_mask(void) {
     if (mask_ready) {
@@ -219,7 +233,10 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
             uplink_rssi_dbm = beacon->peers[pipe].rssi_dbm;
         }
         esb_link_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
-        memcpy(peer_table, beacon->peers, sizeof(peer_table));
+        for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
+            peer_table[peer] = peer_pack(beacon->peers[peer].battery,
+                                         beacon->peers[peer].rssi_dbm);
+        }
         return true;
     }
     if (HOP_COUNT <= 1) {
@@ -283,18 +300,14 @@ uint8_t zmk_split_esb_peer_battery(uint8_t pipe) {
     if (pipe >= ESB_BEACON_PEER_COUNT) {
         return ESB_KEEPALIVE_BATTERY_UNKNOWN;
     }
-    unsigned int key = irq_lock();
-    uint8_t battery = peer_table[pipe].battery;
-    irq_unlock(key);
-    return battery;
+    uint16_t entry = peer_table[pipe];
+    return peer_unpack_battery(entry);
 }
 
 int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe) {
     if (pipe >= ESB_BEACON_PEER_COUNT) {
         return 0;
     }
-    unsigned int key = irq_lock();
-    int8_t rssi = peer_table[pipe].rssi_dbm;
-    irq_unlock(key);
-    return rssi;
+    uint16_t entry = peer_table[pipe];
+    return peer_unpack_rssi_dbm(entry);
 }
