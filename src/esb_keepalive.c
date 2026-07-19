@@ -10,7 +10,8 @@
 
 void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
                           const uint8_t *position_bitmap, uint8_t battery_level,
-                          const int64_t *sensor_totals_udeg, uint8_t sensor_count) {
+                          uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
+                          uint8_t sensor_count) {
     assert(out != NULL);
     assert(out_size >= (size_t)ESB_KEEPALIVE_LENGTH(sensor_count));
     assert(position_bitmap != NULL);
@@ -19,6 +20,7 @@ void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
     out[ESB_KEEPALIVE_STATE_OFFSET] = state;
     memcpy(&out[ESB_KEEPALIVE_BITMAP_OFFSET], position_bitmap, ESB_KEEPALIVE_BITMAP_BYTES);
     out[ESB_KEEPALIVE_BATTERY_OFFSET] = battery_level;
+    out[ESB_KEEPALIVE_LINK_COST_OFFSET] = link_cost_x10;
     for (uint8_t sensor_index = 0; sensor_index < sensor_count; sensor_index++) {
         sys_put_le64((uint64_t)sensor_totals_udeg[sensor_index],
                      &out[ESB_KEEPALIVE_SENSOR_OFFSET +
@@ -61,6 +63,11 @@ const uint8_t *esb_keepalive_bitmap(const uint8_t *data) {
 uint8_t esb_keepalive_battery_level(const uint8_t *data) {
     assert(data != NULL);
     return data[ESB_KEEPALIVE_BATTERY_OFFSET];
+}
+
+uint8_t esb_keepalive_link_cost_x10(const uint8_t *data) {
+    assert(data != NULL);
+    return data[ESB_KEEPALIVE_LINK_COST_OFFSET];
 }
 
 void esb_keepalive_bitmap_set(uint8_t *bitmap, uint32_t position, bool pressed) {

@@ -124,9 +124,29 @@ void hop_policy_mask_set(uint8_t *mask, size_t index, bool active) {
     }
 }
 
+static uint8_t moving_pipe_penalty(int8_t rssi_dbm, uint8_t link_cost_x10, int8_t floor_dbm) {
+    uint8_t rssi_penalty = hop_policy_loss_penalty(rssi_dbm, floor_dbm);
+    uint8_t cost_penalty = hop_policy_link_cost_penalty(link_cost_x10);
+    return (rssi_penalty > cost_penalty) ? rssi_penalty : cost_penalty;
+}
+
+uint8_t hop_policy_link_cost_penalty(uint8_t cost_x10) {
+    if (cost_x10 <= HOP_POLICY_RETRY_EWMA_LOW_X10) {
+        return 0;
+    }
+    int penalty = 1 + ((int)cost_x10 - HOP_POLICY_RETRY_EWMA_LOW_X10) /
+                          HOP_POLICY_LINK_COST_GRADE_STEP;
+    if (penalty > HOP_POLICY_MAX_LOSS_PENALTY) {
+        penalty = HOP_POLICY_MAX_LOSS_PENALTY;
+    }
+    return (uint8_t)penalty;
+}
+
 uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
-                                  const int8_t *rssi_dbm, int8_t floor_dbm, size_t count) {
+                                  const int8_t *rssi_dbm, const uint8_t *link_cost_x10,
+                                  int8_t floor_dbm, size_t count) {
     assert(rssi_dbm != NULL);
+    assert(link_cost_x10 != NULL);
     uint8_t worst = 0;
     for (size_t index = 0; index < count; index++) {
         if (!(active_mask & (1u << index))) {
@@ -134,7 +154,7 @@ uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
         }
         uint8_t penalty;
         if (motion_mask & (1u << index)) {
-            penalty = hop_policy_loss_penalty(rssi_dbm[index], floor_dbm);
+            penalty = moving_pipe_penalty(rssi_dbm[index], link_cost_x10[index], floor_dbm);
         } else {
             penalty = HOP_POLICY_MAX_LOSS_PENALTY;
         }
@@ -234,9 +254,11 @@ bool hop_policy_hop_vote(const uint8_t *link_loss, const uint8_t *weights, size_
 }
 
 void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_mask,
-                            uint32_t active_mask, const int8_t *rssi_dbm, int8_t floor_dbm) {
+                            uint32_t active_mask, const int8_t *rssi_dbm,
+                            const uint8_t *link_cost_x10, int8_t floor_dbm) {
     assert(link_loss != NULL);
     assert(rssi_dbm != NULL);
+    assert(link_cost_x10 != NULL);
     for (size_t index = 0; index < count; index++) {
         if (!(active_mask & (1u << index))) {
             link_loss[index] = 0;
@@ -244,7 +266,7 @@ void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_ma
         }
         uint8_t penalty;
         if (motion_mask & (1u << index)) {
-            penalty = hop_policy_loss_penalty(rssi_dbm[index], floor_dbm);
+            penalty = moving_pipe_penalty(rssi_dbm[index], link_cost_x10[index], floor_dbm);
         } else {
             penalty = HOP_POLICY_MAX_LOSS_PENALTY;
         }

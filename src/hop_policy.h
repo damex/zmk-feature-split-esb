@@ -44,6 +44,11 @@ uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
 #define HOP_POLICY_RETRY_EWMA_HIGH_X10 45
 uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, uint8_t count_max);
 
+/* Graded penalty from a peripheral's reported attempts EWMA: zero at or below
+ * the low retry breakpoint, one point per grade step over it, capped. */
+#define HOP_POLICY_LINK_COST_GRADE_STEP 8
+uint8_t hop_policy_link_cost_penalty(uint8_t cost_x10);
+
 uint8_t hop_policy_index_next(uint8_t index, size_t count);
 
 uint8_t hop_policy_index_next_active(uint8_t index, const uint8_t *mask, size_t count);
@@ -72,7 +77,8 @@ uint16_t hop_policy_retest_threshold(uint16_t base_windows, uint8_t level);
 
 /* Zero when no pipe polls this window: an untested channel is neither blamed nor cleared. */
 uint8_t hop_policy_window_penalty(uint32_t motion_mask, uint32_t active_mask,
-                                  const int8_t *rssi_dbm, int8_t floor_dbm, size_t count);
+                                  const int8_t *rssi_dbm, const uint8_t *link_cost_x10,
+                                  int8_t floor_dbm, size_t count);
 
 void hop_policy_score_update(uint8_t *score, uint8_t penalty, uint8_t decay);
 
@@ -92,11 +98,13 @@ size_t hop_policy_survey_mask(const int8_t *energy_dbm, size_t pool_count,
 
 /* Per window, accrue graded per-pipe loss from poll traffic, so only an actively-polling
  * pipe whose link is degrading drives a hop, and the weaker it is the sooner.
- * Motion (bit in motion_mask) adds hop_policy_loss_penalty(rssi_dbm[pipe]). An active pipe
- * with no motion is fully lost and adds HOP_POLICY_MAX_LOSS_PENALTY. A healthy (penalty 0)
- * or idle/absent pipe clears to zero. Loss saturates at UINT8_MAX. */
+ * Motion (bit in motion_mask) adds the worst of hop_policy_loss_penalty(rssi_dbm[pipe])
+ * and hop_policy_link_cost_penalty(link_cost_x10[pipe]). An active pipe with no motion
+ * is fully lost and adds HOP_POLICY_MAX_LOSS_PENALTY. A healthy (penalty 0) or
+ * idle/absent pipe clears to zero. Loss saturates at UINT8_MAX. */
 void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_mask,
-                            uint32_t active_mask, const int8_t *rssi_dbm, int8_t floor_dbm);
+                            uint32_t active_mask, const int8_t *rssi_dbm,
+                            const uint8_t *link_cost_x10, int8_t floor_dbm);
 
 /* Beacon scheduling: announce the epoch only while it is fresh.
  * A changed epoch arms repeat_windows announcements, then goes quiet, so a steady stream

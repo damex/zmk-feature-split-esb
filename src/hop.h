@@ -60,4 +60,6 @@ void hop_boot_mask(void);
 /* Resume last-acked channel state from retained RAM.
  * Run before esb_link_init, so the radio tunes to it. */
 void hop_restore(void);
+
+uint8_t hop_link_cost_x10(void);
 #endif

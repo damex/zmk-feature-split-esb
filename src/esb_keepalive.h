@@ -3,8 +3,8 @@
 
 /*
  * Uplink keepalive: periodic peripheral state snapshot the central reconciles against.
- * Wire: tag, hop-state byte, pressed-position bitmap, battery level, cumulative
- * sensor totals.
+ * Wire: tag, hop-state byte, pressed-position bitmap, battery level, uplink
+ * link cost, cumulative sensor totals.
  * Tag 0xFF cannot collide with event packets, whose first byte is an event type.
  * Positions above ESB_KEEPALIVE_POSITION_COUNT are not covered.
  * Battery level is ESB_KEEPALIVE_BATTERY_UNKNOWN when the peripheral does not report it.
@@ -23,7 +23,8 @@
 #define ESB_KEEPALIVE_POSITION_COUNT (ESB_KEEPALIVE_BITMAP_BYTES * 8)
 #define ESB_KEEPALIVE_BATTERY_OFFSET (ESB_KEEPALIVE_BITMAP_OFFSET + ESB_KEEPALIVE_BITMAP_BYTES)
 #define ESB_KEEPALIVE_BATTERY_UNKNOWN 0xFF
-#define ESB_KEEPALIVE_SENSOR_OFFSET (ESB_KEEPALIVE_BATTERY_OFFSET + 1)
+#define ESB_KEEPALIVE_LINK_COST_OFFSET (ESB_KEEPALIVE_BATTERY_OFFSET + 1)
+#define ESB_KEEPALIVE_SENSOR_OFFSET (ESB_KEEPALIVE_LINK_COST_OFFSET + 1)
 #define ESB_KEEPALIVE_SENSOR_BYTES 8
 #define ESB_KEEPALIVE_BASE_LENGTH ESB_KEEPALIVE_SENSOR_OFFSET
 #define ESB_KEEPALIVE_LENGTH(sensor_count)                                                         \
@@ -31,7 +32,8 @@
 
 void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
                           const uint8_t *position_bitmap, uint8_t battery_level,
-                          const int64_t *sensor_totals_udeg, uint8_t sensor_count);
+                          uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
+                          uint8_t sensor_count);
 
 bool esb_keepalive_matches(const uint8_t *data, uint8_t length);
 
@@ -45,6 +47,8 @@ uint8_t esb_keepalive_state(const uint8_t *data);
 const uint8_t *esb_keepalive_bitmap(const uint8_t *data);
 
 uint8_t esb_keepalive_battery_level(const uint8_t *data);
+
+uint8_t esb_keepalive_link_cost_x10(const uint8_t *data);
 
 /* Out-of-range positions: set is ignored, get reads false. */
 void esb_keepalive_bitmap_set(uint8_t *bitmap, uint32_t position, bool pressed);

@@ -238,8 +238,9 @@ Indicators need `CONFIG_ZMK_HID_INDICATORS` on the central.
 
 List two or more channels in `hop-channels` and the link hops between them, stepping
 off a channel that degrades. The central drives the hop: it counts a served
-peripheral's window bad when motion goes missing or arrives weaker than
-`rssi-floor-dbm`, and a weighted vote across peripherals (`hop-threshold`) moves the
+peripheral's window bad when motion goes missing, arrives weaker than
+`rssi-floor-dbm`, or the keepalive reports a climbing uplink retry cost, and a
+weighted vote across peripherals (`hop-threshold`) moves the
 whole link to the next channel. A peripheral that loses the central sweeps the list
 to re-find it, sweeping faster the more its acked transmits retried. One channel is a
 fixed link, no hopping. Every peripheral must carry the central's list, so flash them

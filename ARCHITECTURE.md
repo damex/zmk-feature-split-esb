@@ -227,13 +227,13 @@ All three run on the system workqueue.
 |   +------------+-----------+--------------------+                            |
 |                v                                                             |
 |  [send keepalive] --> [retained RAM]                                         |
-|  state, key bitmap,   last-acked channel,                                    |
-|  battery, totals      epoch, mask                                            |
+|  state, key bitmap,     last-acked channel,                                  |
+|  battery, cost, totals  epoch, mask                                          |
 +------------------------------------------------------------------------------+
 
 +-- central decision tick -------- idle-keepalive-ms window -------------------+
 |                                                                              |
-|  [heard / motion / active masks]              hop_central.c                  |
+|  [heard / motion / active / link cost]        hop_central.c                  |
 |      |                                                                       |
 |      v                                                                       |
 |  [per-pipe loss + channel score] --> [mask recompute]                        |
@@ -334,7 +334,8 @@ keepalive        peripheral to central, every tick
   [1]     state, 0 idle / 1 active
   [2..9]  pressed-position bitmap, 64 keys
   [10]    battery percent, 0xFF unknown
-  [11..]  per-sensor running total, i64 le microdegrees each
+  [11]    uplink link cost, attempts EWMA x10
+  [12..]  per-sensor running total, i64 le microdegrees each
 
 beacon           central to peripheral, rides an ACK
   [0]    0xFE

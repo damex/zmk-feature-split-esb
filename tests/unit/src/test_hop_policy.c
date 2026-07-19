@@ -138,11 +138,18 @@ ZTEST(hop_policy, test_retest_threshold) {
 
 ZTEST(hop_policy, test_window_penalty) {
     int8_t rssi[2] = {-50, -50};
-    zassert_equal(hop_policy_window_penalty(0x1, 0x3, rssi, -85, 2), HOP_POLICY_MAX_LOSS_PENALTY,
+    const uint8_t quiet_cost[3] = {10, 10, 10};
+    zassert_equal(hop_policy_window_penalty(0x1, 0x3, rssi, quiet_cost, -85, 2),
+                  HOP_POLICY_MAX_LOSS_PENALTY,
                   "active pipe with no motion scores max");
-    zassert_equal(hop_policy_window_penalty(0, 0, rssi, -85, 2), 0, "no active pipe is clean");
+    zassert_equal(hop_policy_window_penalty(0, 0, rssi, quiet_cost, -85, 2), 0,
+                  "no active pipe is clean");
     int8_t weak[1] = {-97};
-    zassert_equal(hop_policy_window_penalty(0x1, 0x1, weak, -85, 1), 3, "12 dB under floor grades to 3");
+    zassert_equal(hop_policy_window_penalty(0x1, 0x1, weak, quiet_cost, -85, 1), 3,
+                  "12 dB under floor grades to 3");
+    const uint8_t costly[1] = {45};
+    zassert_equal(hop_policy_window_penalty(0x1, 0x1, rssi, costly, -85, 1),
+                  HOP_POLICY_MAX_LOSS_PENALTY, "high link cost grades a strong pipe");
 }
 
 ZTEST(hop_policy, test_mask_set_round_trip) {
@@ -265,20 +272,21 @@ ZTEST(hop_policy, test_accrue_loss) {
     const int8_t rssi[3] = {-40, -97, 0}; /* pipe0 strong, pipe1 weak, pipe2 n/a */
     const int8_t floor = -85;
     /* pipe0 active+motion strong, pipe1 active+motion weak, pipe2 active with no motion */
+    const uint8_t quiet_cost[3] = {10, 10, 10};
     hop_policy_accrue_loss(link_loss, 3, (1u << 0) | (1u << 1),
-                           (1u << 0) | (1u << 1) | (1u << 2), rssi, floor);
+                           (1u << 0) | (1u << 1) | (1u << 2), rssi, quiet_cost, floor);
     zassert_equal(link_loss[0], 0, "strong motion clears");
     zassert_equal(link_loss[1], 3, "weak motion adds a graded penalty");
     zassert_equal(link_loss[2], 5 + HOP_POLICY_MAX_LOSS_PENALTY, "no motion adds the max");
 
     uint8_t idle[1] = {7};
     const int8_t strong[1] = {-40};
-    hop_policy_accrue_loss(idle, 1, 0, 0, strong, floor); /* not active */
+    hop_policy_accrue_loss(idle, 1, 0, 0, strong, quiet_cost, floor); /* not active */
     zassert_equal(idle[0], 0, "idle pipe clears, never drives a hop");
 
     uint8_t sat[1] = {UINT8_MAX};
     const int8_t weak[1] = {-120};
-    hop_policy_accrue_loss(sat, 1, (1u << 0), (1u << 0), weak, floor);
+    hop_policy_accrue_loss(sat, 1, (1u << 0), (1u << 0), weak, quiet_cost, floor);
     zassert_equal(sat[0], UINT8_MAX, "loss saturates, no wrap");
 }
 

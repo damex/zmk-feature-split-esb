@@ -136,7 +136,7 @@ uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state) {
         return 0;
     }
     esb_keepalive_encode(out, out_size, state, pressed_positions, keepalive_battery_level(),
-                         keepalive_sensor_totals(), sensor_count);
+                         hop_link_cost_x10(), keepalive_sensor_totals(), sensor_count);
     return length;
 }
 

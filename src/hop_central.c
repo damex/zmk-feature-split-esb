@@ -60,6 +60,7 @@ BUILD_ASSERT(ESB_BEACON_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
 static volatile int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
+static volatile uint8_t pipe_link_cost_x10[PERIPHERAL_COUNT];
 static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
@@ -277,12 +278,13 @@ static void stage_beacon(uint32_t heard) {
     }
 }
 
-static void score_current_channel(uint32_t motion, uint32_t active, const int8_t *rssi_dbm) {
+static void score_current_channel(uint32_t motion, uint32_t active, const int8_t *rssi_dbm,
+                                  const uint8_t *link_cost_x10) {
     if (active == 0) {
         return;
     }
-    uint8_t penalty = hop_policy_window_penalty(motion, active, rssi_dbm, rssi_floor_dbm,
-                                                PERIPHERAL_COUNT);
+    uint8_t penalty = hop_policy_window_penalty(motion, active, rssi_dbm, link_cost_x10,
+                                                rssi_floor_dbm, PERIPHERAL_COUNT);
     hop_policy_score_update(&channel_bad[hop_index], penalty, CHANNEL_BAD_DECAY);
 }
 
@@ -392,13 +394,16 @@ static void decision_work_fn(struct k_work *work) {
     }
 
     int8_t rssi_snapshot[PERIPHERAL_COUNT];
+    uint8_t cost_snapshot[PERIPHERAL_COUNT];
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         rssi_snapshot[pipe] = pipe_rssi_dbm[pipe];
+        cost_snapshot[pipe] = pipe_link_cost_x10[pipe];
     }
-    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, rssi_snapshot, rssi_floor_dbm);
+    hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, rssi_snapshot,
+                           cost_snapshot, rssi_floor_dbm);
     LOG_DBG("hop: heard=%02x motion=%02x active=%02x", (unsigned)heard, (unsigned)motion,
             (unsigned)active);
-    score_current_channel(motion, active, rssi_snapshot);
+    score_current_channel(motion, active, rssi_snapshot, cost_snapshot);
     recompute_mask(active);
     uint32_t rejoining = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
@@ -517,6 +522,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         return false;
     }
     if (keepalive) {
+        pipe_link_cost_x10[pipe] = esb_keepalive_link_cost_x10(data);
         if (hop_policy_keepalive_is_active(esb_keepalive_state(data))) {
             atomic_or(&pipe_active_mask, BIT(pipe));
         }

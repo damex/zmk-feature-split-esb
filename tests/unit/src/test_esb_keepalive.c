@@ -15,17 +15,19 @@ ZTEST(esb_keepalive, test_encode_layout) {
     esb_keepalive_bitmap_set(bitmap, 0, true);
     esb_keepalive_bitmap_set(bitmap, 63, true);
     uint8_t wire[ESB_KEEPALIVE_LENGTH(0)];
-    esb_keepalive_encode(wire, sizeof(wire), 0x01, bitmap, 97, NULL, 0);
+    esb_keepalive_encode(wire, sizeof(wire), 0x01, bitmap, 97, 23, NULL, 0);
     zassert_equal(wire[ESB_KEEPALIVE_TAG_OFFSET], ESB_KEEPALIVE_TAG, "tag byte");
     zassert_equal(esb_keepalive_state(wire), 0x01, "state byte");
     zassert_mem_equal(esb_keepalive_bitmap(wire), bitmap, ESB_KEEPALIVE_BITMAP_BYTES, "bitmap");
     zassert_equal(esb_keepalive_battery_level(wire), 97, "battery byte");
+    zassert_equal(esb_keepalive_link_cost_x10(wire), 23, "link cost byte");
 }
 
 ZTEST(esb_keepalive, test_matches) {
     uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
     uint8_t wire[ESB_KEEPALIVE_LENGTH(0)];
-    esb_keepalive_encode(wire, sizeof(wire), 0x00, bitmap, ESB_KEEPALIVE_BATTERY_UNKNOWN, NULL, 0);
+    esb_keepalive_encode(wire, sizeof(wire), 0x00, bitmap, ESB_KEEPALIVE_BATTERY_UNKNOWN, 10,
+                         NULL, 0);
     zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0)), "tagged base-length packet");
     zassert_false(esb_keepalive_matches(wire, 1), "beacon length is not a keepalive");
     uint8_t event_like[ESB_KEEPALIVE_LENGTH(0)] = {0x02};
@@ -37,7 +39,7 @@ ZTEST(esb_keepalive, test_sensor_totals) {
     uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
     int64_t totals[2] = {90000000LL, -3500000LL};
     uint8_t wire[ESB_KEEPALIVE_LENGTH(2)];
-    esb_keepalive_encode(wire, sizeof(wire), 0x00, bitmap, 50, totals, 2);
+    esb_keepalive_encode(wire, sizeof(wire), 0x00, bitmap, 50, 10, totals, 2);
     zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(2)), "totals length matches");
     zassert_false(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(2) - 1),
                   "partial total is not a keepalive");
