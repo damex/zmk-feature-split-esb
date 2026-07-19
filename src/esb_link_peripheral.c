@@ -91,13 +91,16 @@ static int submit_payload(const struct esb_payload *payload) {
     hfclk_gate_hold();
     unsigned int key = irq_lock();
     int error = esb_write_payload(payload);
-    if (error == -ENOMEM &&
-        (k_uptime_get_32() - esb_link_tx_last_event_ms()) > TX_STALL_TIMEOUT_MS) {
-        LOG_WRN("TX engine stalled, flushing to recover");
-        (void)esb_flush_tx();
-        esb_link_mark_tx_event();
-        error = esb_write_payload(payload);
+    irq_unlock(key);
+    if (error != -ENOMEM ||
+        (k_uptime_get_32() - esb_link_tx_last_event_ms()) <= TX_STALL_TIMEOUT_MS) {
+        return error;
     }
+    LOG_WRN("TX engine stalled, flushing to recover");
+    (void)esb_flush_tx();
+    esb_link_mark_tx_event();
+    key = irq_lock();
+    error = esb_write_payload(payload);
     irq_unlock(key);
     return error;
 }
