@@ -5,6 +5,8 @@ Packet-native: split messages map to ESB packets (a report's input events
 coalesce into one, each packed to a compact on-air form), carried over a
 lock-free SPSC RX path.
 ESB hardware ACK + retransmit + CRC handle reliability.
+[ARCHITECTURE.md](ARCHITECTURE.md) documents the internals: packet paths,
+engine ticks, wire formats.
 
 ## Install
 
