@@ -182,9 +182,6 @@ static bool any_pipe_served(void) {
     return false;
 }
 
-BUILD_ASSERT(PERIPHERAL_COUNT <= ESB_BEACON_PEER_COUNT,
-             "more peripherals than the beacon roster holds; raise ESB_BEACON_PEER_COUNT");
-
 int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators) {
     if (pipe >= PERIPHERAL_COUNT) {
         return -EINVAL;

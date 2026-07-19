@@ -29,6 +29,28 @@ static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
     return length == ESB_MASK_UPDATE_LENGTH && data[0] == ESB_MASK_UPDATE_TAG;
 }
 
+#define ESB_BEACON_TAG 0xFE
+#define ESB_BEACON_PEER_COUNT DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals))
+
+struct esb_beacon_peer {
+    uint8_t battery;
+    int8_t rssi_dbm;
+} __attribute__((packed));
+
+struct esb_beacon {
+    uint8_t tag;
+    uint8_t epoch;
+    uint8_t hid_modifiers;
+    uint8_t hid_indicators;
+    struct esb_beacon_peer peers[ESB_BEACON_PEER_COUNT];
+} __attribute__((packed));
+#define ESB_BEACON_LENGTH (4 + ESB_BEACON_PEER_COUNT * 2)
+BUILD_ASSERT(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
+
+static inline bool esb_is_beacon(const uint8_t *data, uint8_t length) {
+    return length == ESB_BEACON_LENGTH && data[0] == ESB_BEACON_TAG;
+}
+
 extern uint8_t hop_index;
 
 /* Rendezvous channels, never masked, both roles cycle them on a lost link.

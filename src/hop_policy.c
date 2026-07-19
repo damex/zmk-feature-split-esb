@@ -60,11 +60,6 @@ uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, ui
     return (uint8_t)(count_min + (into * (uint32_t)(count_max - count_min)) / span);
 }
 
-bool hop_policy_is_beacon(const uint8_t *data, uint8_t length) {
-    assert(data != NULL);
-    return length == ESB_BEACON_LENGTH && data[0] == ESB_BEACON_TAG;
-}
-
 bool hop_policy_keepalive_is_active(uint8_t byte) {
     return byte == ESB_KEEPALIVE_ACTIVE;
 }

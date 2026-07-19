@@ -63,14 +63,6 @@ ZTEST(hop_policy, test_attempts_penalty) {
     zassert_equal(hop_policy_attempts_penalty(255, good), HOP_POLICY_MAX_LOSS_PENALTY, "lost: capped");
 }
 
-ZTEST(hop_policy, test_is_beacon) {
-    const uint8_t beacon[ESB_BEACON_LENGTH] = {[0] = ESB_BEACON_TAG};
-    zassert_true(hop_policy_is_beacon(beacon, ESB_BEACON_LENGTH), "tagged, right length");
-    const uint8_t command[ESB_BEACON_LENGTH] = {[0] = 0x01};
-    zassert_false(hop_policy_is_beacon(command, ESB_BEACON_LENGTH), "wrong tag is not beacon");
-    zassert_false(hop_policy_is_beacon(beacon, 2), "wrong length is not beacon");
-}
-
 ZTEST(hop_policy, test_index_next_wraps) {
     zassert_equal(hop_policy_index_next(0, 3), 1, NULL);
     zassert_equal(hop_policy_index_next(1, 3), 2, NULL);

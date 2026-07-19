@@ -7,25 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define ESB_BEACON_TAG 0xFE
-#define ESB_BEACON_PEER_COUNT 2
-
-struct esb_beacon_peer {
-    uint8_t battery;
-    int8_t rssi_dbm;
-} __attribute__((packed));
-
-struct esb_beacon {
-    uint8_t tag;
-    uint8_t epoch;
-    uint8_t hid_modifiers;
-    uint8_t hid_indicators;
-    struct esb_beacon_peer peers[ESB_BEACON_PEER_COUNT];
-} __attribute__((packed));
-
-#define ESB_BEACON_LENGTH (4 + ESB_BEACON_PEER_COUNT * 2)
-_Static_assert(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
-
 /* Keepalive state byte values: whether the peripheral is actively polling. */
 #define ESB_KEEPALIVE_IDLE 0x00
 #define ESB_KEEPALIVE_ACTIVE 0x01
@@ -62,8 +43,6 @@ uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
 #define HOP_POLICY_RETRY_EWMA_LOW_X10 15
 #define HOP_POLICY_RETRY_EWMA_HIGH_X10 45
 uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, uint8_t count_max);
-
-bool hop_policy_is_beacon(const uint8_t *data, uint8_t length);
 
 uint8_t hop_policy_index_next(uint8_t index, size_t count);
 
