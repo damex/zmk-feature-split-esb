@@ -311,12 +311,20 @@ zmk_split_esb_get_status(&status);
 | `epoch` | hop generation |
 | `searching` | link degraded, hunting for the peer |
 | `rssi_dbm` | received signal: central reports worst sampled peripheral link, peripheral its central link |
+| `attempts_ewma_x10` | delivery cost, 10 = every packet on first try, central reads 0 |
 
 `rssi_dbm` reads 0 until the first packet arrives.
 
 Per-link signal on a multi-peripheral central: `zmk_split_esb_pipe_count()` plus
 `zmk_split_esb_pipe_rssi_dbm(pipe)`, indexed by ESB pipe. A peripheral has only
 index 0.
+
+Peer state, readable on both roles: `zmk_split_esb_peer_battery(pipe)` (0xFF
+until known) and `zmk_split_esb_peer_rssi_dbm(pipe)` (central-measured, 0 before
+the first sample). The central tracks both from keepalives. Peripherals get them
+relayed in the beacon roster, so a half's widget can show the other half's
+battery and signal. HID state for widgets: `zmk_split_esb_hid_modifiers()` and
+`zmk_split_esb_hid_indicators()`.
 
 ## Limitations
 
