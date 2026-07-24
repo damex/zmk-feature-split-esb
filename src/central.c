@@ -322,7 +322,7 @@ static void reconcile_battery(uint8_t source, uint8_t level) {
         return;
     }
     tracked_battery_levels[source] = level;
-    LOG_DBG("peripheral %u battery %u%%", source, level);
+    LOG_INF("peripheral %u battery %u%%", source, level);
     struct zmk_peripheral_battery_state_changed battery_event = {
         .source = source,
         .state_of_charge = level,
