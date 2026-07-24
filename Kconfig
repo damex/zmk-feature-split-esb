@@ -55,6 +55,12 @@ config ZMK_SPLIT_ESB_PRIORITY
     int "Split transport registration priority"
     default 50
 
+config ZMK_SPLIT_ESB_BATTERY_LOG
+    bool "Log peripheral battery changes on the central"
+    help
+      Battery level changes to the central log, one line per percent step.
+      Diagnostic only, needs a log backend.
+
 module = ZMK_SPLIT_ESB
 module-str = ZMK ESB split transport
 source "subsys/logging/Kconfig.template.log_config"

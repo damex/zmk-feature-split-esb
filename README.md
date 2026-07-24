@@ -332,6 +332,8 @@ Peripheral battery levels raise `zmk_peripheral_battery_state_changed` on the
 central, since ZMK's own handler sits behind `ZMK_SPLIT_BLE`, dead on an ESB-only
 build. Central `.conf` needs `CONFIG_ZMK_BATTERY_REPORTING=y` for the event to
 exist. Display widgets and indicators consume it as usual.
+`CONFIG_ZMK_SPLIT_ESB_BATTERY_LOG=y` prints level changes on the central log,
+one line per percent step.
 
 `ZMK_SPLIT_CENTRAL_PERIPHERAL_COUNT` is 0 on an ESB-only central (ZMK derives it
 from BLE/wired counts). Events still deliver, but:
