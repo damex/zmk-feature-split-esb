@@ -43,11 +43,6 @@ void esb_link_send_keepalive(uint8_t state);
  * Returns the encoded length, 0 when out_size is too small.
  * Defined in peripheral.c. */
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state);
-
-/* Peripheral only.
- * Radio-ISR context.
- * Defined in peripheral.c. */
-void esb_link_hid_state_store(uint8_t modifiers, uint8_t indicators);
 #endif
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)

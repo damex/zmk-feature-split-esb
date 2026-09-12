@@ -21,6 +21,7 @@
 #include "hop.h"
 #include "hop_internal.h"
 #include "hop_policy.h"
+#include "peripheral.h"
 
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
@@ -232,7 +233,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         if (pipe < ESB_BEACON_PEER_COUNT) {
             uplink_rssi_dbm = beacon->peers[pipe].rssi_dbm;
         }
-        esb_link_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
+        peripheral_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
         for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
             peer_table[peer] = peer_pack(beacon->peers[peer].battery,
                                          beacon->peers[peer].rssi_dbm);
