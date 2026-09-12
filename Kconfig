@@ -61,6 +61,37 @@ config ZMK_SPLIT_ESB_BATTERY_LOG
       Battery level changes to the central log, one line per percent step.
       Diagnostic only, needs a log backend.
 
+menuconfig ZMK_SPLIT_ESB_WIRE
+    bool "Wire link between split peripherals"
+    depends on SERIAL
+    select UART_INTERRUPT_DRIVEN
+    select RING_BUFFER
+    select CRC
+    help
+      Bidirectional UART link between two split peripherals. Reuses the ESB
+      wire packet format above raw framing. Base transport for wire-central
+      and wire-peripheral sub-roles.
+
+if ZMK_SPLIT_ESB_WIRE
+
+config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS
+    int "Wire link keepalive period, ms"
+    default 100
+
+config ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS
+    int "Wire link peer-alive timeout, ms"
+    default 500
+
+config ZMK_SPLIT_ESB_WIRE_RX_STACK_SIZE
+    int "Wire link RX thread stack size"
+    default 1024
+
+config ZMK_SPLIT_ESB_WIRE_RX_PRIORITY
+    int "Wire link RX thread priority"
+    default 4
+
+endif # ZMK_SPLIT_ESB_WIRE
+
 module = ZMK_SPLIT_ESB
 module-str = ZMK ESB split transport
 source "subsys/logging/Kconfig.template.log_config"
