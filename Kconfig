@@ -72,6 +72,20 @@ menuconfig ZMK_SPLIT_ESB_WIRE
       wire packet format above raw framing. Base transport for wire-central
       and wire-peripheral sub-roles.
 
+choice ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT
+    prompt "Peripheral transport"
+    depends on !ZMK_SPLIT_ROLE_CENTRAL
+    default ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_ESB
+
+config ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_ESB
+    bool "ESB radio"
+
+config ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE
+    bool "Wire (UART / USB CDC)"
+    select ZMK_SPLIT_ESB_WIRE
+
+endchoice
+
 if ZMK_SPLIT_ESB_WIRE
 
 config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS
