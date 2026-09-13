@@ -101,6 +101,10 @@ config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS
     int "Wire link keepalive period, ms"
     default 100
 
+config ZMK_SPLIT_ESB_WIRE_STATE_MS
+    int "Wire peripheral state broadcast period, ms"
+    default 500
+
 config ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS
     int "Wire link peer-alive timeout, ms"
     default 500

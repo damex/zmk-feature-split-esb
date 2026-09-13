@@ -18,7 +18,6 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_batch.h"
-#include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_wire.h"
 #include "hop.h"
@@ -68,16 +67,7 @@ static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *e
 static struct esb_batch batch;
 
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state) {
-    uint8_t sensor_count = peripheral_sensor_count();
-    uint8_t length = (uint8_t)ESB_KEEPALIVE_LENGTH(sensor_count);
-
-    if (out_size < length) {
-        return 0;
-    }
-    esb_keepalive_encode(out, out_size, state, peripheral_pressed_bitmap(),
-                         peripheral_battery_level(), hop_link_cost_x10(),
-                         peripheral_sensor_totals(), sensor_count);
-    return length;
+    return peripheral_keepalive_fill(out, out_size, state, hop_link_cost_x10());
 }
 
 static int esb_peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {

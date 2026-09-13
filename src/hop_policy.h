@@ -7,10 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Keepalive state byte values: whether the peripheral is actively polling. */
-#define ESB_KEEPALIVE_IDLE 0x00
-#define ESB_KEEPALIVE_ACTIVE 0x01
-
 bool hop_policy_keepalive_is_active(uint8_t byte);
 
 /* ESB RSSI is a positive magnitude, dBm is its negative. */

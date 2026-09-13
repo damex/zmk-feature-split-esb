@@ -7,8 +7,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zmk/sensors.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
+
+#include "esb_keepalive.h"
+
+#define PERIPHERAL_KEEPALIVE_MAX_LENGTH ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN)
 
 void peripheral_set_transport(const struct zmk_split_transport_peripheral *instance);
 
@@ -25,3 +30,5 @@ uint8_t peripheral_sensor_count(void);
 
 void peripheral_deliver_command(const uint8_t *bytes, size_t length);
 void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators);
+
+uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost);

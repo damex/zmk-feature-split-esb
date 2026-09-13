@@ -159,3 +159,16 @@ uint8_t zmk_split_esb_hid_indicators(void) {
 void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators) {
     atomic_set(&synced_hid_state, esb_hid_state_pack(modifiers, indicators));
 }
+
+uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state,
+                                  uint8_t link_cost) {
+    uint8_t sensor_count = peripheral_sensor_count();
+    uint8_t length = (uint8_t)ESB_KEEPALIVE_LENGTH(sensor_count);
+    if (out_size < length) {
+        return 0;
+    }
+    esb_keepalive_encode(out, out_size, state, peripheral_pressed_bitmap(),
+                         peripheral_battery_level(), link_cost,
+                         peripheral_sensor_totals(), sensor_count);
+    return length;
+}

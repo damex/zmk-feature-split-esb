@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "esb_keepalive.h"
 #include "hop_policy.h"
 
 uint8_t hop_policy_saturating_add(uint8_t value, uint8_t add) {

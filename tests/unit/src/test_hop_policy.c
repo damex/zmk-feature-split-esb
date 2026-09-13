@@ -7,6 +7,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
+#include "esb_keepalive.h"
 #include "hop_policy.h"
 
 #define ANCHOR_POOL_MAX 101

@@ -212,7 +212,9 @@ static void keepalive_work_fn(struct k_work *work) {
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
     uint16_t period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
-    esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE);
+    if (!active || searching) {
+        esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE);
+    }
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
 
