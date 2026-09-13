@@ -43,6 +43,11 @@ void esb_link_send_keepalive(uint8_t state);
  * Returns the encoded length, 0 when out_size is too small.
  * Defined in peripheral.c. */
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state);
+
+#if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)
+/* One packet under the wire peer's pipe. */
+int esb_link_send_relay(const uint8_t *data, size_t length, bool ack);
+#endif
 #endif
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)

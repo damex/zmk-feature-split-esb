@@ -105,17 +105,21 @@ static int submit_payload(const struct esb_payload *payload) {
     return error;
 }
 
-int esb_link_send(const uint8_t *data, size_t length, bool ack) {
+static int send_on_pipe(uint8_t pipe, const uint8_t *data, size_t length, bool ack) {
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     hop_note_data_sent();
     struct esb_payload payload = {0};
-    payload.pipe = self_pipe;
+    payload.pipe = pipe;
     payload.noack = !ack;
     payload.length = (uint8_t)length;
     memcpy(payload.data, data, length);
-    int error = submit_payload(&payload);
+    return submit_payload(&payload);
+}
+
+int esb_link_send(const uint8_t *data, size_t length, bool ack) {
+    int error = send_on_pipe(self_pipe, data, length, ack);
     if (error) {
         LOG_WRN("uplink event dropped, esb_write_payload returned %d", error);
     }
@@ -131,6 +135,23 @@ void esb_link_send_keepalive(uint8_t state) {
     }
     (void)submit_payload(&keepalive);
 }
+
+#if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)
+BUILD_ASSERT(DT_HAS_CHOSEN(zmk_esb_wire_peer),
+             "wire relay needs a chosen zmk,esb-wire-peer");
+static const uint8_t peer_pipe = DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe);
+BUILD_ASSERT(DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe) !=
+             DT_PROP(DT_CHOSEN(zmk_esb_self), pipe),
+             "wire peer pipe must differ from self pipe");
+
+int esb_link_send_relay(const uint8_t *data, size_t length, bool ack) {
+    int error = send_on_pipe(peer_pipe, data, length, ack);
+    if (error) {
+        LOG_WRN("relay event dropped, esb_write_payload returned %d", error);
+    }
+    return error;
+}
+#endif
 
 int esb_link_role_start(void) {
     return 0;

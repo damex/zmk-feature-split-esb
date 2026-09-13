@@ -86,6 +86,15 @@ config ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE
 
 endchoice
 
+config ZMK_SPLIT_ESB_WIRE_RELAY
+    bool "Relay events from a wire peer"
+    depends on ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_ESB
+    select ZMK_SPLIT_ESB_WIRE
+    help
+      Peripheral acts as wire central for another split peripheral over the
+      wire link. Received events land at wire_relay for future forwarding
+      through the ESB uplink.
+
 if ZMK_SPLIT_ESB_WIRE
 
 config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS
