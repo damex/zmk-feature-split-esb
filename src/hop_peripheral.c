@@ -6,6 +6,7 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
+#include <stdatomic.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -44,12 +45,12 @@ static uint16_t camp_dwell;
 static uint8_t degrade_undo_index;
 static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
-static volatile int8_t uplink_rssi_dbm;
+static _Atomic int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 static uint8_t staged_mask[ESB_HOP_MASK_BYTES];
 static atomic_t mask_update_seen;
-static volatile uint16_t peer_table[ESB_BEACON_PEER_COUNT];
+static _Atomic uint16_t peer_table[ESB_BEACON_PEER_COUNT];
 
 #define PEER_RSSI_SHIFT 8
 

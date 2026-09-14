@@ -7,6 +7,7 @@
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -59,15 +60,15 @@ BUILD_ASSERT(ESB_BEACON_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
              "beacon does not fit one control latch; raise ESB_LINK_CONTROL_MAX_LENGTH");
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
-static volatile int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
-static volatile uint8_t pipe_link_cost_x10[PERIPHERAL_COUNT];
+static _Atomic int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
+static _Atomic uint8_t pipe_link_cost_x10[PERIPHERAL_COUNT];
 static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
 static uint16_t silent_windows;
 static uint8_t silent_escapes;
-static volatile uint32_t pipe_last_heard_ms[PERIPHERAL_COUNT];
-static volatile bool pipe_ever_heard[PERIPHERAL_COUNT];
+static _Atomic uint32_t pipe_last_heard_ms[PERIPHERAL_COUNT];
+static _Atomic bool pipe_ever_heard[PERIPHERAL_COUNT];
 static uint32_t pipe_was_lost_mask;
 static uint16_t anchor_visit_window;
 static uint8_t rendezvous_anchor;
