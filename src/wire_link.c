@@ -50,7 +50,6 @@ static K_SEM_DEFINE(wire_rx_wake, 0, 1);
 
 static void wire_on_frame(const uint8_t *payload, size_t length, void *user_data) {
     ARG_UNUSED(user_data);
-    atomic_set(&wire_peer_last_rx_uptime, (atomic_val_t)k_uptime_get_32());
     if (length == 0) {
         return;
     }
@@ -86,16 +85,21 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
     if (uart_irq_update(uart_device) <= 0) {
         return;
     }
+    bool got_rx = false;
     while (uart_irq_rx_ready(uart_device) > 0) {
         uint8_t buffer[WIRE_LINK_CHUNK_BYTES];
         const int read = uart_fifo_read(uart_device, buffer, sizeof(buffer));
         if (read <= 0) {
             break;
         }
+        got_rx = true;
         const uint32_t written = ring_buf_put(&wire_rx_ring, buffer, (uint32_t)read);
         if (written < (uint32_t)read) {
             LOG_WRN("wire rx ring overrun, %d bytes dropped", read - (int)written);
         }
+    }
+    if (got_rx) {
+        atomic_set(&wire_peer_last_rx_uptime, (atomic_val_t)k_uptime_get_32());
     }
     while (uart_irq_tx_ready(uart_device) > 0) {
         uint8_t *chunk = NULL;
