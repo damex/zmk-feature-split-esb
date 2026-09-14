@@ -19,6 +19,10 @@
 
 #include "esb_keepalive.h"
 #include "esb_link.h"
+
+#ifndef CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
+#define CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS 32
+#endif
 #include "hop.h"
 #include "hop_internal.h"
 #include "hop_policy.h"
@@ -212,7 +216,13 @@ static void keepalive_work_fn(struct k_work *work) {
     }
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
-    uint16_t period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
+    bool force_fast = DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay);
+    uint16_t period_ms;
+    if (force_fast) {
+        period_ms = CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS;
+    } else {
+        period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
+    }
     if (!active || searching) {
         esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE);
     }

@@ -169,3 +169,14 @@ child-binding:
           Central's command backlog for this peripheral. Raise it for one that receives
           many commands. Beacons and mask updates bypass it, each riding a per-pipe latch
           that the newest value overwrites.
+      role:
+        type: string
+        default: peripheral
+        enum:
+          - peripheral
+          - relay
+        description: |
+          peripheral: sends kscan / sensor / input events to the central. Default.
+          relay: receives relayed traffic from the central (HID reports today), no
+          upstream events. Lets a dumb dongle join the split link and forward HID to
+          its own USB endpoint.

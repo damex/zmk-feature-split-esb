@@ -49,6 +49,38 @@ config ZMK_SPLIT_ESB_BATTERY_LOG
       Battery level changes to the central log, one line per percent step.
       Diagnostic only, needs a log backend.
 
+config ZMK_SPLIT_ESB_HID_RELAY
+    bool "Relay HID reports across the ESB link"
+    select USB if !ZMK_SPLIT_ROLE_CENTRAL
+    select USB_DEVICE_STACK if !ZMK_SPLIT_ROLE_CENTRAL
+    select USB_DEVICE_HID if !ZMK_SPLIT_ROLE_CENTRAL
+    select USB_DEVICE_INITIALIZE_AT_BOOT if !ZMK_SPLIT_ROLE_CENTRAL
+    help
+      Central: snoop HID reports and send each one to every relay-role peripheral.
+      Peripheral (role = "relay"): register a USB HID device and forward each
+      received report onto it. Lets a dumb dongle expose the split as one USB
+      HID device to the host. Requires at least one peripheral with role = "relay"
+      in the zmk,split-esb DT node.
+
+config ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
+    int "Relay peripheral poll period, ms"
+    default 4
+    depends on ZMK_SPLIT_ESB_HID_RELAY
+    help
+      Relay-role peripheral pings central at this rate so any HID report queued
+      on its pipe comes back on the ACK payload. Lower is faster HID latency,
+      at the cost of more radio airtime and higher relay power draw.
+
+config ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS
+    int "HID relay keepalive period, ms"
+    default 4
+    depends on ZMK_SPLIT_ESB_HID_RELAY
+    help
+      Central re-sends the current HID report at this rate even when nothing
+      changed, so a rare dropped release report heals within one period. Same
+      pattern as the split keepalive that heals lost key events. Match this to
+      ZMK_SPLIT_ESB_HID_RELAY_POLL_MS so every relay poll has a fresh report.
+
 menuconfig ZMK_SPLIT_ESB_WIRE
     bool "Wire link between split peripherals"
     select SERIAL

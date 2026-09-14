@@ -44,6 +44,14 @@ static int reply_queue_init(void) {
 }
 SYS_INIT(reply_queue_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
+#define RELAY_PIPE_BIT(node) \
+    +(DT_ENUM_HAS_VALUE(node, role, relay) ? (1u << DT_PROP(node, pipe)) : 0u)
+#define RELAY_PIPE_MASK (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, RELAY_PIPE_BIT))
+
+bool esb_link_pipe_is_relay(uint8_t pipe) {
+    return (RELAY_PIPE_MASK & (1u << pipe)) != 0u;
+}
+
 uint8_t esb_link_source_ids(uint8_t *out_ids) {
     __ASSERT_NO_MSG(out_ids != NULL);
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
@@ -93,6 +101,26 @@ int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (length > 0) {
         memcpy(packet.data, data, length);
     }
+    if (k_msgq_put(reply_queue[pipe], &packet, K_NO_WAIT) != 0) {
+        return -ENOBUFS;
+    }
+    return 0;
+}
+
+int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length) {
+    if (pipe >= REPLY_PIPE_COUNT) {
+        return -EINVAL;
+    }
+    if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+        return -EMSGSIZE;
+    }
+    struct esb_link_packet packet = {0};
+    packet.pipe = pipe;
+    packet.length = (uint8_t)length;
+    if (length > 0) {
+        memcpy(packet.data, data, length);
+    }
+    k_msgq_purge(reply_queue[pipe]);
     if (k_msgq_put(reply_queue[pipe], &packet, K_NO_WAIT) != 0) {
         return -ENOBUFS;
     }

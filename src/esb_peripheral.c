@@ -18,6 +18,7 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_batch.h"
+#include "esb_hid_relay_peripheral.h"
 #include "esb_link.h"
 #include "esb_wire.h"
 #include "hop.h"
@@ -112,9 +113,15 @@ static const struct zmk_split_transport_peripheral_api esb_peripheral_api = {
 ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(esb_peripheral, &esb_peripheral_api,
                                         CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
+#define SELF_IS_RELAY DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay)
+
 static void esb_peripheral_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
     ARG_UNUSED(pipe);
-    peripheral_deliver_command(data, length);
+    if (SELF_IS_RELAY) {
+        esb_hid_relay_deliver(data, length);
+    } else {
+        peripheral_deliver_command(data, length);
+    }
 }
 
 static int esb_peripheral_init(void) {

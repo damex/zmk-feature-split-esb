@@ -52,6 +52,17 @@ int esb_link_send_relay(const uint8_t *data, size_t length, bool ack);
 
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 /* Central only.
+ * True when the pipe's DT role is "relay" (downlink sink, no upstream events). */
+bool esb_link_pipe_is_relay(uint8_t pipe);
+
+/* Central only.
+ * Purge the pipe's reply queue and stage `data` as the single pending reply.
+ * Latest-wins semantics for producers that only ever want the freshest state
+ * delivered next (e.g. HID relay). Returns -EINVAL on bad pipe, -EMSGSIZE on
+ * oversize payload. */
+int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length);
+
+/* Central only.
  * Fill out_ids with the peripheral source ids (= pipe numbers).
  * Returns the count. */
 uint8_t esb_link_source_ids(uint8_t *out_ids);
