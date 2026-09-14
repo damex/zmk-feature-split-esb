@@ -148,6 +148,59 @@ Right half (peripheral): claim pipe 1.
 Keys deliver, but peripheral-count limit below applies: no global-behavior broadcast,
 no HID-indicator forwarding.
 
+### Wire relay: one half over UART
+
+One half runs ESB, other rides UART to it. ESB half relays wire frames onto own
+ESB pipe. Dongle sees a normal peripheral. Shared (`esb_shared.dtsi`) reuses
+two-halves shape above.
+
+Relay half (ESB + wire central):
+```dts
+#include "esb_shared.dtsi"
+/ {
+    chosen {
+        zmk,esb-self = &left;
+        zmk,esb-wire-peer = &right;
+        zmk,esb-wire = &uart0;
+    };
+};
+&uart0 { status = "okay"; current-speed = <460800>; };
+```
+`.conf`:
+```conf
+CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY=y
+```
+
+Wire half (no radio):
+```dts
+#include "esb_shared.dtsi"
+/ {
+    chosen {
+        zmk,esb-self = &right;
+        zmk,esb-wire = &uart0;
+    };
+};
+&uart0 { status = "okay"; current-speed = <460800>; };
+```
+`.conf`:
+```conf
+CONFIG_ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE=y
+```
+
+Bidirectional (two pins, TX + RX between halves): full-duplex, stock pinctrl on
+both sides.
+
+Unidirectional (single data pin, TRRS with one signal line): wire peer pushes,
+relay listens. Uplink only. Wire side needs pinctrl override so its TX lands on
+the shared pin. `nice_nano` defaults to TX=P0.06 and RX=P0.08. Here we put
+wire on P0.08:
+```dts
+&uart0_default {
+    group1 { psels = <NRF_PSEL(UART_RX, 0, 6)>; bias-pull-up; };
+    group2 { psels = <NRF_PSEL(UART_TX, 0, 8)>; };
+};
+```
+
 | DT property | Value |
 |---|---|
 | `base-address` | 4-byte bytestring `[..]`, shared across pipes, vary bytes (all-same-byte syncs poorly) |
