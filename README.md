@@ -258,6 +258,11 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_SPLIT_ESB_EVENT_QUEUE_SIZE` | 16 | central queue for key/sensor/battery events bound for the system workqueue |
 | `ZMK_SPLIT_ESB_COMMAND_QUEUE_SIZE` | 8 | peripheral queue for inbound central commands |
 | `ZMK_SPLIT_ESB_PRIORITY` | 50 | transport registration priority |
+| `ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS` | 100 | wire link-layer heartbeat period |
+| `ZMK_SPLIT_ESB_WIRE_STATE_MS` | 500 | wire peer state broadcast period |
+| `ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS` | 500 | silence before wire link declared down |
+| `ZMK_SPLIT_ESB_WIRE_RX_STACK_SIZE` | 1024 | wire RX thread stack |
+| `ZMK_SPLIT_ESB_WIRE_RX_PRIORITY` | 4 | wire RX thread priority |
 
 ## Lost-event reconcile
 
