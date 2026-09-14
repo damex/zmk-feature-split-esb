@@ -205,6 +205,60 @@ initialized.
 +------------------------------------------------------------------------------+
 ```
 
+## Wire uplink: wire peer event to central
+
+```
++-- wire peer -----------------------------------------------------------------+
+| caller thread                                                                |
+|                                                                              |
+|   [ZMK event]                                                                |
+|       |                                                                      |
+|       v                                                                      |
+|   [peripheral_report_event]                       peripheral.c               |
+|       |                                                                      |
+|       v                                                                      |
+|   [esb_wire_encode_event]                         esb_wire.c                 |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_peripheral_report_event]                  wire_peripheral.c          |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_frame_encode]                             wire_frame.c               |
+|   COBS wrap, CRC8-CCITT postfix                                              |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_link_send]                                wire_link.c                |
+|   irq_lock, ring_buf_put, uart_irq_tx_enable                                 |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_tx_ring]                                                             |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| UART ISR                                                                     |
+|                                                                              |
+|   [wire_tx_ring] --> [uart_fifo_fill]                                        |
+|   ISR disables TX IRQ when ring empties                                      |
++---------------|--------------------------------------------------------------+
+                | UART bytes
++-- relay half -|--------------------------------------------------------------+
+| UART ISR      v                                                              |
+|                                                                              |
+|   [uart_fifo_read] --> [wire_rx_ring]                                        |
+|   stamp wire_peer_last_rx_uptime per byte batch                              |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| wire_link_rx thread                                                          |
+|                                                                              |
+|   [wire_rx_ring] --> [wire_frame_parser_ingest]   wire_link.c                |
+|                      COBS decode, CRC check                                  |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_on_frame] --> [wire_relay_on_frame]       wire_relay.c               |
+|       |                                                                      |
+|       v                                                                      |
+|   [esb_link_send_relay] --> [ESB TX FIFO]                                    |
+|   places frame on wire peer's ESB pipe for uplink to central                 |
++------------------------------------------------------------------------------+
+```
+
 ## Ticks
 
 All three run on the system workqueue.
@@ -365,3 +419,5 @@ the `CONFIG_ZMK_SPLIT_ESB` prefix.
 | reply queue, per pipe | `reply-queue-depth` | stage returns -ENOBUFS |
 | control latch, per pipe | one slot per kind | newest overwrites, by design |
 | ESB TX FIFO | `CONFIG_ESB_TX_FIFO_SIZE` | send fails, stall flush recovers |
+| wire RX ring | `WIRE_FRAME_MAX_ENCODED * 2` | ISR logs, bytes dropped |
+| wire TX ring | `WIRE_FRAME_MAX_ENCODED * 2` | send returns -ENOBUFS |
