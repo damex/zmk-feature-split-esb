@@ -227,16 +227,20 @@ initialized.
 |   COBS wrap, CRC8-CCITT postfix                                              |
 |       |                                                                      |
 |       v                                                                      |
-|   [wire_link_send]                                wire_link.c                |
-|   irq_lock, ring_buf_put, uart_irq_tx_enable                                 |
+|   [wire_link_send_event]                          wire_link.c                |
+|   ring_buf_put, uart_irq_tx_enable                                           |
 |       |                                                                      |
 |       v                                                                      |
-|   [wire_tx_ring]                                                             |
+|   [wire_tx_event_ring]                                                       |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | UART ISR                                                                     |
 |                                                                              |
-|   [wire_tx_ring] --> [uart_fifo_fill]                                        |
-|   ISR disables TX IRQ when ring empties                                      |
+|   [wire_tx_event_ring]     drained first                                     |
+|   [wire_tx_keepalive_ring] drained after event ring empties                  |
+|       |                                                                      |
+|       v                                                                      |
+|   [uart_fifo_fill]                                                           |
+|   TX IRQ disables when both rings empty                                      |
 +---------------|--------------------------------------------------------------+
                 | UART bytes
 +-- relay half -|--------------------------------------------------------------+
@@ -420,4 +424,5 @@ the `CONFIG_ZMK_SPLIT_ESB` prefix.
 | control latch, per pipe | one slot per kind | newest overwrites, by design |
 | ESB TX FIFO | `CONFIG_ESB_TX_FIFO_SIZE` | send fails, stall flush recovers |
 | wire RX ring | `WIRE_FRAME_MAX_ENCODED * 2` | ISR logs, bytes dropped |
-| wire TX ring | `WIRE_FRAME_MAX_ENCODED * 2` | send returns -ENOBUFS |
+| wire TX event ring | `WIRE_FRAME_MAX_ENCODED * 2` | send returns -ENOBUFS |
+| wire TX keepalive ring | `WIRE_FRAME_MAX_ENCODED` | send returns -ENOBUFS |
