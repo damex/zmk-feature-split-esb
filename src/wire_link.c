@@ -27,12 +27,13 @@ BUILD_ASSERT(DT_NODE_EXISTS(WIRE_LINK_UART_NODE),
              "chosen zmk,esb-wire must reference a UART node");
 
 #define WIRE_LINK_RX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
+#define WIRE_LINK_TX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_CHUNK_BYTES        64
-#define WIRE_LINK_TX_LOCK_TIMEOUT_MS 50
 
 static const struct device *const wire_uart_device = DEVICE_DT_GET(WIRE_LINK_UART_NODE);
 
 RING_BUF_DECLARE(wire_rx_ring, WIRE_LINK_RX_RING_BYTES);
+RING_BUF_DECLARE(wire_tx_ring, WIRE_LINK_TX_RING_BYTES);
 
 static struct wire_frame_parser wire_parser;
 
@@ -40,9 +41,6 @@ static atomic_ptr_t wire_rx_subscription;
 
 static atomic_t wire_peer_last_rx_uptime;
 static struct k_work_delayable wire_keepalive_work;
-
-static uint8_t wire_tx_framed[WIRE_FRAME_MAX_ENCODED];
-static K_SEM_DEFINE(wire_tx_lock, 1, 1);
 
 static K_THREAD_STACK_DEFINE(wire_rx_stack, CONFIG_ZMK_SPLIT_ESB_WIRE_RX_STACK_SIZE);
 static struct k_thread wire_rx_thread_data;
@@ -97,6 +95,20 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
             LOG_WRN("wire rx ring overrun, %d bytes dropped", read - (int)written);
         }
     }
+    while (uart_irq_tx_ready(uart_device) > 0) {
+        uint8_t *chunk = NULL;
+        const uint32_t claim = ring_buf_get_claim(&wire_tx_ring, &chunk,
+                                                  WIRE_LINK_CHUNK_BYTES);
+        if (claim == 0) {
+            uart_irq_tx_disable(uart_device);
+            break;
+        }
+        const int sent = uart_fifo_fill(uart_device, chunk, (int)claim);
+        ring_buf_get_finish(&wire_tx_ring, (uint32_t)(sent < 0 ? 0 : sent));
+        if (sent < (int)claim) {
+            break;
+        }
+    }
     k_sem_give(&wire_rx_wake);
 }
 
@@ -109,19 +121,18 @@ int wire_link_send(const uint8_t *payload, size_t length) {
     if (length > WIRE_FRAME_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
-    if (k_sem_take(&wire_tx_lock, K_MSEC(WIRE_LINK_TX_LOCK_TIMEOUT_MS)) != 0) {
-        return -EBUSY;
-    }
-    const int encoded = wire_frame_encode(payload, length,
-                                          wire_tx_framed, sizeof(wire_tx_framed));
+    uint8_t framed[WIRE_FRAME_MAX_ENCODED];
+    const int encoded = wire_frame_encode(payload, length, framed, sizeof(framed));
     if (encoded < 0) {
-        k_sem_give(&wire_tx_lock);
         return encoded;
     }
-    for (int byte_index = 0; byte_index < encoded; byte_index++) {
-        uart_poll_out(wire_uart_device, wire_tx_framed[byte_index]);
+    unsigned int key = irq_lock();
+    const uint32_t written = ring_buf_put(&wire_tx_ring, framed, (uint32_t)encoded);
+    irq_unlock(key);
+    if (written < (uint32_t)encoded) {
+        return -ENOBUFS;
     }
-    k_sem_give(&wire_tx_lock);
+    uart_irq_tx_enable(wire_uart_device);
     return 0;
 }
 
@@ -137,7 +148,7 @@ bool wire_link_is_up(void) {
 static void wire_keepalive_fire(struct k_work *work) {
     ARG_UNUSED(work);
     const int send_result = wire_link_send(NULL, 0);
-    if (send_result != 0 && send_result != -EBUSY) {
+    if (send_result != 0 && send_result != -ENOBUFS) {
         LOG_WRN("wire keepalive send failed (%d)", send_result);
     }
     k_work_reschedule(&wire_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS));
