@@ -63,7 +63,7 @@ config ZMK_SPLIT_ESB_BATTERY_LOG
 
 menuconfig ZMK_SPLIT_ESB_WIRE
     bool "Wire link between split peripherals"
-    depends on SERIAL
+    select SERIAL
     select UART_INTERRUPT_DRIVEN
     select RING_BUFFER
     select CRC
