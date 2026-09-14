@@ -23,7 +23,7 @@ static uint32_t last_wire_send_ms;
 static uint8_t wire_keepalive_buffer[PERIPHERAL_KEEPALIVE_MAX_LENGTH];
 
 static int wire_peripheral_send(const uint8_t *data, size_t length) {
-    int result = wire_link_send(data, length);
+    int result = wire_link_send_event(data, length);
     if (result == 0) {
         last_wire_send_ms = k_uptime_get_32();
     }
@@ -99,7 +99,10 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
                                                active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE,
                                                0);
     if (length > 0) {
-        (void)wire_peripheral_send(wire_keepalive_buffer, length);
+        int result = wire_link_send_keepalive(wire_keepalive_buffer, length);
+        if (result == 0) {
+            last_wire_send_ms = k_uptime_get_32();
+        }
     }
     k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS));
 }
