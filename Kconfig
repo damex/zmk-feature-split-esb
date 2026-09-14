@@ -25,18 +25,6 @@ config ZMK_SPLIT_ESB_RX_QUEUE_SIZE
       Lock-free SPSC ring between the radio ISR and the dispatch thread. Must be
       a power of 2. Deep enough to ride out dispatch stalls at the RX rate.
 
-config ZMK_SPLIT_ESB_RX_THREAD_STACK_SIZE
-    int "RX dispatch thread stack size"
-    default 1536
-    help
-      Dispatch thread decodes packets and forwards input events to the input
-      subsystem. Behavior-bound traffic is handed to the system workqueue, so
-      ZMK keymap and behavior code never runs on this stack.
-
-config ZMK_SPLIT_ESB_RX_THREAD_PRIORITY
-    int "RX dispatch thread priority"
-    default 2
-
 config ZMK_SPLIT_ESB_EVENT_QUEUE_SIZE
     int "Central: behavior-bound event queue depth"
     default 16
@@ -108,14 +96,6 @@ config ZMK_SPLIT_ESB_WIRE_STATE_MS
 config ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS
     int "Wire link peer-alive timeout, ms"
     default 500
-
-config ZMK_SPLIT_ESB_WIRE_RX_STACK_SIZE
-    int "Wire link RX thread stack size"
-    default 1024
-
-config ZMK_SPLIT_ESB_WIRE_RX_PRIORITY
-    int "Wire link RX thread priority"
-    default 4
 
 endif # ZMK_SPLIT_ESB_WIRE
 

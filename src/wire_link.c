@@ -29,6 +29,8 @@ BUILD_ASSERT(DT_NODE_EXISTS(WIRE_LINK_UART_NODE),
 #define WIRE_LINK_RX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_TX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_CHUNK_BYTES        64
+#define WIRE_LINK_RX_STACK_SIZE      1024
+#define WIRE_LINK_RX_PRIORITY        4
 
 static const struct device *const wire_uart_device = DEVICE_DT_GET(WIRE_LINK_UART_NODE);
 
@@ -42,7 +44,7 @@ static atomic_ptr_t wire_rx_subscription;
 static atomic_t wire_peer_last_rx_uptime;
 static struct k_work_delayable wire_keepalive_work;
 
-static K_THREAD_STACK_DEFINE(wire_rx_stack, CONFIG_ZMK_SPLIT_ESB_WIRE_RX_STACK_SIZE);
+static K_THREAD_STACK_DEFINE(wire_rx_stack, WIRE_LINK_RX_STACK_SIZE);
 static struct k_thread wire_rx_thread_data;
 static K_SEM_DEFINE(wire_rx_wake, 0, 1);
 
@@ -166,7 +168,7 @@ static int wire_link_init(void) {
     k_thread_create(&wire_rx_thread_data, wire_rx_stack,
                     K_THREAD_STACK_SIZEOF(wire_rx_stack),
                     wire_rx_thread_entry, NULL, NULL, NULL,
-                    CONFIG_ZMK_SPLIT_ESB_WIRE_RX_PRIORITY, 0, K_NO_WAIT);
+                    WIRE_LINK_RX_PRIORITY, 0, K_NO_WAIT);
     k_thread_name_set(&wire_rx_thread_data, "wire_link_rx");
     k_work_init_delayable(&wire_keepalive_work, wire_keepalive_fire);
     k_work_reschedule(&wire_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS));

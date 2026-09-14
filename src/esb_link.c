@@ -25,6 +25,9 @@
 #include "esb_link_internal.h"
 #include "hop.h"
 
+#define RX_THREAD_STACK_SIZE 1536
+#define RX_THREAD_PRIORITY   2
+
 LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_split_esb),
@@ -89,7 +92,7 @@ BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
  * requires. */
 SPSC_DEFINE(rx_spsc, struct esb_link_packet, CONFIG_ZMK_SPLIT_ESB_RX_QUEUE_SIZE);
 static K_SEM_DEFINE(rx_sem, 0, 1);
-static K_THREAD_STACK_DEFINE(rx_thread_stack, CONFIG_ZMK_SPLIT_ESB_RX_THREAD_STACK_SIZE);
+static K_THREAD_STACK_DEFINE(rx_thread_stack, RX_THREAD_STACK_SIZE);
 static struct k_thread rx_thread;
 
 static esb_link_rx_callback_t rx_callback;
@@ -250,7 +253,7 @@ static int esb_link_radio_setup(void) {
 int esb_link_init(esb_link_rx_callback_t callback) {
     rx_callback = callback;
     k_thread_create(&rx_thread, rx_thread_stack, K_THREAD_STACK_SIZEOF(rx_thread_stack),
-                    rx_thread_fn, NULL, NULL, NULL, CONFIG_ZMK_SPLIT_ESB_RX_THREAD_PRIORITY, 0,
+                    rx_thread_fn, NULL, NULL, NULL, RX_THREAD_PRIORITY, 0,
                     K_NO_WAIT);
 
     int error = esb_link_hfclk_acquire();
