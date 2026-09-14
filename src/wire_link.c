@@ -4,7 +4,7 @@
 /*
  * Bidirectional UART link between two split peripherals.
  * Framing lives in wire_frame.c.
- * UART node from chosen zmk,split-esb-wire.
+ * UART node from chosen zmk,esb-wire.
  * Physical UART or USB CDC.
  */
 
@@ -22,9 +22,9 @@
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-#define WIRE_LINK_UART_NODE          DT_CHOSEN(zmk_split_esb_wire)
+#define WIRE_LINK_UART_NODE          DT_CHOSEN(zmk_esb_wire)
 BUILD_ASSERT(DT_NODE_EXISTS(WIRE_LINK_UART_NODE),
-             "chosen zmk,split-esb-wire must reference a UART node");
+             "chosen zmk,esb-wire must reference a UART node");
 
 #define WIRE_LINK_RX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_CHUNK_BYTES        64
