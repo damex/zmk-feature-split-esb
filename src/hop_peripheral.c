@@ -148,6 +148,7 @@ static void adopt_epoch(uint8_t epoch) {
     lost_windows = 0;
     camp_dwell = 0;
     degrade_undo_armed = false;
+    attempts_ewma_x10 = 10;
     atomic_set(&max_tx_attempts, 0);
 }
 
