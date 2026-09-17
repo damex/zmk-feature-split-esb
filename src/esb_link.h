@@ -55,6 +55,8 @@ int esb_link_send_relay(const uint8_t *data, size_t length, bool ack);
  * True when the pipe's DT role is "relay" (downlink sink, no upstream events). */
 bool esb_link_pipe_is_relay(uint8_t pipe);
 
+bool esb_link_pipe_is_self(uint8_t pipe);
+
 /* Central only.
  * Purge the pipe's reply queue and stage `data` as the single pending reply.
  * Latest-wins semantics for producers that only ever want the freshest state

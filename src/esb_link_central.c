@@ -48,16 +48,28 @@ SYS_INIT(reply_queue_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
     +(DT_ENUM_HAS_VALUE(node, role, relay) ? (1u << DT_PROP(node, pipe)) : 0u)
 #define RELAY_PIPE_MASK (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, RELAY_PIPE_BIT))
 
+#define SELF_PIPE_BIT(node) \
+    +(DT_ENUM_HAS_VALUE(node, role, self) ? (1u << DT_PROP(node, pipe)) : 0u)
+#define SELF_PIPE_MASK (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, SELF_PIPE_BIT))
+
 bool esb_link_pipe_is_relay(uint8_t pipe) {
     return (RELAY_PIPE_MASK & (1u << pipe)) != 0u;
 }
 
+bool esb_link_pipe_is_self(uint8_t pipe) {
+    return (SELF_PIPE_MASK & (1u << pipe)) != 0u;
+}
+
 uint8_t esb_link_source_ids(uint8_t *out_ids) {
     __ASSERT_NO_MSG(out_ids != NULL);
+    uint8_t out_count = 0;
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
-        out_ids[pipe] = pipe;
+        if (esb_link_pipe_is_self(pipe)) {
+            continue;
+        }
+        out_ids[out_count++] = pipe;
     }
-    return esb_link_pipe_count;
+    return out_count;
 }
 
 BUILD_ASSERT(ESB_LINK_CONTROL_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,

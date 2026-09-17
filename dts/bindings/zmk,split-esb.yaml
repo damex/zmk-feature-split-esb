@@ -175,8 +175,11 @@ child-binding:
         enum:
           - peripheral
           - relay
+          - self
         description: |
           peripheral: sends kscan / sensor / input events to the central. Default.
           relay: receives relayed traffic from the central (HID reports today), no
           upstream events. Lets a dumb dongle join the split link and forward HID to
           its own USB endpoint.
+          self: central pipe slot in peripherals table. Central skips from source-id
+          enumeration and connection tracking.

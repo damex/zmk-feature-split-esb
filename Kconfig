@@ -115,6 +115,14 @@ config ZMK_SPLIT_ESB_WIRE_RELAY
       wire link. Received events land at wire_relay for future forwarding
       through the ESB uplink.
 
+config ZMK_SPLIT_ESB_WIRE_PEER
+    bool "Central has a wire peer"
+    depends on ZMK_SPLIT_ROLE_CENTRAL
+    select ZMK_SPLIT_ESB_WIRE
+    help
+      Central ingests events and keepalives from split peripheral over wire
+      link. Peer pipe named by chosen zmk,esb-wire-peer.
+
 if ZMK_SPLIT_ESB_WIRE
 
 config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS

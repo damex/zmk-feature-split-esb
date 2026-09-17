@@ -24,12 +24,14 @@
 #include <zmk/split/transport/central.h>
 #include <zmk/split/transport/types.h>
 
+#include "central.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
 #include "hop.h"
 #include "esb_sensor_sync.h"
 #include "esb_wire.h"
+#include "wire_central.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -50,6 +52,9 @@ static enum zmk_split_transport_connections_status central_connections_status(vo
 
 static int central_send_command(uint8_t source,
                                 struct zmk_split_transport_central_command command) {
+    if (wire_central_owns_pipe(source)) {
+        return wire_central_send_command((const uint8_t *)&command, sizeof(command));
+    }
     return esb_link_stage_reply(source, (const uint8_t *)&command, sizeof(command));
 }
 
@@ -186,6 +191,9 @@ static enum zmk_split_transport_connections_status central_connections_status(vo
     uint8_t total = 0;
     uint8_t connected = 0;
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
+        if (esb_link_pipe_is_self(pipe)) {
+            continue;
+        }
         total++;
         if (pipe_connected[pipe]) {
             connected++;
@@ -274,12 +282,18 @@ static K_WORK_DELAYABLE_DEFINE(staleness_work, staleness_work_fn);
 static void staleness_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count && pipe < ESB_LINK_PIPE_MAX; pipe++) {
+        if (esb_link_pipe_is_self(pipe)) {
+            continue;
+        }
         uint32_t quiet_ms = hop_pipe_quiet_ms(pipe);
         bool heard = hop_pipe_heard(pipe);
         LOG_DBG("pipe %u heard=%d quiet=%ums connection=%d", (unsigned)pipe, (int)heard,
                 (unsigned)quiet_ms, (int)pipe_connected[pipe]);
         if (heard) {
-            if (quiet_ms <= peripheral_timeout_ms) {
+            bool wire_peer = wire_central_owns_pipe(pipe);
+            bool peer_active = wire_peer ? (wire_central_peer_is_up() && quiet_ms <= peripheral_timeout_ms)
+                                         : (quiet_ms <= peripheral_timeout_ms);
+            if (peer_active) {
                 pipe_stale[pipe] = false;
             } else if (!pipe_stale[pipe]) {
                 pipe_stale[pipe] = true;
@@ -403,7 +417,7 @@ static void central_event_work_fn(struct k_work *work) {
 
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
-static void central_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
+void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
     if (esb_keepalive_matches(data, (uint8_t)length)) {
         struct central_inbound inbound = {
             .source = pipe,
@@ -471,7 +485,7 @@ static int central_init(void) {
         return clock_error;
     }
     hop_boot_mask();
-    return esb_link_init(central_on_rx);
+    return esb_link_init(central_ingest_packet);
 }
 
 SYS_INIT(central_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

@@ -53,6 +53,9 @@ bool hop_pipe_needs_rendezvous(uint8_t pipe);
 uint32_t hop_pipe_quiet_ms(uint8_t pipe);
 bool hop_pipe_heard(uint8_t pipe);
 
+/* Non-ESB path (wire peer) stamps liveness without touching channel-quality state. */
+void hop_pipe_note_seen(uint8_t pipe);
+
 /* Boot mask from persisted spectrum and an energy sweep.
  * Radio must be idle: run before esb_link_init, HFCLK running. */
 void hop_boot_mask(void);

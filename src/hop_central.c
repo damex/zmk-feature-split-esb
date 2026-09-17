@@ -24,6 +24,7 @@
 #include "hop.h"
 #include "hop_internal.h"
 #include "hop_policy.h"
+#include "wire_central.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -158,9 +159,20 @@ bool hop_pipe_heard(uint8_t pipe) {
     return pipe_ever_heard[pipe];
 }
 
+void hop_pipe_note_seen(uint8_t pipe) {
+    if (pipe >= PERIPHERAL_COUNT) {
+        return;
+    }
+    pipe_last_heard_ms[pipe] = k_uptime_get_32();
+    pipe_ever_heard[pipe] = true;
+}
+
 bool hop_pipe_needs_rendezvous(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return true;
+    }
+    if (esb_link_pipe_is_self(pipe) || wire_central_owns_pipe(pipe)) {
+        return false;
     }
     return hop_pipe_quiet_ms(pipe) >= ESB_HOP_LOSS_DETECT_MS;
 }
@@ -272,6 +284,9 @@ static void stage_beacon(uint32_t heard) {
         return;
     }
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (esb_link_pipe_is_self(pipe) || wire_central_owns_pipe(pipe)) {
+            continue;
+        }
         if (!burst && !(heard & BIT(pipe))) {
             continue;
         }
@@ -352,6 +367,9 @@ static void stage_mask_update(void) {
     struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG};
     memcpy(update.mask, mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
+        if (esb_link_pipe_is_self(pipe) || wire_central_owns_pipe(pipe)) {
+            continue;
+        }
         if (hop_pipe_needs_rendezvous(pipe)) {
             continue; /* rejoins via anchor beacon, not a stale-channel mask reply */
         }
