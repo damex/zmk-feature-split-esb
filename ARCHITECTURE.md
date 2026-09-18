@@ -291,7 +291,7 @@ All three run on the system workqueue.
 
 +-- central decision tick -------- idle-keepalive-ms window -------------------+
 |                                                                              |
-|  [heard / motion / active / link cost]        hop_central.c                  |
+|  [heard / motion / active masks]              hop_central.c                  |
 |      |                                                                       |
 |      v                                                                       |
 |  [per-pipe loss + channel score] --> [mask recompute]                        |
