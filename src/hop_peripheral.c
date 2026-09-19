@@ -19,6 +19,7 @@
 
 #include "esb_keepalive.h"
 #include "esb_link.h"
+#include "spsc_latch.h"
 
 #ifndef CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
 #define CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS 32
@@ -52,8 +53,13 @@ static uint8_t adopted_epoch;
 static _Atomic int8_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
-static uint8_t staged_mask[ESB_HOP_MASK_BYTES];
-static atomic_t mask_update_seen;
+
+#define STAGED_MASK_SLOTS 2
+struct staged_mask {
+    uint8_t bytes[ESB_HOP_MASK_BYTES];
+};
+static struct staged_mask staged_mask_pool[STAGED_MASK_SLOTS];
+static struct spsc_latch staged_mask_latch = {.slot_count = STAGED_MASK_SLOTS};
 static _Atomic uint16_t peer_table[ESB_BEACON_PEER_COUNT];
 
 #define PEER_RSSI_SHIFT 8
@@ -123,14 +129,13 @@ void hop_restore(void) {
     hop_index = retained_link.hop_index;
 }
 
-/* Read under the lock the radio ISR stages with. */
 static void adopt_staged_mask(void) {
-    if (atomic_get(&mask_update_seen) == 0) {
+    struct staged_mask *slot = spsc_latch_peek(&staged_mask_latch);
+    if (slot == NULL) {
         return;
     }
-    unsigned int key = irq_lock();
-    memcpy(active_mask, staged_mask, ESB_HOP_MASK_BYTES);
-    irq_unlock(key);
+    memcpy(active_mask, slot->bytes, ESB_HOP_MASK_BYTES);
+    (void)spsc_latch_release(&staged_mask_latch, slot);
 }
 
 /* Adopt the central's channel on a beacon epoch or mask change.
@@ -259,8 +264,9 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
     }
     if (esb_is_mask_update(data, length)) {
         const struct esb_mask_update *update = (const struct esb_mask_update *)data;
-        memcpy(staged_mask, update->mask, ESB_HOP_MASK_BYTES);
-        atomic_set(&mask_update_seen, 1);
+        uint8_t index = spsc_latch_claim(&staged_mask_latch);
+        memcpy(staged_mask_pool[index].bytes, update->mask, ESB_HOP_MASK_BYTES);
+        spsc_latch_publish(&staged_mask_latch, &staged_mask_pool[index]);
         return true;
     }
     return false;
