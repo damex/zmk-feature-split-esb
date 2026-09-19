@@ -287,6 +287,15 @@ size_t hop_policy_survey_mask(const int8_t *energy_dbm, size_t pool_count,
     return masked;
 }
 
+bool hop_policy_window_period_fires(uint8_t *counter, uint8_t period) {
+    assert(counter != NULL);
+    if (++(*counter) >= period) {
+        *counter = 0;
+        return true;
+    }
+    return false;
+}
+
 bool hop_policy_should_beacon(uint8_t epoch, uint8_t *beaconed_epoch, uint8_t *repeats_left,
                               uint8_t repeat_windows) {
     assert(beaconed_epoch != NULL);

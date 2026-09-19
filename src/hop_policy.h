@@ -94,6 +94,8 @@ size_t hop_policy_survey_mask(const int8_t *energy_dbm, size_t pool_count,
 void hop_policy_accrue_loss(uint8_t *link_loss, size_t count, uint32_t motion_mask,
                             uint32_t active_mask, const int8_t *rssi_dbm, int8_t floor_dbm);
 
+bool hop_policy_window_period_fires(uint8_t *counter, uint8_t period);
+
 /* Beacon scheduling: announce the epoch only while it is fresh.
  * A changed epoch arms repeat_windows announcements, then goes quiet, so a steady stream
  * never crowds commands out of the reverse channel. */

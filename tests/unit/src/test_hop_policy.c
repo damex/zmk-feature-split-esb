@@ -23,6 +23,23 @@ ZTEST(hop_policy, test_saturating_add) {
     zassert_equal(hop_policy_saturating_add(UINT8_MAX, 1), UINT8_MAX, "stays at max");
 }
 
+ZTEST(hop_policy, test_window_period_fires_on_period) {
+    uint8_t counter = 0;
+    zassert_false(hop_policy_window_period_fires(&counter, 4), "no fire on tick 1");
+    zassert_false(hop_policy_window_period_fires(&counter, 4), "no fire on tick 2");
+    zassert_false(hop_policy_window_period_fires(&counter, 4), "no fire on tick 3");
+    zassert_true(hop_policy_window_period_fires(&counter, 4), "fires on tick 4");
+    zassert_equal(counter, 0, "counter resets on fire");
+}
+
+ZTEST(hop_policy, test_window_period_fires_never_double_at_wrap) {
+    uint8_t counter = 0;
+    for (int step = 0; step < 500; step++) {
+        (void)hop_policy_window_period_fires(&counter, 5);
+        zassert_true(counter < 5, "counter never exceeds period");
+    }
+}
+
 ZTEST(hop_policy, test_should_hop_threshold) {
     uint8_t bad_windows = 0;
     const uint16_t threshold = 3;

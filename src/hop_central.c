@@ -87,7 +87,7 @@ static uint8_t anchor_mask[ESB_HOP_MASK_BYTES];
 static bool pending_valid;
 static bool mask_ready;
 static uint8_t mask_update_repeats;
-static uint16_t mask_window;
+static uint8_t mask_window;
 static uint8_t persisted_mask[ESB_HOP_MASK_BYTES];
 static bool persisted_mask_valid;
 
@@ -278,10 +278,7 @@ static void escape_silent_channel(void) {
 static void stage_beacon(uint32_t heard) {
     bool burst = hop_policy_should_beacon(hop_epoch, &beaconed_epoch, &beacon_repeats_left,
                                           BEACON_REPEAT_WINDOWS);
-    bool refresh = ++beacon_window >= BEACON_RSSI_PERIOD_WINDOWS;
-    if (refresh) {
-        beacon_window = 0;
-    }
+    bool refresh = hop_policy_window_period_fires(&beacon_window, BEACON_RSSI_PERIOD_WINDOWS);
     if (!burst && !refresh) {
         return;
     }
@@ -358,10 +355,7 @@ static void recompute_mask(uint32_t active) {
 /* Slow refresh backs the post-change burst, so a peripheral that missed it still converges. */
 static void stage_mask_update(void) {
     bool burst = mask_update_repeats > 0;
-    bool refresh = ++mask_window >= MASK_REFRESH_WINDOWS;
-    if (refresh) {
-        mask_window = 0;
-    }
+    bool refresh = hop_policy_window_period_fires(&mask_window, MASK_REFRESH_WINDOWS);
     if (burst) {
         mask_update_repeats--;
     } else if (!refresh) {
