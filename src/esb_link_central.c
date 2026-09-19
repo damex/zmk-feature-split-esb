@@ -19,6 +19,7 @@
 
 #include "esb_link.h"
 #include "esb_link_internal.h"
+#include "spsc_latch.h"
 
 #define ESB_PERIPHERALS DT_INST_CHILD(0, peripherals)
 
@@ -75,12 +76,26 @@ uint8_t esb_link_source_ids(uint8_t *out_ids) {
 BUILD_ASSERT(ESB_LINK_CONTROL_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "control latch does not fit one ESB payload");
 
-struct control_slot {
+#define CONTROL_LATCH_SLOTS 2
+
+struct control_payload {
     uint8_t data[ESB_LINK_CONTROL_MAX_LENGTH];
     uint8_t length;
-    bool pending;
 };
-static struct control_slot control_slots[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT];
+
+static struct control_payload
+    control_pool[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT][CONTROL_LATCH_SLOTS];
+static struct spsc_latch control_latch[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT];
+
+static int control_latch_init(void) {
+    for (size_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
+        for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
+            control_latch[pipe][kind].slot_count = CONTROL_LATCH_SLOTS;
+        }
+    }
+    return 0;
+}
+SYS_INIT(control_latch_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
 int esb_link_latch_control(uint8_t pipe, enum esb_link_control kind, const uint8_t *data,
                            size_t length) {
@@ -91,12 +106,11 @@ int esb_link_latch_control(uint8_t pipe, enum esb_link_control kind, const uint8
     if (length == 0 || length > ESB_LINK_CONTROL_MAX_LENGTH) {
         return -EMSGSIZE;
     }
-    struct control_slot *slot = &control_slots[pipe][kind];
-    unsigned int key = irq_lock();
+    uint8_t index = spsc_latch_claim(&control_latch[pipe][kind]);
+    struct control_payload *slot = &control_pool[pipe][kind][index];
     memcpy(slot->data, data, length);
     slot->length = (uint8_t)length;
-    slot->pending = true;
-    irq_unlock(key);
+    spsc_latch_publish(&control_latch[pipe][kind], slot);
     return 0;
 }
 
@@ -149,8 +163,8 @@ void esb_link_set_idle(bool idle) {
 
 static bool write_pending_control(uint8_t pipe) {
     for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
-        struct control_slot *slot = &control_slots[pipe][kind];
-        if (!slot->pending) {
+        struct control_payload *slot = spsc_latch_peek(&control_latch[pipe][kind]);
+        if (slot == NULL) {
             continue;
         }
         struct esb_payload payload = {0};
@@ -158,7 +172,7 @@ static bool write_pending_control(uint8_t pipe) {
         payload.length = slot->length;
         memcpy(payload.data, slot->data, slot->length);
         if (esb_write_payload(&payload) == 0) {
-            slot->pending = false;
+            (void)spsc_latch_release(&control_latch[pipe][kind], slot);
         }
         return true;
     }
