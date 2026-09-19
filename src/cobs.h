@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define COBS_MAX_ENCODED(input_length) ((input_length) + (input_length) / 254 + 2)
+
 int cobs_encode(const uint8_t *input, size_t input_length,
                 uint8_t *output, size_t output_capacity);
 

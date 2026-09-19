@@ -97,3 +97,17 @@ ZTEST(cobs, test_decode_rejects_empty_buffer) {
     const int result = cobs_decode_in_place(buffer, 0, &decoded_length);
     zassert_equal(result, -EINVAL, "empty buffer rejected");
 }
+
+ZTEST(cobs, test_encode_rejects_at_254_boundary) {
+    uint8_t input[254];
+    memset(input, 0x11, sizeof(input));
+    uint8_t output[sizeof(input) + 2];
+    const int encoded_length = cobs_encode(input, sizeof(input), output, sizeof(output));
+    zassert_equal(encoded_length, -ENOMEM, "254 non-zero bytes need input+3, not input+2");
+}
+
+ZTEST(cobs, test_roundtrip_at_254_boundary) {
+    uint8_t input[254];
+    memset(input, 0x11, sizeof(input));
+    expect_roundtrip(input, sizeof(input));
+}

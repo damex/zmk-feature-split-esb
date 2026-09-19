@@ -6,11 +6,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "cobs.h"
+
 #define WIRE_FRAME_MAX_PAYLOAD        128
 #define WIRE_FRAME_CRC_BYTES          1
-#define WIRE_FRAME_COBS_OVERHEAD_MAX  2
-#define WIRE_FRAME_MAX_ENCODED        (WIRE_FRAME_MAX_PAYLOAD + WIRE_FRAME_CRC_BYTES + \
-                                       WIRE_FRAME_COBS_OVERHEAD_MAX)
+#define WIRE_FRAME_MAX_ENCODED        COBS_MAX_ENCODED(WIRE_FRAME_MAX_PAYLOAD + \
+                                                       WIRE_FRAME_CRC_BYTES)
 
 typedef void (*wire_frame_ingest_callback_t)(const uint8_t *payload, size_t length,
                                              void *user_data);

@@ -7,7 +7,7 @@
 
 int cobs_encode(const uint8_t *input, size_t input_length,
                 uint8_t *output, size_t output_capacity) {
-    if (output_capacity < input_length + 2) {
+    if (output_capacity < COBS_MAX_ENCODED(input_length)) {
         return -ENOMEM;
     }
     size_t output_index = 1;
