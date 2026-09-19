@@ -23,8 +23,10 @@ target_sources(testbinary PRIVATE
   src/test_esb_sensor_sync.c
   src/test_hop_policy.c
   src/test_cobs.c
+  src/test_spsc_latch.c
   ${esb_root}/src/esb_keepalive.c
   ${esb_root}/src/esb_sensor_sync.c
   ${esb_root}/src/hop_policy.c
   ${esb_root}/src/cobs.c
+  ${esb_root}/src/spsc_latch.c
 )
