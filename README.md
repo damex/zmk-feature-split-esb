@@ -22,14 +22,12 @@ workspace lacks (`zmk` and Zephyr come from your own manifest):
       revision: v0.6.1
       import: true
 ```
-Then update and apply the Kconfig fixes `sdk-nrf` needs on ZMK's Zephyr:
-```
-west update
-west patch -sm zmk-feature-split-esb apply
-```
-For a local checkout, build with `-DZMK_EXTRA_MODULES=<path>/zmk-feature-split-esb`
-instead. Your workspace must then already provide `sdk-nrf` + `nrfxlib` with the
-patches applied.
+Then `west update`. Module's `modules/modules.cmake` applies sdk-nrf Kconfig
+fixes at cmake configure. No `west patch` step.
+
+For local checkout, build with `-DZMK_EXTRA_MODULES=<path>/zmk-feature-split-esb`
+instead. Workspace must already provide `sdk-nrf` + `nrfxlib`. Module patches
+them on top.
 
 ## Configure
 
@@ -412,6 +410,7 @@ The `LicenseRef-Nordic-5-Clause` parts restrict use to Nordic hardware.
 For an ESB-only build the link symbols come from sdk-nrf.
 nrfxlib is still cloned into your workspace and gets linked if you also enable BLE.
 
-Patches under `zephyr/patches/nrf/` modify sdk-nrf files (Nordic-licensed) and
-apply on the user side via `west patch`. They don't redistribute Nordic source.
-`patches.yml` lists upstream versions after which each patch can be dropped.
+Patches under `zephyr/patches/nrf/` modify sdk-nrf files (Nordic-licensed).
+`modules/modules.cmake` applies them at cmake configure. Nordic source not
+redistributed. `patches.yml` names the upstream version after which each patch
+can be dropped.
