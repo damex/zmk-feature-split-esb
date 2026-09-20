@@ -1,6 +1,9 @@
 # Copyright 2026 Roman Kuzmitskii (@damex)
 # SPDX-License-Identifier: MIT
 
+config NRF_SECURITY
+    default n
+
 menuconfig ZMK_SPLIT_ESB
     bool "ZMK ESB split transport"
     depends on ZMK_SPLIT
