@@ -7,3 +7,4 @@ build:
   kconfig: Kconfig
   settings:
     dts_root: .
+    module_ext_root: .
