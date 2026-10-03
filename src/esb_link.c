@@ -270,8 +270,7 @@ int esb_link_init(esb_link_rx_callback_t callback) {
     config.crc = esb_crc_from_bits(crc_bits);
     config.retransmit_count = retransmit_count;
     config.retransmit_delay = retransmit_delay_us;
-    /* Per-packet ACK is controlled by event_wants_ack() in peripheral.c.
-     * The reverse channel rides the ACKs that the peripheral does request. */
+    /* Reverse channel rides only the ACKs the peripheral requests. */
     config.selective_auto_ack = true;
     config.tx_mode = ESB_TXMODE_AUTO;
     config.use_fast_ramp_up = use_fast_ramp_up;

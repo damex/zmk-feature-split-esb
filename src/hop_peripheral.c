@@ -40,6 +40,9 @@ static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
 static atomic_t data_sent_since_tick;
+static atomic_t acked_sent_since_tick;
+static atomic_t tx_succeeded_since_tick;
+static atomic_t tx_failed_since_tick;
 static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
@@ -211,8 +214,20 @@ static void lost_window(void) {
     }
 }
 
+/* Fire-and-forget sends raise TX success too, so only a failure proves loss. */
+static void settle_link_state(void) {
+    bool failed = atomic_set(&tx_failed_since_tick, 0) != 0;
+    bool succeeded = atomic_set(&tx_succeeded_since_tick, 0) != 0;
+    if (failed) {
+        atomic_set(&link_acked, 0);
+    } else if (succeeded) {
+        atomic_set(&link_acked, 1);
+    }
+}
+
 static void keepalive_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
+    settle_link_state();
     if (HOP_COUNT > 1) {
         ensure_mask();
         uint8_t epoch = (uint8_t)atomic_get(&beacon_epoch);
@@ -228,6 +243,7 @@ static void keepalive_work_fn(struct k_work *work) {
         }
     }
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
+    bool acked_sent = atomic_set(&acked_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
     bool force_fast = DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay);
     uint16_t period_ms;
@@ -236,8 +252,9 @@ static void keepalive_work_fn(struct k_work *work) {
     } else {
         period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
     }
-    if (!active || searching) {
+    if (!acked_sent || searching) {
         esb_link_send_keepalive(active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE);
+        atomic_set(&acked_sent_since_tick, 1);
     }
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
@@ -287,21 +304,28 @@ static void record_tx_attempts(uint8_t attempts) {
 }
 
 void hop_note_tx_success(uint8_t attempts) {
-    atomic_set(&link_acked, 1);
+    atomic_set(&tx_succeeded_since_tick, 1);
     if (HOP_COUNT > 1) {
         record_tx_attempts(attempts);
     }
 }
 
 void hop_note_tx_failed(void) {
-    atomic_set(&link_acked, 0);
+    atomic_set(&tx_failed_since_tick, 1);
     if (HOP_COUNT > 1) {
         record_tx_attempts(0xFF); /* a lost packet is the worst this window */
     }
 }
 
-void hop_note_data_sent(void) {
+void hop_note_data_sent(bool acked) {
     atomic_set(&data_sent_since_tick, 1);
+    if (acked) {
+        atomic_set(&acked_sent_since_tick, 1);
+    }
+}
+
+bool hop_ack_probe_due(void) {
+    return atomic_get(&acked_sent_since_tick) == 0;
 }
 
 uint8_t hop_link_cost_x10(void) {

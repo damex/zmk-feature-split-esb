@@ -143,6 +143,7 @@ properties:
       Reserve for high-rate, self-correcting axes (pointer motion).
       Non-input split events (key-position, sensor, battery) are always ACK'd, and
       every other input event is ACK'd unless listed.
+      First send per keepalive tick requests an ACK regardless.
       Omit for fully lossless link.
 
 child-binding:

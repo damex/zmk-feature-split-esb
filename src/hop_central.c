@@ -557,7 +557,8 @@ void hop_note_tx_success(uint8_t attempts) {
 void hop_note_tx_failed(void) {
 }
 
-void hop_note_data_sent(void) {
+void hop_note_data_sent(bool acked) {
+    ARG_UNUSED(acked);
 }
 
 static int8_t worst_pipe_rssi_dbm(void) {

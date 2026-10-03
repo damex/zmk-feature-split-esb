@@ -31,7 +31,8 @@ void hop_stop(void);
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi);
 
 /* Central: no-op.
- * Peripheral: acked transmit succeeded after this many attempts (1 = first try). */
+ * Peripheral: transmit succeeded after this many attempts (1 = first try).
+ * Fire-and-forget success repeats the last acked count. */
 void hop_note_tx_success(uint8_t attempts);
 
 /* Central: no-op.
@@ -40,7 +41,7 @@ void hop_note_tx_failed(void);
 
 /* Central: no-op.
  * Peripheral: real data went out, next keepalive uses the fast rate. */
-void hop_note_data_sent(void);
+void hop_note_data_sent(bool acked);
 
 /* Channel the radio should currently tune to. */
 uint8_t hop_current_channel(void);
@@ -65,4 +66,6 @@ void hop_boot_mask(void);
 void hop_restore(void);
 
 uint8_t hop_link_cost_x10(void);
+
+bool hop_ack_probe_due(void);
 #endif
