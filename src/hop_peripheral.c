@@ -6,13 +6,12 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
+#include <errno.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
-
-#include <esb.h>
 
 #include <zmk_split_esb.h>
 
@@ -33,9 +32,10 @@ BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
              "hop-threshold above 255 never fires, sweep streak saturates at UINT8_MAX");
 
 #define ADAPTIVE_RETRANSMITS_MIN 2
-static const uint8_t retransmit_ceiling = DT_INST_PROP(0, retransmit_count);
+#define RETRANSMIT_CEILING_MAX DT_INST_PROP(0, retransmit_count)
+BUILD_ASSERT(RETRANSMIT_CEILING_MAX <= UINT8_MAX, "retransmit-count above 255");
+static atomic_t retransmit_ceiling = ATOMIC_INIT(RETRANSMIT_CEILING_MAX);
 static uint16_t attempts_ewma_x10 = 10;
-static uint8_t applied_retransmits = DT_INST_PROP(0, retransmit_count);
 static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
@@ -173,11 +173,6 @@ static void connected_window(void) {
     uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
     if (attempts > 0) {
         attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
-        uint8_t budget = hop_policy_adaptive_retransmits(
-            attempts_ewma_x10, ADAPTIVE_RETRANSMITS_MIN, retransmit_ceiling);
-        if (budget != applied_retransmits && esb_set_retransmit_count(budget) == 0) {
-            applied_retransmits = budget;
-        }
     }
     uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
     if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
@@ -214,6 +209,15 @@ static void lost_window(void) {
     }
 }
 
+static uint8_t retransmit_budget(void) {
+    uint8_t ceiling = (uint8_t)atomic_get(&retransmit_ceiling);
+    if (HOP_COUNT <= 1) {
+        return ceiling;
+    }
+    uint8_t retransmit_floor = MIN(ADAPTIVE_RETRANSMITS_MIN, ceiling);
+    return hop_policy_adaptive_retransmits(attempts_ewma_x10, retransmit_floor, ceiling);
+}
+
 /* Fire-and-forget sends raise TX success too, so only a failure proves loss. */
 static void settle_link_state(void) {
     bool failed = atomic_set(&tx_failed_since_tick, 0) != 0;
@@ -242,6 +246,8 @@ static void keepalive_work_fn(struct k_work *work) {
             retain_link_state();
         }
     }
+    esb_link_set_retransmit_count(retransmit_budget());
+    esb_link_apply_pending();
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     bool acked_sent = atomic_set(&acked_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
@@ -326,6 +332,14 @@ void hop_note_data_sent(bool acked) {
 
 bool hop_ack_probe_due(void) {
     return atomic_get(&acked_sent_since_tick) == 0;
+}
+
+int hop_set_retransmit_ceiling(uint32_t ceiling) {
+    if (ceiling > RETRANSMIT_CEILING_MAX) {
+        return -EINVAL;
+    }
+    atomic_set(&retransmit_ceiling, (atomic_val_t)ceiling);
+    return 0;
 }
 
 uint8_t hop_link_cost_x10(void) {

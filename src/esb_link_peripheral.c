@@ -12,7 +12,6 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/sys/time_units.h>
 #include <zephyr/sys/util.h>
 
 #include <esb.h>
@@ -21,30 +20,120 @@
 #include "esb_link.h"
 #include "esb_link_internal.h"
 #include "hop.h"
+#include "hop_policy.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(DT_HAS_CHOSEN(zmk_esb_self), "peripheral needs a chosen zmk,esb-self");
 static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
 
+struct radio_setting {
+    atomic_t requested;
+    atomic_t applied;
+    atomic_t pending;
+    int (*apply)(atomic_val_t value);
+};
+
+static int apply_tx_power(atomic_val_t value) {
+    return esb_set_tx_power((int8_t)value);
+}
+
+static int apply_retransmit_count(atomic_val_t value) {
+    return esb_set_retransmit_count((uint16_t)value);
+}
+
+static int apply_retransmit_delay(atomic_val_t value) {
+    return esb_set_retransmit_delay((uint16_t)value);
+}
+
+static struct radio_setting tx_power_setting = {
+    .requested = ATOMIC_INIT(DT_INST_PROP(0, tx_power_dbm)),
+    .applied = ATOMIC_INIT(DT_INST_PROP(0, tx_power_dbm)),
+    .apply = apply_tx_power,
+};
+
+static struct radio_setting retransmit_count_setting = {
+    .requested = ATOMIC_INIT(DT_INST_PROP(0, retransmit_count)),
+    .applied = ATOMIC_INIT(DT_INST_PROP(0, retransmit_count)),
+    .apply = apply_retransmit_count,
+};
+
+static struct radio_setting retransmit_delay_setting = {
+    .requested = ATOMIC_INIT(DT_INST_PROP(0, retransmit_delay_us)),
+    .applied = ATOMIC_INIT(DT_INST_PROP(0, retransmit_delay_us)),
+    .apply = apply_retransmit_delay,
+};
+
+/* Radio refuses setting changes outside idle, so a busy radio keeps the value pending. */
+static int apply_setting(struct radio_setting *setting) {
+    if (!atomic_cas(&setting->pending, 1, 0)) {
+        return 0;
+    }
+    atomic_val_t value = atomic_get(&setting->requested);
+    int error = setting->apply(value);
+    if (error == -EBUSY) {
+        atomic_set(&setting->pending, 1);
+        return 0;
+    }
+    if (error == 0) {
+        atomic_set(&setting->applied, value);
+    }
+    return error;
+}
+
+static int request_setting(struct radio_setting *setting, atomic_val_t value) {
+    atomic_set(&setting->requested, value);
+    atomic_set(&setting->pending, 1);
+    return apply_setting(setting);
+}
+
+int esb_link_set_tx_power(int32_t dbm) {
+    if (dbm < INT8_MIN || dbm > INT8_MAX) {
+        return -EINVAL;
+    }
+    return request_setting(&tx_power_setting, dbm);
+}
+
+int esb_link_set_retransmit_delay(uint32_t delay_us) {
+    if (delay_us > UINT16_MAX) {
+        return -EINVAL;
+    }
+    return request_setting(&retransmit_delay_setting, (atomic_val_t)delay_us);
+}
+
+void esb_link_set_retransmit_count(uint8_t count) {
+    (void)request_setting(&retransmit_count_setting, count);
+}
+
+void esb_link_apply_pending(void) {
+    struct radio_setting *const settings[] = {
+        &tx_power_setting,
+        &retransmit_count_setting,
+        &retransmit_delay_setting,
+    };
+    for (size_t index = 0; index < ARRAY_SIZE(settings); index++) {
+        int error = apply_setting(settings[index]);
+        if (error < 0) {
+            LOG_WRN("radio setting rejected (%d)", error);
+        }
+    }
+}
+
 /* Worst legitimate completion-event silence is one packet exhausting its
  * retransmits. TX_STALL_MARGIN such cycles with the FIFO still full means the
  * engine stalled; the floor covers per-attempt airtime the product omits. */
 #define TX_STALL_MARGIN 4
 #define TX_STALL_FLOOR_MS 100
-#define TX_STALL_TIMEOUT_MS                                                                        \
-    MAX(TX_STALL_FLOOR_MS, (TX_STALL_MARGIN * DT_INST_PROP(0, retransmit_count) *                  \
-                            DT_INST_PROP(0, retransmit_delay_us)) /                                \
-                               USEC_PER_MSEC)
 
 /* PTX needs HFXO only around TX bursts. */
 #define HFCLK_IDLE_HOLD_MARGIN 2
 #define HFCLK_IDLE_HOLD_FLOOR_MS 10
-#define HFCLK_IDLE_HOLD_MS                                                                         \
-    MAX(HFCLK_IDLE_HOLD_FLOOR_MS,                                                                  \
-        (HFCLK_IDLE_HOLD_MARGIN * DT_INST_PROP(0, retransmit_count) *                              \
-         DT_INST_PROP(0, retransmit_delay_us)) /                                                   \
-            USEC_PER_MSEC)
+
+static uint32_t live_retry_cycle_ms(uint8_t margin, uint32_t floor_ms) {
+    uint8_t count = (uint8_t)atomic_get(&retransmit_count_setting.applied);
+    uint16_t delay_us = (uint16_t)atomic_get(&retransmit_delay_setting.applied);
+    return hop_policy_retry_cycle_ms(count, delay_us, margin, floor_ms);
+}
 
 static K_MUTEX_DEFINE(hfclk_gate_mutex);
 static bool hfclk_gating;
@@ -65,7 +154,9 @@ static void hfclk_gate_hold(void) {
     k_mutex_lock(&hfclk_gate_mutex, K_FOREVER);
     (void)esb_link_hfclk_acquire();
     if (hfclk_gating) {
-        k_work_reschedule(&hfclk_release_work, K_MSEC(HFCLK_IDLE_HOLD_MS));
+        k_work_reschedule(&hfclk_release_work,
+                          K_MSEC(live_retry_cycle_ms(HFCLK_IDLE_HOLD_MARGIN,
+                                                     HFCLK_IDLE_HOLD_FLOOR_MS)));
     }
     k_mutex_unlock(&hfclk_gate_mutex);
 }
@@ -74,7 +165,9 @@ void esb_link_set_idle(bool idle) {
     k_mutex_lock(&hfclk_gate_mutex, K_FOREVER);
     hfclk_gating = idle;
     if (idle) {
-        k_work_reschedule(&hfclk_release_work, K_MSEC(HFCLK_IDLE_HOLD_MS));
+        k_work_reschedule(&hfclk_release_work,
+                          K_MSEC(live_retry_cycle_ms(HFCLK_IDLE_HOLD_MARGIN,
+                                                     HFCLK_IDLE_HOLD_FLOOR_MS)));
     } else {
         k_work_cancel_delayable(&hfclk_release_work);
         (void)esb_link_hfclk_acquire();
@@ -92,8 +185,8 @@ static int submit_payload(const struct esb_payload *payload) {
     unsigned int key = irq_lock();
     int error = esb_write_payload(payload);
     irq_unlock(key);
-    if (error != -ENOMEM ||
-        (k_uptime_get_32() - esb_link_tx_last_event_ms()) <= TX_STALL_TIMEOUT_MS) {
+    uint32_t silence_ms = k_uptime_get_32() - esb_link_tx_last_event_ms();
+    if (error != -ENOMEM || silence_ms <= live_retry_cycle_ms(TX_STALL_MARGIN, TX_STALL_FLOOR_MS)) {
         return error;
     }
     LOG_WRN("TX engine stalled, flushing to recover");

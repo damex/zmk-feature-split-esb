@@ -6,6 +6,8 @@
 #include <stdint.h>
 
 #include <zephyr/sys/__assert.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys_clock.h>
 
 #include "esb_keepalive.h"
 #include "hop_policy.h"
@@ -64,6 +66,12 @@ uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, ui
     uint32_t span = HOP_POLICY_RETRY_EWMA_HIGH_X10 - HOP_POLICY_RETRY_EWMA_LOW_X10;
     uint32_t into = (uint32_t)ewma_x10 - HOP_POLICY_RETRY_EWMA_LOW_X10;
     return (uint8_t)(count_min + (into * (uint32_t)(count_max - count_min)) / span);
+}
+
+uint32_t hop_policy_retry_cycle_ms(uint8_t count, uint16_t delay_us, uint8_t margin,
+                                   uint32_t floor_ms) {
+    uint32_t cycle_us = (uint32_t)margin * count * delay_us;
+    return MAX(floor_ms, cycle_us / USEC_PER_MSEC);
 }
 
 bool hop_policy_keepalive_is_active(uint8_t byte) {

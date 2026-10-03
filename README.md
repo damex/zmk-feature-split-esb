@@ -344,7 +344,16 @@ Each step overrides the previous:
 2. **Saved values:** any persisted in NVS apply on top (needs `CONFIG_SETTINGS`).
 3. **Live changes:** pushed at runtime via `settings_runtime_set`, no reflash.
 
-Runtime-overridable keys: `esb/tx_power`, `esb/retransmit_count`, `esb/retransmit_delay`.
+Runtime-overridable keys, each a uint32:
+
+| Key | Meaning | Range |
+|---|---|---|
+| `esb/tx_power` | TX power, dBm, two's complement | -128 to 127 |
+| `esb/retransmit_count` | adaptive retransmit ceiling | 0 to DT `retransmit-count` |
+| `esb/retransmit_delay` | delay between retransmits, us | radio minimum to 65535 |
+
+Out-of-range value returns `-EINVAL`. Busy radio defers the write to the next
+keepalive tick.
 
 ## Status API
 

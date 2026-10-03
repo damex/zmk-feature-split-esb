@@ -40,6 +40,9 @@ uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
 #define HOP_POLICY_RETRY_EWMA_HIGH_X10 45
 uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, uint8_t count_max);
 
+uint32_t hop_policy_retry_cycle_ms(uint8_t count, uint16_t delay_us, uint8_t margin,
+                                   uint32_t floor_ms);
+
 uint8_t hop_policy_index_next(uint8_t index, size_t count);
 
 uint8_t hop_policy_index_next_active(uint8_t index, const uint8_t *mask, size_t count);

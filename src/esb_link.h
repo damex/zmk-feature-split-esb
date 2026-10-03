@@ -40,6 +40,15 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack);
 void esb_link_send_keepalive(uint8_t state);
 
 /* Peripheral only.
+ * Return -EINVAL for a value the radio rejects.
+ * Busy radio defers the write to esb_link_apply_pending. */
+int esb_link_set_tx_power(int32_t dbm);
+int esb_link_set_retransmit_delay(uint32_t delay_us);
+void esb_link_set_retransmit_count(uint8_t count);
+
+void esb_link_apply_pending(void);
+
+/* Peripheral only.
  * Returns the encoded length, 0 when out_size is too small.
  * Defined in peripheral.c. */
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state);

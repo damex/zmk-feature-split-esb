@@ -67,5 +67,8 @@ void hop_restore(void);
 
 uint8_t hop_link_cost_x10(void);
 
+/* Returns -EINVAL above the DT retransmit-count. */
+int hop_set_retransmit_ceiling(uint32_t ceiling);
+
 bool hop_ack_probe_due(void);
 #endif

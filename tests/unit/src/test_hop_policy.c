@@ -368,6 +368,14 @@ ZTEST(hop_policy, test_adaptive_retransmits) {
     zassert_equal(hop_policy_adaptive_retransmits(30, 3, 3), 3, "degenerate range is total");
 }
 
+ZTEST(hop_policy, test_retry_cycle_ms) {
+    zassert_equal(hop_policy_retry_cycle_ms(12, 600, 4, 100), 100, "short cycles hold the floor");
+    zassert_equal(hop_policy_retry_cycle_ms(12, 600, 20, 100), 144, "long cycles exceed the floor");
+    zassert_equal(hop_policy_retry_cycle_ms(0, 600, 4, 10), 10, "no retransmits holds the floor");
+    zassert_equal(hop_policy_retry_cycle_ms(UINT8_MAX, UINT16_MAX, UINT8_MAX, 0), 4261413,
+                  "widest inputs do not wrap");
+}
+
 ZTEST(hop_policy, test_index_next_active) {
     uint8_t mask[1] = {0x0D};
 

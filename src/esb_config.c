@@ -3,16 +3,17 @@
 
 /*
  * Applies "esb/" settings to the radio: settings_load at boot, settings_runtime_set
- * live. Value is a uint32, cast per key.
+ * live. Value is a uint32, range-checked per key.
  */
 #include <errno.h>
 #include <stdint.h>
 
-#include <esb.h>
-
 #include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
+
+#include "esb_link.h"
+#include "hop.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -26,13 +27,13 @@ static int esb_config_set(const char *name, size_t len, settings_read_cb read_cb
         return -EIO;
     }
     if (settings_name_steq(name, "tx_power", &next) && next == NULL) {
-        return esb_set_tx_power((int8_t)value);
+        return esb_link_set_tx_power((int32_t)value);
     }
     if (settings_name_steq(name, "retransmit_count", &next) && next == NULL) {
-        return esb_set_retransmit_count((uint16_t)value);
+        return hop_set_retransmit_ceiling(value);
     }
     if (settings_name_steq(name, "retransmit_delay", &next) && next == NULL) {
-        return esb_set_retransmit_delay((uint16_t)value);
+        return esb_link_set_retransmit_delay(value);
     }
     return -ENOENT;
 }
