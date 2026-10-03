@@ -6,39 +6,39 @@ patches:
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "nrf71 SYS_CLOCK_HW_CYCLES_PER_SEC default uses dt_nodelabel_int_prop, absent in ZMK's Zephyr 4.1.0; static value (nrf71 unused on nrf52). Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: nrf71 SYS_CLOCK_HW_CYCLES_PER_SEC default uses dt_nodelabel_int_prop, absent in ZMK's Zephyr 4.1.0; static value (nrf71 unused on nrf52). Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
   - path: nrf/oberon-ctr-drbg-no-aes-select.patch
     sha256sum: a6227988047fb6e9db7595014a6bfdbd42b0e8d842f60b51c692365cc947e1b2
     module: nrf
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "nrf_oberon CTR_DRBG 'select PSA_WANT_KEY_TYPE_AES' forms a recursive dependency with ZMK's Zephyr 4.1.0 mbedtls; drop the select. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: nrf_oberon CTR_DRBG 'select PSA_WANT_KEY_TYPE_AES' forms a recursive dependency with ZMK's Zephyr 4.1.0 mbedtls; drop the select. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
   - path: nrf/openthread-kconfig-defconfig-types.patch
     sha256sum: abce704069c10c9cefce9b801a11031f3b8ea4b6e314de094f5ee6927bc3aa41
     module: nrf
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "OpenThread defconfig assigns defaults to typeless symbols; add explicit bool/int types for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: OpenThread defconfig assigns defaults to typeless symbols; add explicit bool/int types for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
   - path: nrf/mpsl-clock-timeout-static.patch
     sha256sum: 0f3a6c7a92ffb85741e5d361fc155a5246932d2a455f010feda1cffb5de332cf
     module: nrf
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "MPSL clock timeout default references CLOCK_CONTROL_NRF_LFCLK_CLOCK_TIMEOUT_MS, absent in ZMK's Zephyr 4.1.0; static value. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: MPSL clock timeout default references CLOCK_CONTROL_NRF_LFCLK_CLOCK_TIMEOUT_MS, absent in ZMK's Zephyr 4.1.0; static value. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
   - path: nrf/secure-storage-its-name-len-type.patch
     sha256sum: 346bf0cc453d1b68c810768fd69e3cd25e1c9f9a42e41a46f31326f4e8cab0ab
     module: nrf
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "secure_storage ITS name-length default on a typeless symbol; add int type for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: secure_storage ITS name-length default on a typeless symbol; add int type for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
   - path: nrf/nrf54lm20a-uart-rxto-type.patch
     sha256sum: 26d112f0b951cb6e7c66b5604825c11d5de12dc32977b9ccb5f7f64fe1451ef1
     module: nrf
     author: Roman Kuzmitskii
     email: roman@damex.org
     date: 2026-05-25
-    comments: "nrf54lm20a UART RXTO workaround default on a typeless symbol; add bool type for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0."
+    comments: nrf54lm20a UART RXTO workaround default on a typeless symbol; add bool type for ZMK's Zephyr 4.1.0. Removable on Zephyr >= 4.1.99 or NCS >= 3.3.0.
