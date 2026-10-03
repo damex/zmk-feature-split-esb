@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -22,6 +23,9 @@ LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 #define FRAMES_MAX 8
 #define RX_WAIT_MS 100
 #define RX_SETTLE_MS 10
+#define TX_FIFO_BYTES DT_PROP(DT_CHOSEN(zmk_esb_wire), tx_fifo_size)
+#define BULK_PAYLOAD_BYTES 100
+#define SEND_ATTEMPTS_MAX 8
 
 struct frame_log {
     size_t count;
@@ -109,6 +113,75 @@ ZTEST(wire_link, test_keepalive_and_event_frames_stay_whole) {
     zassert_equal(log.count, 2, "both frames decode whole");
     zassert_mem_equal(log.payloads[0], keepalive, sizeof(keepalive), "keepalive first");
     zassert_mem_equal(log.payloads[1], event, sizeof(event), "event second");
+}
+
+ZTEST(wire_link, test_full_ring_rejects_whole_frame) {
+    uint8_t payload[BULK_PAYLOAD_BYTES];
+    size_t accepted = 0;
+    int result = 0;
+    for (size_t attempt = 0; attempt < SEND_ATTEMPTS_MAX; attempt++) {
+        memset(payload, (int)(attempt + 1), sizeof(payload));
+        result = wire_link_send_event(payload, sizeof(payload));
+        if (result != 0) {
+            break;
+        }
+        accepted++;
+    }
+    zassert_equal(result, -ENOBUFS, "full event ring refuses the frame");
+    uint8_t wire[CAPTURE_BYTES];
+    size_t length = pump_tx(wire, sizeof(wire));
+    memset(payload, 0xEE, sizeof(payload));
+    zassert_ok(wire_link_send_event(payload, sizeof(payload)), "drained ring accepts again");
+    length += pump_tx(&wire[length], sizeof(wire) - length);
+    struct frame_log log = {0};
+    decode(wire, length, &log);
+    zassert_equal(log.count, accepted + 1, "every accepted frame decodes whole");
+    zassert_mem_equal(log.payloads[accepted], payload, sizeof(payload), "frame after refusal intact");
+}
+
+ZTEST(wire_link, test_oversize_payload_rejected) {
+    uint8_t payload[WIRE_FRAME_MAX_PAYLOAD + 1] = {0};
+    zassert_equal(wire_link_send_event(payload, sizeof(payload)), -EMSGSIZE,
+                  "oversize payload refused");
+    uint8_t wire[CAPTURE_BYTES];
+    zassert_equal(pump_tx(wire, sizeof(wire)), 0, "nothing reaches the wire");
+}
+
+ZTEST(wire_link, test_event_goes_before_queued_keepalive) {
+    const uint8_t filler[] = {0x01};
+    const uint8_t keepalive[] = {0xA1, 0xA2, 0xA3};
+    const uint8_t event[] = {0xB1, 0xB2, 0xB3};
+    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
+    zassert_equal(wire_frame_encode(filler, sizeof(filler), frame, sizeof(frame)), TX_FIFO_BYTES,
+                  "filler frame fills the tx fifo exactly");
+    zassert_ok(wire_link_send_event(filler, sizeof(filler)));
+    k_sleep(K_MSEC(1));
+    zassert_ok(wire_link_send_keepalive(keepalive, sizeof(keepalive)));
+    zassert_ok(wire_link_send_event(event, sizeof(event)));
+    uint8_t wire[CAPTURE_BYTES];
+    struct frame_log log = {0};
+    decode(wire, pump_tx(wire, sizeof(wire)), &log);
+    zassert_equal(log.count, 3, "all frames decode whole");
+    zassert_mem_equal(log.payloads[1], event, sizeof(event), "queued event goes first");
+    zassert_mem_equal(log.payloads[2], keepalive, sizeof(keepalive), "keepalive follows");
+}
+
+ZTEST(wire_link, test_rx_back_to_back_frames_keep_order) {
+    const uint8_t first[] = {0xD1, 0xD2};
+    const uint8_t second[] = {0xE1, 0x00, 0xE3};
+    uint8_t chunk[2 * WIRE_FRAME_MAX_ENCODED];
+    int first_length = wire_frame_encode(first, sizeof(first), chunk, sizeof(chunk));
+    zassert_true(first_length > 0, "first frame encodes");
+    int second_length = wire_frame_encode(second, sizeof(second), &chunk[first_length],
+                                          sizeof(chunk) - (size_t)first_length);
+    zassert_true(second_length > 0, "second frame encodes");
+    size_t length = (size_t)(first_length + second_length);
+    zassert_equal(uart_emul_put_rx_data(WIRE_UART, chunk, length), (uint32_t)length);
+    zassert_ok(k_sem_take(&rx_sem, K_MSEC(RX_WAIT_MS)), "first frame delivered");
+    zassert_ok(k_sem_take(&rx_sem, K_MSEC(RX_WAIT_MS)), "second frame delivered");
+    zassert_equal(rx_log.count, 2, "two frames delivered");
+    zassert_mem_equal(rx_log.payloads[0], first, sizeof(first), "first frame first");
+    zassert_mem_equal(rx_log.payloads[1], second, sizeof(second), "second frame second");
 }
 
 ZTEST(wire_link, test_rx_frame_reaches_subscriber) {
