@@ -65,11 +65,9 @@ int wire_frame_encode(const uint8_t *payload, size_t payload_length,
         return -EINVAL;
     }
     uint8_t plain[WIRE_FRAME_MAX_PAYLOAD + WIRE_FRAME_CRC_BYTES];
-    if (payload_length == 0) {
-        plain[0] = 0;
-    } else {
+    if (payload_length > 0) {
         memcpy(plain, payload, payload_length);
-        plain[payload_length] = crc8_ccitt(0x00, payload, payload_length);
     }
+    plain[payload_length] = crc8_ccitt(0x00, plain, payload_length);
     return cobs_encode(plain, payload_length + WIRE_FRAME_CRC_BYTES, output, output_capacity);
 }
