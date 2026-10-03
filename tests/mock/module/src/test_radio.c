@@ -3,7 +3,8 @@
 
 /*
  * Test radio standing in for NCS ESB on the central.
- * Exits 0 once the expected keyboard and consumer taps reach the relay, 1 at deadline.
+ * Exits 0 once the relay delivers the expected report changes in order.
+ * Exits 1 on the first wrong change or at deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
@@ -20,6 +21,7 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
+#include <dt-bindings/zmk/keys.h>
 #include <zmk/hid.h>
 
 #include <esb.h>
@@ -30,58 +32,99 @@ LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 #define VERDICT_DEADLINE_MS 1000
 #define REPORT_ID_OFFSET offsetof(struct zmk_hid_keyboard_report, report_id)
-#define REPORT_BODY_OFFSET offsetof(struct zmk_hid_keyboard_report, body)
+#define RELEASED 0
 
 const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
 
-struct tracked_report {
+struct expected_change {
     uint8_t report_id;
-    uint32_t expected_taps;
+    uint32_t usage;
 };
 
-static const struct tracked_report tracked_reports[] = {
-    {.report_id = ZMK_HID_REPORT_ID_KEYBOARD,
-     .expected_taps = CONFIG_ZMK_SPLIT_ESB_TEST_KEYBOARD_TAPS},
-    {.report_id = ZMK_HID_REPORT_ID_CONSUMER,
-     .expected_taps = CONFIG_ZMK_SPLIT_ESB_TEST_CONSUMER_TAPS},
+static const struct expected_change expected_changes[] = {
+    {.report_id = ZMK_HID_REPORT_ID_KEYBOARD, .usage = A},
+    {.report_id = ZMK_HID_REPORT_ID_KEYBOARD, .usage = RELEASED},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = C_MUTE},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = RELEASED},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = C_VOL_UP},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = RELEASED},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = C_VOL_UP},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = RELEASED},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = C_VOL_DN},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .usage = RELEASED},
 };
-static bool report_pressed[ARRAY_SIZE(tracked_reports)];
-static uint32_t report_taps[ARRAY_SIZE(tracked_reports)];
-static const uint8_t zero_bytes[CONFIG_ESB_MAX_PAYLOAD_LENGTH];
+static size_t next_change;
 
-static bool report_is_empty(const struct esb_payload *payload) {
-    size_t body_length = payload->length - REPORT_BODY_OFFSET;
-    return memcmp(&payload->data[REPORT_BODY_OFFSET], zero_bytes, body_length) == 0;
+union relay_report {
+    struct zmk_hid_keyboard_report keyboard;
+    struct zmk_hid_consumer_report consumer;
+};
+
+static struct zmk_hid_keyboard_report last_keyboard = {.report_id = ZMK_HID_REPORT_ID_KEYBOARD};
+static struct zmk_hid_consumer_report last_consumer = {.report_id = ZMK_HID_REPORT_ID_CONSUMER};
+
+static size_t build_expected(const struct expected_change *change, union relay_report *report) {
+    *report = (union relay_report){0};
+    if (change->report_id == ZMK_HID_REPORT_ID_KEYBOARD) {
+        report->keyboard.report_id = ZMK_HID_REPORT_ID_KEYBOARD;
+        if (change->usage != RELEASED) {
+            report->keyboard.body.keys[0] = ZMK_HID_USAGE_ID(change->usage);
+        }
+        return sizeof(report->keyboard);
+    }
+    report->consumer.report_id = ZMK_HID_REPORT_ID_CONSUMER;
+    if (change->usage != RELEASED) {
+        report->consumer.body.keys[0] = ZMK_HID_USAGE_ID(change->usage);
+    }
+    return sizeof(report->consumer);
 }
 
-static bool all_taps_delivered(void) {
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
-        if (report_taps[index] < tracked_reports[index].expected_taps) {
-            return false;
-        }
+static void print_bytes(const uint8_t *data, size_t length) {
+    for (size_t index = 0; index < length; index++) {
+        printk(" %02x", data[index]);
     }
-    return true;
+    printk("\n");
+}
+
+static void check_change(const uint8_t *data, size_t length) {
+    union relay_report expected;
+    size_t expected_length = build_expected(&expected_changes[next_change], &expected);
+    if (length != expected_length || memcmp(data, &expected, length) != 0) {
+        printk("FAIL: step %u of %u, expected", (unsigned int)(next_change + 1),
+               (unsigned int)ARRAY_SIZE(expected_changes));
+        print_bytes((const uint8_t *)&expected, expected_length);
+        printk("FAIL: got");
+        print_bytes(data, length);
+        exit(1);
+    }
+    next_change++;
+    if (next_change == ARRAY_SIZE(expected_changes)) {
+        printk("PASS: relay delivered all %u report changes in order\n",
+               (unsigned int)ARRAY_SIZE(expected_changes));
+        exit(0);
+    }
 }
 
 int esb_write_payload(const struct esb_payload *payload) {
-    if (payload->length <= REPORT_BODY_OFFSET || payload->length > CONFIG_ESB_MAX_PAYLOAD_LENGTH) {
+    void *last;
+    size_t size;
+    if (payload->data[REPORT_ID_OFFSET] == ZMK_HID_REPORT_ID_KEYBOARD) {
+        last = &last_keyboard;
+        size = sizeof(last_keyboard);
+    } else if (payload->data[REPORT_ID_OFFSET] == ZMK_HID_REPORT_ID_CONSUMER) {
+        last = &last_consumer;
+        size = sizeof(last_consumer);
+    } else {
+        return 0;
+    }
+    if (payload->length != size) {
         return -EMSGSIZE;
     }
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
-        if (payload->data[REPORT_ID_OFFSET] != tracked_reports[index].report_id) {
-            continue;
-        }
-        if (!report_is_empty(payload)) {
-            report_pressed[index] = true;
-        } else if (report_pressed[index]) {
-            report_pressed[index] = false;
-            report_taps[index]++;
-        }
+    if (memcmp(last, payload->data, size) == 0) {
+        return 0;
     }
-    if (all_taps_delivered()) {
-        printk("PASS: relay delivered every keyboard and consumer tap\n");
-        exit(0);
-    }
+    memcpy(last, payload->data, size);
+    check_change(payload->data, size);
     return 0;
 }
 
@@ -100,13 +143,8 @@ static void relay_poll_fn(struct k_work *work) {
 
 static void verdict_deadline_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
-        if (report_taps[index] < tracked_reports[index].expected_taps) {
-            printk("FAIL: relay delivered %u of %u taps on report 0x%02x\n",
-                   report_taps[index], tracked_reports[index].expected_taps,
-                   tracked_reports[index].report_id);
-        }
-    }
+    printk("FAIL: relay stopped at step %u of %u\n", (unsigned int)(next_change + 1),
+           (unsigned int)ARRAY_SIZE(expected_changes));
     exit(1);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_deadline_work, verdict_deadline_fn);

@@ -17,14 +17,6 @@ config ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
     int
     default 4
 
-config ZMK_SPLIT_ESB_TEST_KEYBOARD_TAPS
-    int "Keyboard taps the relay must deliver"
-    default 1
-
-config ZMK_SPLIT_ESB_TEST_CONSUMER_TAPS
-    int "Consumer taps the relay must deliver"
-    default 1
-
 module = ZMK_SPLIT_ESB
 module-str = ZMK ESB split transport
 source "subsys/logging/Kconfig.template.log_config"

@@ -21,7 +21,7 @@
 
         default_layer {
             bindings = <
-                &mt LSHFT A &kp C_VOL_UP
+                &mt LSHFT A &kp C_MUTE
                 &none &none
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
@@ -33,7 +33,7 @@
         status = "okay";
         event-startup-delay = <100>;
         event-period = <10>;
-        events = <18 18 18 18 18>;
+        events = <18 18 (-18)>;
     };
 
     sensors: sensors {
