@@ -1,0 +1,13 @@
+---
+name: yamllint
+"on":
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: yamllint -s .
