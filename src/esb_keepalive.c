@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Uplink keepalive codec and key reconcile verdicts. */
+
 #include <string.h>
 
 #include <zephyr/sys/__assert.h>

@@ -1,7 +1,10 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* Sensor rotation crosses the air as a cumulative microdegree total. */
+/*
+ * Cumulative sensor rotation tracking.
+ * Rotation crosses the air as a cumulative microdegree total.
+ */
 #pragma once
 
 #include <stdbool.h>

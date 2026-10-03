@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Boot energy survey over the hop pool. */
 #pragma once
 
 #include <stddef.h>

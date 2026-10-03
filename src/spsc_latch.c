@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Single-producer latest-value latch. */
+
 #include "spsc_latch.h"
 
 #include <zephyr/sys/__assert.h>

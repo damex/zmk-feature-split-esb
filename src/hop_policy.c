@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Hop and link policy, pure functions. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

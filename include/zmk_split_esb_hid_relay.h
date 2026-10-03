@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* HID relay sink registration. */
 #pragma once
 
 #include <stddef.h>

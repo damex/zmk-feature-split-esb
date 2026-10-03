@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* COBS byte stuffing for wire frames. */
+
 #include "cobs.h"
 
 #include <errno.h>

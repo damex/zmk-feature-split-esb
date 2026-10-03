@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Wire link between split peripherals over UART. */
 #pragma once
 
 #include <stdbool.h>

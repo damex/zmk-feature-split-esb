@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Modifiers and indicators packed into one word, so a peripheral thread reads a
- * coherent pair against a beacon writing it.
+ * HID state word, modifiers and indicators.
+ * One word, so a reader never pairs modifiers and indicators from two beacons.
  */
 #pragma once
 

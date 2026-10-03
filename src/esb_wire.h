@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Compact on-air encoding for split peripheral events.
- * One event becomes a 1-byte type tag plus a tight payload. The input event (the
- * high-rate path) is field-packed to drop ZMK's struct padding, 13 bytes to 10, so a
- * coalesced 2-axis motion packet shrinks from 26 to 20 bytes on air.
+ * Compact on-air codec for split peripheral events.
+ * Input events pack fields past ZMK struct padding, high-rate path shrinks on air.
  */
 #pragma once
 

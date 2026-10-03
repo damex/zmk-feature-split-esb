@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Compact on-air codec for split peripheral events. */
+
 #include <string.h>
 
 #include <zephyr/sys/__assert.h>

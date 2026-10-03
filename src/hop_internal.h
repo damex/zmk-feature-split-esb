@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Shared channel layer between hop.c and the per-role engines (hop_central.c,
- * hop_peripheral.c). The includer must define DT_DRV_COMPAT zmk_split_esb first.
+ * Hop engine internals shared by both roles.
+ * Includer defines DT_DRV_COMPAT zmk_split_esb first.
  */
 #pragma once
 

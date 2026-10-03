@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Hop and link policy, pure functions. */
 #pragma once
 
 #include <stdbool.h>

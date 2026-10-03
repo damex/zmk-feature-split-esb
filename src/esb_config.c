@@ -1,10 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Applies "esb/" settings to the radio: settings_load at boot, settings_runtime_set
- * live. Value is a uint32, range-checked per key.
- */
+/* Settings handler for "esb/" radio tunables. */
 #include <errno.h>
 #include <stdint.h>
 

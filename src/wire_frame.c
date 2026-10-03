@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Wire frame codec, COBS with CRC8 trailer. */
+
 #include "wire_frame.h"
 
 #include <errno.h>

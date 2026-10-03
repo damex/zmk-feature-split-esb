@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* COBS byte stuffing. */
 #pragma once
 
 #include <stddef.h>

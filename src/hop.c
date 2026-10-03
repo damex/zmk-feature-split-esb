@@ -1,11 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Shared channel layer for the hop engine.
- * Owns the channel table and the radio retune; the per-role engines (hop_central.c,
- * hop_peripheral.c) set hop_index and call apply_hop_channel.
- */
+/* Hop engine channel table and radio retune, both roles. */
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <zephyr/devicetree.h>

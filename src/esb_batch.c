@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Coalesce one report's per-axis events into a single packet: ZMK forwards each
- * axis as its own event (REL_X sync=0, REL_Y sync=1), doubling on-air packets at high rate.
- * Buffer input events and flush on the sync event (the report boundary, us later, so no
- * real latency added).
+ * Input event batching into one ESB packet.
+ * ZMK forwards each axis as its own event, doubling on-air packets at high rate.
+ * Flush rides the sync event, the report boundary, so batching adds no latency.
  */
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/util.h>

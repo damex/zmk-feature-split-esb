@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* HID relay, central half: keyboard reports out to relay-role pipes. */
+
 #include <errno.h>
 
 #include <zephyr/init.h>

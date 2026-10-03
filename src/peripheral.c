@@ -1,10 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * ZMK split peripheral shared core.
- * Common state and dispatch across transports.
- */
+/* ZMK split peripheral shared core, both transports. */
 
 #include "peripheral.h"
 

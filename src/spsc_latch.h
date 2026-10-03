@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Single-producer latest-value latch. */
 #pragma once
 
 #include <stdbool.h>

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * ZMK ESB split central. Source id = ESB pipe.
+ * ZMK ESB split central.
+ * Source id equals ESB pipe.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 

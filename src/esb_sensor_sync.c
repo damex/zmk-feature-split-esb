@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Cumulative sensor rotation tracking. */
+
 #include <stddef.h>
 
 #include <zephyr/sys/__assert.h>

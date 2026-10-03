@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Wire relay, wire peer frames onto the peer's ESB pipe. */
+
 #include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 

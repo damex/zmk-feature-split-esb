@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* HID relay, peripheral half: received reports to the registered sink. */
+
 #include <zephyr/kernel.h>
 
 #include <zmk_split_esb_hid_relay.h>

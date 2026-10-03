@@ -1,6 +1,8 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* HID relay USB sink on a relay-role peripheral. */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

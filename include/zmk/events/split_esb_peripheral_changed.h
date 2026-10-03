@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Event raised when an ESB peripheral connects or drops. */
 #pragma once
 
 #include <zephyr/kernel.h>

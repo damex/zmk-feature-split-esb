@@ -1,6 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
+/* Input event batching into one ESB packet. */
 #pragma once
 
 #include <stdbool.h>

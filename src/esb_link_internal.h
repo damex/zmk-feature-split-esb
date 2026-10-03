@@ -1,10 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Role seam between the shared radio layer (esb_link.c) and the per-role halves
- * (esb_link_central.c, esb_link_peripheral.c).
- */
+/* ESB radio link internals shared by both role halves. */
 #pragma once
 
 #include <stdint.h>
