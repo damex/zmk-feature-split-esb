@@ -1,0 +1,14 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+
+config ZMK_SPLIT_ESB_MAX_PAYLOAD
+    int
+    default 48
+
+config ESB_MAX_PAYLOAD_LENGTH
+    int
+    default 48
+
+module = ZMK_SPLIT_ESB
+module-str = ZMK ESB split transport
+source "subsys/logging/Kconfig.template.log_config"

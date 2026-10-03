@@ -1,7 +1,0 @@
----
-name: zmk-feature-split-esb-test
-build:
-  cmake: .
-  kconfig: Kconfig
-  settings:
-    dts_root: ../../..
