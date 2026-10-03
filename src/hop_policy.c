@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/util.h>
@@ -168,6 +169,42 @@ size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count) {
         }
     }
     return count;
+}
+
+#define MASK_STORE_POOL_COUNT_OFFSET 0
+#define MASK_STORE_CHANNELS_OFFSET 1
+
+size_t hop_policy_mask_store_encode(uint8_t *stored, size_t stored_size, const uint8_t *channels,
+                                    const uint8_t *mask, size_t pool_count) {
+    __ASSERT_NO_MSG(stored != NULL);
+    __ASSERT_NO_MSG(channels != NULL);
+    __ASSERT_NO_MSG(mask != NULL);
+    size_t length = HOP_POLICY_MASK_STORE_LENGTH(pool_count);
+    if (pool_count > UINT8_MAX || stored_size < length) {
+        return 0;
+    }
+    stored[MASK_STORE_POOL_COUNT_OFFSET] = (uint8_t)pool_count;
+    memcpy(&stored[MASK_STORE_CHANNELS_OFFSET], channels, pool_count);
+    memcpy(&stored[MASK_STORE_CHANNELS_OFFSET + pool_count], mask, (pool_count + 7) / 8);
+    return length;
+}
+
+bool hop_policy_mask_store_matches(const uint8_t *stored, size_t stored_length,
+                                   const uint8_t *channels, size_t pool_count) {
+    __ASSERT_NO_MSG(stored != NULL);
+    __ASSERT_NO_MSG(channels != NULL);
+    if (pool_count > UINT8_MAX || stored_length != HOP_POLICY_MASK_STORE_LENGTH(pool_count)) {
+        return false;
+    }
+    if (stored[MASK_STORE_POOL_COUNT_OFFSET] != pool_count) {
+        return false;
+    }
+    return memcmp(&stored[MASK_STORE_CHANNELS_OFFSET], channels, pool_count) == 0;
+}
+
+const uint8_t *hop_policy_mask_store_mask(const uint8_t *stored, size_t pool_count) {
+    __ASSERT_NO_MSG(stored != NULL);
+    return &stored[MASK_STORE_CHANNELS_OFFSET + pool_count];
 }
 
 void hop_policy_score_update(uint8_t *score, uint8_t penalty, uint8_t decay) {

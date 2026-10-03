@@ -60,6 +60,16 @@ bool hop_policy_mask_get(const uint8_t *mask, size_t index);
 void hop_policy_mask_set(uint8_t *mask, size_t index, bool active);
 size_t hop_policy_mask_active_count(const uint8_t *mask, size_t pool_count);
 
+#define HOP_POLICY_MASK_STORE_LENGTH(pool_count) (1 + (pool_count) + ((pool_count) + 7) / 8)
+
+size_t hop_policy_mask_store_encode(uint8_t *stored, size_t stored_size, const uint8_t *channels,
+                                    const uint8_t *mask, size_t pool_count);
+
+bool hop_policy_mask_store_matches(const uint8_t *stored, size_t stored_length,
+                                   const uint8_t *channels, size_t pool_count);
+
+const uint8_t *hop_policy_mask_store_mask(const uint8_t *stored, size_t pool_count);
+
 /* Returns pool_count when no channel qualifies. Channels set in anchor_mask are exempt. */
 size_t hop_policy_worst_channel(const uint8_t *channel_bad, const uint8_t *mask,
                                 const uint8_t *anchor_mask, size_t pool_count,

@@ -216,6 +216,51 @@ ZTEST(hop_policy, test_mask_get_and_count) {
     zassert_equal(hop_policy_mask_active_count(mask, 4), 2, "two active in pool of 4");
 }
 
+ZTEST(hop_policy, test_mask_store_count_only_blob_rejected) {
+    const uint8_t live_channels[] = {74, 75, 77};
+    const uint8_t count_only[] = {3, 0x05};
+    zassert_false(hop_policy_mask_store_matches(count_only, sizeof(count_only), live_channels,
+                                                ARRAY_SIZE(live_channels)),
+                  "pool length alone never proves the same channels");
+}
+
+ZTEST(hop_policy, test_mask_store_round_trip) {
+    const uint8_t channels[] = {74, 75, 76, 77, 78, 79, 80, 81, 82};
+    const uint8_t mask[2] = {0xEF, 0x01};
+    uint8_t stored[HOP_POLICY_MASK_STORE_LENGTH(ARRAY_SIZE(channels))];
+    zassert_equal(hop_policy_mask_store_encode(stored, sizeof(stored), channels, mask,
+                                               ARRAY_SIZE(channels)),
+                  sizeof(stored), "encodes the full layout");
+    zassert_true(hop_policy_mask_store_matches(stored, sizeof(stored), channels,
+                                               ARRAY_SIZE(channels)),
+                 "same channel list matches");
+    zassert_mem_equal(hop_policy_mask_store_mask(stored, ARRAY_SIZE(channels)), mask,
+                      sizeof(mask), "mask reads back");
+}
+
+ZTEST(hop_policy, test_mask_store_rejects_other_channels) {
+    const uint8_t saved[] = {74, 75, 76};
+    const uint8_t live[] = {74, 75, 77};
+    const uint8_t mask[1] = {0x05};
+    uint8_t stored[HOP_POLICY_MASK_STORE_LENGTH(ARRAY_SIZE(saved))];
+    zassert_equal(hop_policy_mask_store_encode(stored, sizeof(stored), saved, mask,
+                                               ARRAY_SIZE(saved)),
+                  sizeof(stored));
+    zassert_false(hop_policy_mask_store_matches(stored, sizeof(stored), live, ARRAY_SIZE(live)),
+                  "same length, other channel values");
+    zassert_false(hop_policy_mask_store_matches(stored, sizeof(stored), saved, 2),
+                  "other pool length");
+}
+
+ZTEST(hop_policy, test_mask_store_encode_short_buffer) {
+    const uint8_t channels[] = {74, 75, 76};
+    const uint8_t mask[1] = {0x07};
+    uint8_t stored[HOP_POLICY_MASK_STORE_LENGTH(ARRAY_SIZE(channels)) - 1];
+    zassert_equal(hop_policy_mask_store_encode(stored, sizeof(stored), channels, mask,
+                                               ARRAY_SIZE(channels)),
+                  0, "short buffer encodes nothing");
+}
+
 ZTEST(hop_policy, test_channel_for_epoch_masked) {
     const uint8_t all[1] = {0x0F}; /* pool of 4, all active */
     zassert_equal(hop_policy_channel_for_epoch_masked(0, all, 4), 0, "all active is identity");

@@ -91,7 +91,13 @@ static uint8_t persisted_mask[ESB_HOP_MASK_BYTES];
 static bool persisted_mask_valid;
 
 #define MASK_SAVE_DEBOUNCE_SEC 60
-#define MASK_STORE_LENGTH (1 + ESB_HOP_MASK_BYTES)
+#define MASK_STORE_LENGTH HOP_POLICY_MASK_STORE_LENGTH(HOP_COUNT)
+
+static void pool_channels(uint8_t *channels) {
+    for (uint8_t index = 0; index < HOP_COUNT; index++) {
+        channels[index] = hop_channel_at(index);
+    }
+}
 
 #if defined(CONFIG_SETTINGS)
 static int hop_mask_settings_set(const char *name, size_t len, settings_read_cb read_cb,
@@ -102,16 +108,17 @@ static int hop_mask_settings_set(const char *name, size_t len, settings_read_cb 
     }
     uint8_t stored[MASK_STORE_LENGTH];
     if (len != sizeof(stored)) {
-        return -EINVAL;
+        return 0;
     }
     if (read_cb(cb_arg, stored, sizeof(stored)) < 0) {
         return -EIO;
     }
-    uint8_t pool_count = stored[0];
-    if (pool_count != HOP_COUNT) {
+    uint8_t channels[HOP_COUNT];
+    pool_channels(channels);
+    if (!hop_policy_mask_store_matches(stored, sizeof(stored), channels, HOP_COUNT)) {
         return 0;
     }
-    memcpy(persisted_mask, &stored[1], ESB_HOP_MASK_BYTES);
+    memcpy(persisted_mask, hop_policy_mask_store_mask(stored, HOP_COUNT), ESB_HOP_MASK_BYTES);
     persisted_mask_valid = true;
     return 0;
 }
@@ -120,9 +127,14 @@ SETTINGS_STATIC_HANDLER_DEFINE(esb_hop, "esb_hop", NULL, hop_mask_settings_set, 
 static void mask_save_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     uint8_t stored[MASK_STORE_LENGTH];
-    stored[0] = HOP_COUNT;
-    memcpy(&stored[1], active_mask, ESB_HOP_MASK_BYTES);
-    int error = settings_save_one("esb_hop/mask", stored, sizeof(stored));
+    uint8_t channels[HOP_COUNT];
+    pool_channels(channels);
+    size_t length =
+        hop_policy_mask_store_encode(stored, sizeof(stored), channels, active_mask, HOP_COUNT);
+    if (length == 0) {
+        return;
+    }
+    int error = settings_save_one("esb_hop/mask", stored, length);
     if (error < 0) {
         LOG_DBG("mask save failed (%d)", error);
     }
@@ -499,9 +511,7 @@ void hop_boot_mask(void) {
     }
     uint8_t channels[HOP_COUNT];
     int8_t energy_dbm[HOP_COUNT];
-    for (uint8_t index = 0; index < HOP_COUNT; index++) {
-        channels[index] = hop_channel_at(index);
-    }
+    pool_channels(channels);
     esb_survey_run(channels, HOP_COUNT, energy_dbm);
     (void)hop_policy_survey_mask(energy_dbm, HOP_COUNT, anchor_mask, min_active,
                                  survey_threshold_dbm, pending_mask);
