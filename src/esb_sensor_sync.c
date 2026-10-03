@@ -1,8 +1,9 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-#include <assert.h>
 #include <stddef.h>
+
+#include <zephyr/sys/__assert.h>
 
 #include "esb_sensor_sync.h"
 
@@ -20,8 +21,8 @@ int32_t esb_sensor_udeg_val2(int64_t udeg) {
 
 bool esb_sensor_track_delta(struct esb_sensor_track *track, int64_t total_udeg,
                             int64_t *delta_udeg) {
-    assert(track != NULL);
-    assert(delta_udeg != NULL);
+    __ASSERT_NO_MSG(track != NULL);
+    __ASSERT_NO_MSG(delta_udeg != NULL);
     int64_t delta = total_udeg - track->last_udeg;
     bool forward = track->valid && delta != 0 && delta >= -ESB_SENSOR_RESYNC_UDEG &&
                    delta <= ESB_SENSOR_RESYNC_UDEG;

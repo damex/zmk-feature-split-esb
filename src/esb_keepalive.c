@@ -1,9 +1,9 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-#include <assert.h>
 #include <string.h>
 
+#include <zephyr/sys/__assert.h>
 #include <zephyr/sys/byteorder.h>
 
 #include "esb_keepalive.h"
@@ -12,10 +12,10 @@ void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
                           const uint8_t *position_bitmap, uint8_t battery_level,
                           uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
                           uint8_t sensor_count) {
-    assert(out != NULL);
-    assert(out_size >= (size_t)ESB_KEEPALIVE_LENGTH(sensor_count));
-    assert(position_bitmap != NULL);
-    assert(sensor_count == 0 || sensor_totals_udeg != NULL);
+    __ASSERT_NO_MSG(out != NULL);
+    __ASSERT_NO_MSG(out_size >= (size_t)ESB_KEEPALIVE_LENGTH(sensor_count));
+    __ASSERT_NO_MSG(position_bitmap != NULL);
+    __ASSERT_NO_MSG(sensor_count == 0 || sensor_totals_udeg != NULL);
     out[ESB_KEEPALIVE_TAG_OFFSET] = ESB_KEEPALIVE_TAG;
     out[ESB_KEEPALIVE_STATE_OFFSET] = state;
     memcpy(&out[ESB_KEEPALIVE_BITMAP_OFFSET], position_bitmap, ESB_KEEPALIVE_BITMAP_BYTES);
@@ -29,7 +29,7 @@ void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
 }
 
 bool esb_keepalive_matches(const uint8_t *data, uint8_t length) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     if (length < ESB_KEEPALIVE_BASE_LENGTH ||
         ((length - ESB_KEEPALIVE_BASE_LENGTH) % ESB_KEEPALIVE_SENSOR_BYTES) != 0) {
         return false;
@@ -45,33 +45,33 @@ uint8_t esb_keepalive_sensor_count(uint8_t length) {
 }
 
 int64_t esb_keepalive_sensor_total_udeg(const uint8_t *data, uint8_t sensor_index) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     return (int64_t)sys_get_le64(
         &data[ESB_KEEPALIVE_SENSOR_OFFSET + (size_t)sensor_index * ESB_KEEPALIVE_SENSOR_BYTES]);
 }
 
 uint8_t esb_keepalive_state(const uint8_t *data) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     return data[ESB_KEEPALIVE_STATE_OFFSET];
 }
 
 const uint8_t *esb_keepalive_bitmap(const uint8_t *data) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     return &data[ESB_KEEPALIVE_BITMAP_OFFSET];
 }
 
 uint8_t esb_keepalive_battery_level(const uint8_t *data) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     return data[ESB_KEEPALIVE_BATTERY_OFFSET];
 }
 
 uint8_t esb_keepalive_link_cost_x10(const uint8_t *data) {
-    assert(data != NULL);
+    __ASSERT_NO_MSG(data != NULL);
     return data[ESB_KEEPALIVE_LINK_COST_OFFSET];
 }
 
 void esb_keepalive_bitmap_set(uint8_t *bitmap, uint32_t position, bool pressed) {
-    assert(bitmap != NULL);
+    __ASSERT_NO_MSG(bitmap != NULL);
     if (position >= ESB_KEEPALIVE_POSITION_COUNT) {
         return;
     }
@@ -85,7 +85,7 @@ void esb_keepalive_bitmap_set(uint8_t *bitmap, uint32_t position, bool pressed) 
 }
 
 bool esb_keepalive_bitmap_get(const uint8_t *bitmap, uint32_t position) {
-    assert(bitmap != NULL);
+    __ASSERT_NO_MSG(bitmap != NULL);
     if (position >= ESB_KEEPALIVE_POSITION_COUNT) {
         return false;
     }
@@ -94,7 +94,7 @@ bool esb_keepalive_bitmap_get(const uint8_t *bitmap, uint32_t position) {
 
 enum esb_keepalive_key_verdict esb_keepalive_key_verdict(const uint8_t *tracked_bitmap,
                                                          uint32_t position, bool pressed) {
-    assert(tracked_bitmap != NULL);
+    __ASSERT_NO_MSG(tracked_bitmap != NULL);
     bool tracked = esb_keepalive_bitmap_get(tracked_bitmap, position);
     if (!pressed && !tracked) {
         return ESB_KEEPALIVE_KEY_DROP_ORPHAN_RELEASE;
@@ -107,8 +107,8 @@ enum esb_keepalive_key_verdict esb_keepalive_key_verdict(const uint8_t *tracked_
 
 uint32_t esb_keepalive_bitmap_diff_next(const uint8_t *tracked, const uint8_t *received,
                                         uint32_t position) {
-    assert(tracked != NULL);
-    assert(received != NULL);
+    __ASSERT_NO_MSG(tracked != NULL);
+    __ASSERT_NO_MSG(received != NULL);
     for (; position < ESB_KEEPALIVE_POSITION_COUNT; position++) {
         if (esb_keepalive_bitmap_get(tracked, position) !=
             esb_keepalive_bitmap_get(received, position)) {
