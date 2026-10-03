@@ -97,14 +97,14 @@ static struct k_thread rx_thread;
 
 static esb_link_rx_callback_t rx_callback;
 
-static uint32_t tx_last_event_ms;
+static atomic_t tx_last_event_ms;
 
 void esb_link_mark_tx_event(void) {
-    tx_last_event_ms = k_uptime_get_32();
+    atomic_set(&tx_last_event_ms, (atomic_val_t)k_uptime_get_32());
 }
 
 uint32_t esb_link_tx_last_event_ms(void) {
-    return tx_last_event_ms;
+    return (uint32_t)atomic_get(&tx_last_event_ms);
 }
 
 /* Dedicated dispatch thread: drain the SPSC and hand each packet to the role layer.

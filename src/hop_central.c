@@ -7,7 +7,6 @@
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <errno.h>
-#include <stdatomic.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -61,14 +60,14 @@ BUILD_ASSERT(ESB_BEACON_LENGTH <= ESB_LINK_CONTROL_MAX_LENGTH,
              "beacon does not fit one control latch; raise ESB_LINK_CONTROL_MAX_LENGTH");
 static uint8_t hop_epoch;
 static uint8_t pipe_loss[PERIPHERAL_COUNT];
-static _Atomic int8_t pipe_rssi_dbm[PERIPHERAL_COUNT];
+static atomic_t pipe_rssi_dbm[PERIPHERAL_COUNT];
 static atomic_t pipe_heard_mask;
 static atomic_t pipe_motion_mask;
 static atomic_t pipe_active_mask;
 static uint16_t silent_windows;
 static uint8_t silent_escapes;
-static _Atomic uint32_t pipe_last_heard_ms[PERIPHERAL_COUNT];
-static _Atomic bool pipe_ever_heard[PERIPHERAL_COUNT];
+static atomic_t pipe_last_heard_ms[PERIPHERAL_COUNT];
+static ATOMIC_DEFINE(pipe_ever_heard, PERIPHERAL_COUNT);
 static uint32_t pipe_was_lost_mask;
 static uint16_t anchor_visit_window;
 static uint8_t rendezvous_anchor;
@@ -138,6 +137,10 @@ static void schedule_mask_save(void) {
 }
 #endif /* CONFIG_SETTINGS */
 
+static int8_t pipe_rssi_dbm_get(uint8_t pipe) {
+    return (int8_t)atomic_get(&pipe_rssi_dbm[pipe]);
+}
+
 static void clear_pipe_loss(void) {
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
         pipe_loss[pipe] = 0;
@@ -148,22 +151,22 @@ uint32_t hop_pipe_quiet_ms(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return UINT32_MAX;
     }
-    return k_uptime_get_32() - pipe_last_heard_ms[pipe];
+    return k_uptime_get_32() - (uint32_t)atomic_get(&pipe_last_heard_ms[pipe]);
 }
 
 bool hop_pipe_heard(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return false;
     }
-    return pipe_ever_heard[pipe];
+    return atomic_test_bit(pipe_ever_heard, pipe);
 }
 
 void hop_pipe_note_seen(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return;
     }
-    pipe_last_heard_ms[pipe] = k_uptime_get_32();
-    pipe_ever_heard[pipe] = true;
+    atomic_set(&pipe_last_heard_ms[pipe], (atomic_val_t)k_uptime_get_32());
+    atomic_set_bit(pipe_ever_heard, pipe);
 }
 
 bool hop_pipe_needs_rendezvous(uint8_t pipe) {
@@ -205,7 +208,7 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
                                 .hid_indicators = hid_indicators};
     for (uint8_t peer = 0; peer < PERIPHERAL_COUNT; peer++) {
         beacon.peers[peer].battery = esb_central_battery_level(peer);
-        beacon.peers[peer].rssi_dbm = pipe_rssi_dbm[peer];
+        beacon.peers[peer].rssi_dbm = pipe_rssi_dbm_get(peer);
     }
     return esb_link_latch_control(pipe, ESB_LINK_CONTROL_BEACON, (const uint8_t *)&beacon,
                                   sizeof(beacon));
@@ -412,7 +415,7 @@ static void decision_work_fn(struct k_work *work) {
 
     int8_t rssi_snapshot[PERIPHERAL_COUNT];
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        rssi_snapshot[pipe] = pipe_rssi_dbm[pipe];
+        rssi_snapshot[pipe] = pipe_rssi_dbm_get(pipe);
     }
     hop_policy_accrue_loss(pipe_loss, PERIPHERAL_COUNT, motion, active, rssi_snapshot,
                            rssi_floor_dbm);
@@ -527,12 +530,12 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
     if (!keepalive) {
         /* Store before the motion bit: the decision tick reads pipe_rssi_dbm only when
          * that bit is set, so publish the value first. */
-        pipe_rssi_dbm[pipe] = hop_policy_rssi_to_dbm(rssi);
+        atomic_set(&pipe_rssi_dbm[pipe], hop_policy_rssi_to_dbm(rssi));
     }
     /* Beacon refresh reads it on a fixed channel too. */
     atomic_or(&pipe_heard_mask, BIT(pipe));
-    pipe_last_heard_ms[pipe] = k_uptime_get_32();
-    pipe_ever_heard[pipe] = true;
+    atomic_set(&pipe_last_heard_ms[pipe], (atomic_val_t)k_uptime_get_32());
+    atomic_set_bit(pipe_ever_heard, pipe);
     if (HOP_COUNT <= 1) {
         return false;
     }
@@ -560,8 +563,9 @@ void hop_note_data_sent(void) {
 static int8_t worst_pipe_rssi_dbm(void) {
     int8_t worst = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (pipe_rssi_dbm[pipe] < worst) {
-            worst = pipe_rssi_dbm[pipe];
+        int8_t rssi_dbm = pipe_rssi_dbm_get(pipe);
+        if (rssi_dbm < worst) {
+            worst = rssi_dbm;
         }
     }
     return worst;
@@ -584,7 +588,7 @@ int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return 0;
     }
-    return pipe_rssi_dbm[pipe];
+    return pipe_rssi_dbm_get(pipe);
 }
 
 uint8_t zmk_split_esb_peer_battery(uint8_t pipe) {
@@ -598,5 +602,5 @@ int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe) {
     if (pipe >= PERIPHERAL_COUNT) {
         return 0;
     }
-    return pipe_rssi_dbm[pipe];
+    return pipe_rssi_dbm_get(pipe);
 }

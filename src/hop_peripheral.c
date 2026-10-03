@@ -6,7 +6,6 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdatomic.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -50,7 +49,7 @@ static uint16_t camp_dwell;
 static uint8_t degrade_undo_index;
 static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
-static _Atomic int8_t uplink_rssi_dbm;
+static atomic_t uplink_rssi_dbm;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 
@@ -60,7 +59,7 @@ struct staged_mask {
 };
 static struct staged_mask staged_mask_pool[STAGED_MASK_SLOTS];
 static struct spsc_latch staged_mask_latch = {.slot_count = STAGED_MASK_SLOTS};
-static _Atomic uint16_t peer_table[ESB_BEACON_PEER_COUNT];
+static atomic_t peer_table[ESB_BEACON_PEER_COUNT];
 
 #define PEER_RSSI_SHIFT 8
 
@@ -74,6 +73,14 @@ static uint8_t peer_unpack_battery(uint16_t entry) {
 
 static int8_t peer_unpack_rssi_dbm(uint16_t entry) {
     return (int8_t)(entry >> PEER_RSSI_SHIFT);
+}
+
+static uint16_t peer_entry_get(uint8_t pipe) {
+    return (uint16_t)atomic_get(&peer_table[pipe]);
+}
+
+static int8_t uplink_rssi_dbm_get(void) {
+    return (int8_t)atomic_get(&uplink_rssi_dbm);
 }
 
 static void ensure_mask(void) {
@@ -250,12 +257,12 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         const struct esb_beacon *beacon = (const struct esb_beacon *)data;
         atomic_set(&beacon_epoch, beacon->epoch); /* adopted in keepalive_work, not queued */
         if (pipe < ESB_BEACON_PEER_COUNT) {
-            uplink_rssi_dbm = beacon->peers[pipe].rssi_dbm;
+            atomic_set(&uplink_rssi_dbm, beacon->peers[pipe].rssi_dbm);
         }
         peripheral_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
         for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
-            peer_table[peer] = peer_pack(beacon->peers[peer].battery,
-                                         beacon->peers[peer].rssi_dbm);
+            atomic_set(&peer_table[peer], peer_pack(beacon->peers[peer].battery,
+                                                    beacon->peers[peer].rssi_dbm));
         }
         return true;
     }
@@ -306,7 +313,7 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     status->channel = hop_current_channel();
     status->epoch = adopted_epoch;
     status->searching = atomic_get(&link_acked) == 0;
-    status->rssi_dbm = uplink_rssi_dbm;
+    status->rssi_dbm = uplink_rssi_dbm_get();
     status->attempts_ewma_x10 = attempts_ewma_x10;
 }
 
@@ -318,21 +325,19 @@ int8_t zmk_split_esb_pipe_rssi_dbm(uint8_t pipe) {
     if (pipe >= 1) {
         return 0;
     }
-    return uplink_rssi_dbm;
+    return uplink_rssi_dbm_get();
 }
 
 uint8_t zmk_split_esb_peer_battery(uint8_t pipe) {
     if (pipe >= ESB_BEACON_PEER_COUNT) {
         return ESB_KEEPALIVE_BATTERY_UNKNOWN;
     }
-    uint16_t entry = peer_table[pipe];
-    return peer_unpack_battery(entry);
+    return peer_unpack_battery(peer_entry_get(pipe));
 }
 
 int8_t zmk_split_esb_peer_rssi_dbm(uint8_t pipe) {
     if (pipe >= ESB_BEACON_PEER_COUNT) {
         return 0;
     }
-    uint16_t entry = peer_table[pipe];
-    return peer_unpack_rssi_dbm(entry);
+    return peer_unpack_rssi_dbm(peer_entry_get(pipe));
 }
