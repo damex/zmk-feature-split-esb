@@ -67,10 +67,8 @@ bool esb_link_pipe_is_relay(uint8_t pipe);
 bool esb_link_pipe_is_self(uint8_t pipe);
 
 /* Central only.
- * Purge the pipe's reply queue and stage `data` as the single pending reply.
- * Latest-wins semantics for producers that only ever want the freshest state
- * delivered next (e.g. HID relay). Returns -EINVAL on bad pipe, -EMSGSIZE on
- * oversize payload. */
+ * Latest-wins reply, newest value overwrites the pending one.
+ * Returns -EINVAL on bad pipe, -EMSGSIZE on empty or oversize payload. */
 int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length);
 
 /* Central only.
@@ -80,7 +78,7 @@ uint8_t esb_link_source_ids(uint8_t *out_ids);
 
 /* Central only.
  * Queue one packet to ride peripheral `pipe`'s next ACK back to it.
- * Returns -ENOBUFS if the reply queue is full. */
+ * Returns -EMSGSIZE on empty or oversize payload, -ENOBUFS if the reply queue is full. */
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length);
 
 uint8_t esb_central_battery_level(uint8_t pipe);

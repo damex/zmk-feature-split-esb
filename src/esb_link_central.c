@@ -128,15 +128,13 @@ int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (pipe >= REPLY_PIPE_COUNT) {
         return -EINVAL;
     }
-    if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+    if (length == 0 || length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     struct esb_link_packet packet = {0};
     packet.pipe = pipe;
     packet.length = (uint8_t)length;
-    if (length > 0) {
-        memcpy(packet.data, data, length);
-    }
+    memcpy(packet.data, data, length);
     if (k_msgq_put(reply_queue[pipe], &packet, K_NO_WAIT) != 0) {
         return -ENOBUFS;
     }
@@ -147,14 +145,12 @@ int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (pipe >= REPLY_PIPE_COUNT) {
         return -EINVAL;
     }
-    if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+    if (length == 0 || length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     uint8_t index = spsc_latch_claim(&replace_latch[pipe]);
     struct reply_payload *slot = &replace_pool[pipe][index];
-    if (length > 0) {
-        memcpy(slot->data, data, length);
-    }
+    memcpy(slot->data, data, length);
     slot->length = (uint8_t)length;
     spsc_latch_publish(&replace_latch[pipe], slot);
     return 0;
@@ -194,9 +190,7 @@ static bool write_pending_replace(uint8_t pipe) {
     struct esb_payload payload = {0};
     payload.pipe = pipe;
     payload.length = slot->length;
-    if (slot->length > 0) {
-        memcpy(payload.data, slot->data, slot->length);
-    }
+    memcpy(payload.data, slot->data, slot->length);
     if (esb_write_payload(&payload) == 0) {
         (void)spsc_latch_release(&replace_latch[pipe], slot);
     }
@@ -225,9 +219,7 @@ void esb_link_role_rx_done(uint8_t pipes_seen) {
         struct esb_payload payload = {0};
         payload.pipe = packet.pipe;
         payload.length = packet.length;
-        if (packet.length > 0) {
-            memcpy(payload.data, packet.data, packet.length);
-        }
+        memcpy(payload.data, packet.data, packet.length);
         if (esb_write_payload(&payload) == 0) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
         }
