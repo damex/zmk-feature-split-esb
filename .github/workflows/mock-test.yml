@@ -23,6 +23,7 @@ jobs:
       - run: pip install west
       - run: west init -l zmk/app
       - run: west update zephyr
-      - run: pip install -r zephyr/scripts/requirements-base.txt
+        working-directory: zmk
+      - run: pip install -r zmk/zephyr/scripts/requirements-base.txt
       - run: make mock-test ZMK_APP=${{ github.workspace }}/zmk/app
         working-directory: zmk-feature-split-esb
