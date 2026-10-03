@@ -7,7 +7,7 @@ description: |
   The central and every peripheral must declare identical values to pair.
   Place this node in a dtsi included by the central and every peripheral.
 
-compatible: "zmk,split-esb"
+compatible: zmk,split-esb
 
 properties:
   base-address:
@@ -19,7 +19,10 @@ properties:
   address-length:
     type: int
     default: 5
-    enum: [3, 4, 5]
+    enum:
+      - 3
+      - 4
+      - 5
     description: |
       On-air address bytes (1 prefix plus base). 5 is standard ESB. Shorter trims a
       byte per packet but weakens address selectivity. Uses the high base-address
@@ -33,7 +36,17 @@ properties:
       WiFi out of the box. The engine measures the pool from live traffic and masks any
       channel that still performs badly. Set explicitly to use a different band. One channel
       means fixed operation.
-    default: [74, 75, 76, 77, 78, 79, 80, 81, 82, 83]
+    default:
+      - 74
+      - 75
+      - 76
+      - 77
+      - 78
+      - 79
+      - 80
+      - 81
+      - 82
+      - 83
   hop-anchors:
     type: uint8-array
     description: |
@@ -128,12 +141,17 @@ properties:
   crc-bits:
     type: int
     default: 16
-    enum: [0, 8, 16]
+    enum:
+      - 0
+      - 8
+      - 16
     description: CRC width in bits (0 disables CRC). All peripherals must match the central.
   bitrate-kbps:
     type: int
     default: 2000
-    enum: [1000, 2000]
+    enum:
+      - 1000
+      - 2000
     description: Radio bitrate in kbps. All peripherals must match the central.
   lossy-codes:
     type: array
