@@ -1,7 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* HID relay, central half: keyboard reports out to relay-role pipes. */
+/* HID relay, central half: keyboard and consumer reports out to relay-role pipes. */
 
 #include <errno.h>
 
@@ -18,12 +18,21 @@
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
-static void stage_keyboard_report(uint8_t pipe) {
-    struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
-    int error = esb_link_stage_reply(pipe, (const uint8_t *)report, sizeof(*report));
+static void stage_report(uint8_t pipe, const void *report, size_t length) {
+    int error = esb_link_stage_reply(pipe, report, length);
     if (error != 0) {
         LOG_WRN("hid relay stage failed pipe %u err %d", pipe, error);
     }
+}
+
+static void stage_keyboard_report(uint8_t pipe) {
+    struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
+    stage_report(pipe, report, sizeof(*report));
+}
+
+static void stage_consumer_report(uint8_t pipe) {
+    struct zmk_hid_consumer_report *report = zmk_hid_get_consumer_report();
+    stage_report(pipe, report, sizeof(*report));
 }
 
 static void hid_relay_keepalive_fire(struct k_work *work);
@@ -35,6 +44,7 @@ static void hid_relay_keepalive_fire(struct k_work *work) {
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
         if (esb_link_pipe_is_relay(pipe) && esb_link_reply_queue_empty(pipe)) {
             stage_keyboard_report(pipe);
+            stage_consumer_report(pipe);
         }
     }
     k_work_reschedule(&hid_relay_keepalive_work,
@@ -43,9 +53,17 @@ static void hid_relay_keepalive_fire(struct k_work *work) {
 
 /* Every change queues in order, a tap's press and release both reach the host. */
 static int hid_relay_listener(const zmk_event_t *event) {
-    ARG_UNUSED(event);
+    const struct zmk_keycode_state_changed *keycode = as_zmk_keycode_state_changed(event);
+    if (keycode == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
-        if (esb_link_pipe_is_relay(pipe)) {
+        if (!esb_link_pipe_is_relay(pipe)) {
+            continue;
+        }
+        if (keycode->usage_page == HID_USAGE_CONSUMER) {
+            stage_consumer_report(pipe);
+        } else {
             stage_keyboard_report(pipe);
         }
     }

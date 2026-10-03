@@ -41,6 +41,7 @@ struct relay_report {
 
 static const struct relay_report relay_reports[] = {
     {.report_id = ZMK_HID_REPORT_ID_KEYBOARD, .length = sizeof(struct zmk_hid_keyboard_report)},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER, .length = sizeof(struct zmk_hid_consumer_report)},
 };
 
 static bool relay_report_valid(const uint8_t *bytes, size_t length) {
