@@ -50,6 +50,8 @@ static const uint8_t peripheral_prefixes[] = {
 };
 #define PERIPHERAL_COUNT ARRAY_SIZE(peripheral_prefixes)
 BUILD_ASSERT(PERIPHERAL_COUNT >= 1, "peripherals needs at least one entry");
+BUILD_ASSERT(PERIPHERAL_COUNT <= CONFIG_ESB_PIPE_COUNT,
+             "peripherals exceed CONFIG_ESB_PIPE_COUNT, ESB has at most 8 pipes");
 #define PIPE_BIT(node) +(1u << DT_PROP(node, pipe))
 #define PIPE_BIT_SUM (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, PIPE_BIT))
 BUILD_ASSERT(PIPE_BIT_SUM == (1u << DT_CHILD_NUM_STATUS_OKAY(ESB_PERIPHERALS)) - 1u,
