@@ -63,11 +63,6 @@ bool esb_link_pipe_is_relay(uint8_t pipe);
 bool esb_link_pipe_is_self(uint8_t pipe);
 
 /* Central only.
- * Latest-wins reply, newest value overwrites the pending one.
- * Returns -EINVAL on bad pipe, -EMSGSIZE on empty or oversize payload. */
-int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length);
-
-/* Central only.
  * Fill out_ids with the peripheral source ids (= pipe numbers).
  * Returns the count. */
 uint8_t esb_link_source_ids(uint8_t *out_ids);
@@ -76,6 +71,8 @@ uint8_t esb_link_source_ids(uint8_t *out_ids);
  * Queue one packet to ride peripheral `pipe`'s next ACK back to it.
  * Returns -EMSGSIZE on empty or oversize payload, -ENOBUFS if the reply queue is full. */
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length);
+
+bool esb_link_reply_queue_empty(uint8_t pipe);
 
 uint8_t esb_central_battery_level(uint8_t pipe);
 

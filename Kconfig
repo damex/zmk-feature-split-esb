@@ -76,10 +76,9 @@ config ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS
     default 4
     depends on ZMK_SPLIT_ESB_HID_RELAY
     help
-      Central re-sends the current HID report at this rate even when nothing
-      changed, so a rare dropped release report heals within one period. Same
-      pattern as the split keepalive that heals lost key events. Match this to
-      ZMK_SPLIT_ESB_HID_RELAY_POLL_MS so every relay poll has a fresh report.
+      Central re-sends the current HID report at this rate while the relay queue
+      is idle, so a rare dropped release report heals within one period.
+      Match this to ZMK_SPLIT_ESB_HID_RELAY_POLL_MS so every relay poll has a fresh report.
 
 menuconfig ZMK_SPLIT_ESB_WIRE
     bool "Wire link between split peripherals"

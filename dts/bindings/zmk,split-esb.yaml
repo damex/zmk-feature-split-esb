@@ -169,8 +169,9 @@ child-binding:
         default: 8
         description: |
           Central's command backlog for this peripheral. Raise it for one that receives
-          many commands. Beacons and mask updates bypass it, each riding a per-pipe latch
-          that the newest value overwrites.
+          many commands. Relay pipes queue every HID report change here, raise it for
+          macro-heavy keymaps. Beacons and mask updates bypass it, each riding a per-pipe
+          latch that the newest value overwrites.
       role:
         type: string
         default: peripheral

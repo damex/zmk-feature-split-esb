@@ -77,15 +77,9 @@ BUILD_ASSERT(ESB_LINK_CONTROL_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "control latch does not fit one ESB payload");
 
 #define CONTROL_LATCH_SLOTS 2
-#define REPLACE_LATCH_SLOTS 2
 
 struct control_payload {
     uint8_t data[ESB_LINK_CONTROL_MAX_LENGTH];
-    uint8_t length;
-};
-
-struct reply_payload {
-    uint8_t data[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
     uint8_t length;
 };
 
@@ -93,15 +87,11 @@ static struct control_payload
     control_pool[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT][CONTROL_LATCH_SLOTS];
 static struct spsc_latch control_latch[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT];
 
-static struct reply_payload replace_pool[REPLY_PIPE_COUNT][REPLACE_LATCH_SLOTS];
-static struct spsc_latch replace_latch[REPLY_PIPE_COUNT];
-
 static int reply_latches_init(void) {
     for (size_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
         for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
             control_latch[pipe][kind].slot_count = CONTROL_LATCH_SLOTS;
         }
-        replace_latch[pipe].slot_count = REPLACE_LATCH_SLOTS;
     }
     return 0;
 }
@@ -141,19 +131,11 @@ int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     return 0;
 }
 
-int esb_link_replace_reply(uint8_t pipe, const uint8_t *data, size_t length) {
+bool esb_link_reply_queue_empty(uint8_t pipe) {
     if (pipe >= REPLY_PIPE_COUNT) {
-        return -EINVAL;
+        return true;
     }
-    if (length == 0 || length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
-        return -EMSGSIZE;
-    }
-    uint8_t index = spsc_latch_claim(&replace_latch[pipe]);
-    struct reply_payload *slot = &replace_pool[pipe][index];
-    memcpy(slot->data, data, length);
-    slot->length = (uint8_t)length;
-    spsc_latch_publish(&replace_latch[pipe], slot);
-    return 0;
+    return k_msgq_num_used_get(reply_queue[pipe]) == 0;
 }
 
 int esb_link_role_start(void) {
@@ -182,21 +164,6 @@ static bool write_pending_control(uint8_t pipe) {
     return false;
 }
 
-static bool write_pending_replace(uint8_t pipe) {
-    struct reply_payload *slot = spsc_latch_peek(&replace_latch[pipe]);
-    if (slot == NULL) {
-        return false;
-    }
-    struct esb_payload payload = {0};
-    payload.pipe = pipe;
-    payload.length = slot->length;
-    memcpy(payload.data, slot->data, slot->length);
-    if (esb_write_payload(&payload) == 0) {
-        (void)spsc_latch_release(&replace_latch[pipe], slot);
-    }
-    return true;
-}
-
 /* ISR-only, so esb_write_payload has a single caller context, no lock.
  * ACK FIFO is shared across pipes: reply only for a pipe that just RXed, one write
  * per RX, so an idle pipe never head-of-line blocks others and a dying one leaks a
@@ -207,9 +174,6 @@ void esb_link_role_rx_done(uint8_t pipes_seen) {
             continue;
         }
         if (write_pending_control(pipe)) {
-            continue;
-        }
-        if (write_pending_replace(pipe)) {
             continue;
         }
         struct esb_link_packet packet;
