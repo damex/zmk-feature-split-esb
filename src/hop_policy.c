@@ -69,6 +69,13 @@ uint8_t hop_policy_adaptive_retransmits(uint16_t ewma_x10, uint8_t count_min, ui
     return (uint8_t)(count_min + (into * (uint32_t)(count_max - count_min)) / span);
 }
 
+bool hop_policy_hfclk_release_allowed(bool gating, bool radio_idle) {
+    if (!gating) {
+        return false;
+    }
+    return radio_idle;
+}
+
 uint32_t hop_policy_retry_cycle_ms(uint8_t count, uint16_t delay_us, uint8_t margin,
                                    uint32_t floor_ms) {
     uint32_t cycle_us = (uint32_t)margin * count * delay_us;

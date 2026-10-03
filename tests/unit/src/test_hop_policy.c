@@ -413,6 +413,12 @@ ZTEST(hop_policy, test_adaptive_retransmits) {
     zassert_equal(hop_policy_adaptive_retransmits(30, 3, 3), 3, "degenerate range is total");
 }
 
+ZTEST(hop_policy, test_hfclk_release_waits_for_idle_radio) {
+    zassert_true(hop_policy_hfclk_release_allowed(true, true), "gated idle radio releases");
+    zassert_false(hop_policy_hfclk_release_allowed(true, false), "busy radio keeps the crystal");
+    zassert_false(hop_policy_hfclk_release_allowed(false, true), "ungated never releases");
+}
+
 ZTEST(hop_policy, test_retry_cycle_ms) {
     zassert_equal(hop_policy_retry_cycle_ms(12, 600, 4, 100), 100, "short cycles hold the floor");
     zassert_equal(hop_policy_retry_cycle_ms(12, 600, 20, 100), 144, "long cycles exceed the floor");

@@ -138,17 +138,22 @@ static uint32_t live_retry_cycle_ms(uint8_t margin, uint32_t floor_ms) {
 static K_MUTEX_DEFINE(hfclk_gate_mutex);
 static bool hfclk_gating;
 
+static void hfclk_release_work_fn(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(hfclk_release_work, hfclk_release_work_fn);
+
 static void hfclk_release_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
     k_mutex_lock(&hfclk_gate_mutex, K_FOREVER);
     /* Cancel misses an already-running item, so recheck under the lock. */
-    if (hfclk_gating) {
+    if (hop_policy_hfclk_release_allowed(hfclk_gating, esb_is_idle())) {
         esb_link_hfclk_release();
+    } else if (hfclk_gating) {
+        k_work_reschedule(&hfclk_release_work,
+                          K_MSEC(live_retry_cycle_ms(HFCLK_IDLE_HOLD_MARGIN,
+                                                     HFCLK_IDLE_HOLD_FLOOR_MS)));
     }
     k_mutex_unlock(&hfclk_gate_mutex);
 }
-
-static K_WORK_DELAYABLE_DEFINE(hfclk_release_work, hfclk_release_work_fn);
 
 static void hfclk_gate_hold(void) {
     k_mutex_lock(&hfclk_gate_mutex, K_FOREVER);
