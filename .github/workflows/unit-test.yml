@@ -20,6 +20,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            zephyr/scripts/requirements-base.txt
+            zephyr/scripts/requirements-build-test.txt
+            zephyr/scripts/requirements-run-test.txt
       - run: pip install -r zephyr/scripts/requirements-base.txt -r zephyr/scripts/requirements-build-test.txt -r zephyr/scripts/requirements-run-test.txt
       - run: make unit-test
         working-directory: zmk-feature-split-esb
