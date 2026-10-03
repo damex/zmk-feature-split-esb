@@ -1,15 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Single-device ESB radio layer.
- * One packet in, one out.
- * Reliability is ESB hardware ACK + retransmit, so no framing, reassembly,
- * software CRC or retry table here.
- * The reverse channel rides ACK payloads: the central stages a reply, it goes
- * out on the next received packet's ACK.
- * Channel hopping lives in hop.c.
- */
+/* ESB radio link, shared radio setup and RX dispatch. */
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <zephyr/kernel.h>

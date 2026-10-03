@@ -1,12 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Bidirectional UART link between two split peripherals.
- * Framing lives in wire_frame.c.
- * UART node from chosen zmk,esb-wire.
- * Physical UART or USB CDC.
- */
+/* Wire link between split peripherals over UART. */
 
 #include "wire_link.h"
 

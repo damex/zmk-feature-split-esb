@@ -1,10 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/*
- * Single-device ESB radio layer: whole packets in and out, no framing or
- * reassembly (ESB delivers discrete CRC-checked packets).
- */
+/* ESB radio link, both roles. */
 #pragma once
 
 #include <stdbool.h>
@@ -49,8 +46,7 @@ void esb_link_set_retransmit_count(uint8_t count);
 void esb_link_apply_pending(void);
 
 /* Peripheral only.
- * Returns the encoded length, 0 when out_size is too small.
- * Defined in peripheral.c. */
+ * Returns the encoded length, 0 when out_size is too small. */
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state);
 
 #if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)
