@@ -47,6 +47,8 @@ int64_t esb_keepalive_sensor_total_udeg(const uint8_t *data, uint8_t sensor_inde
 
 uint8_t esb_keepalive_state(const uint8_t *data);
 
+uint8_t esb_keepalive_peripheral_state(bool active, bool searching);
+
 const uint8_t *esb_keepalive_bitmap(const uint8_t *data);
 
 uint8_t esb_keepalive_battery_level(const uint8_t *data);

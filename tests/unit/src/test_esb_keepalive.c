@@ -69,6 +69,17 @@ ZTEST(esb_keepalive, test_sensor_totals) {
     zassert_equal(esb_keepalive_sensor_total_udeg(wire, 1), -3500000LL, "negative total");
 }
 
+ZTEST(esb_keepalive, test_peripheral_state_active_only_while_searching) {
+    zassert_equal(esb_keepalive_peripheral_state(true, true), ESB_KEEPALIVE_ACTIVE,
+                  "active and searching reports active");
+    zassert_equal(esb_keepalive_peripheral_state(true, false), ESB_KEEPALIVE_IDLE,
+                  "active on a live link reports idle");
+    zassert_equal(esb_keepalive_peripheral_state(false, true), ESB_KEEPALIVE_IDLE,
+                  "idle while searching reports idle");
+    zassert_equal(esb_keepalive_peripheral_state(false, false), ESB_KEEPALIVE_IDLE,
+                  "idle on a live link reports idle");
+}
+
 ZTEST(esb_keepalive, test_bitmap_set_get_clear) {
     uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
     zassert_false(esb_keepalive_bitmap_get(bitmap, 5), "starts clear");

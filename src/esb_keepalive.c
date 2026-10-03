@@ -59,6 +59,10 @@ uint8_t esb_keepalive_state(const uint8_t *data) {
     return data[ESB_KEEPALIVE_STATE_OFFSET];
 }
 
+uint8_t esb_keepalive_peripheral_state(bool active, bool searching) {
+    return (active && searching) ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE;
+}
+
 const uint8_t *esb_keepalive_bitmap(const uint8_t *data) {
     __ASSERT_NO_MSG(data != NULL);
     return &data[ESB_KEEPALIVE_BITMAP_OFFSET];

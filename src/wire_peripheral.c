@@ -94,10 +94,9 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
         return;
     }
     const bool active = zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE;
+    const uint8_t state = esb_keepalive_peripheral_state(active, !wire_link_is_up());
     uint8_t length = peripheral_keepalive_fill(wire_keepalive_buffer,
-                                               sizeof(wire_keepalive_buffer),
-                                               active ? ESB_KEEPALIVE_ACTIVE : ESB_KEEPALIVE_IDLE,
-                                               0);
+                                               sizeof(wire_keepalive_buffer), state, 0);
     if (length > 0) {
         int result = wire_link_send_keepalive(wire_keepalive_buffer, length);
         if (result == 0) {
