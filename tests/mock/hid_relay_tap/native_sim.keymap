@@ -3,19 +3,6 @@
 #include <dt-bindings/zmk/kscan_mock.h>
 
 / {
-    esb_link {
-        compatible = "zmk,split-esb";
-        base-address = [E7 D3 9A 5C];
-
-        peripherals {
-            relay: peripheral_relay {
-                pipe = <0>;
-                prefix = <0x4B>;
-                role = "relay";
-            };
-        };
-    };
-
     keymap {
         compatible = "zmk,keymap";
 

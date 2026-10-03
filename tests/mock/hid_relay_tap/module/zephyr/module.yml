@@ -2,6 +2,6 @@
 name: zmk-feature-split-esb-test-hid-relay-tap
 build:
   cmake: .
-  kconfig: Kconfig
+  kconfig: ../../../../Kconfig
   settings:
     dts_root: ../../../..

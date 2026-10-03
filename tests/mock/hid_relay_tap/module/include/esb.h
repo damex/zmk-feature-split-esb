@@ -17,7 +17,7 @@ struct esb_payload {
     int8_t rssi;
     uint8_t noack;
     uint8_t pid;
-    uint8_t data[CONFIG_ESB_MAX_PAYLOAD_LENGTH];
+    uint8_t data[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
 };
 
 int esb_write_payload(const struct esb_payload *payload);

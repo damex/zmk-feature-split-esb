@@ -2,6 +2,6 @@
 name: zmk-feature-split-esb-test-hid-state-sync
 build:
   cmake: .
-  kconfig: Kconfig
+  kconfig: ../../../../Kconfig
   settings:
     dts_root: ../../../..

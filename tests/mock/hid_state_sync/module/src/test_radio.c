@@ -66,7 +66,7 @@ static void check_beacon(const struct esb_payload *payload) {
 }
 
 int esb_write_payload(const struct esb_payload *payload) {
-    if (payload->length == 0 || payload->length > CONFIG_ESB_MAX_PAYLOAD_LENGTH) {
+    if (payload->length == 0 || payload->length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
     if (esb_is_beacon(payload->data, payload->length)) {
