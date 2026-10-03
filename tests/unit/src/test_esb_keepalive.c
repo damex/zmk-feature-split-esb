@@ -23,6 +23,26 @@ ZTEST(esb_keepalive, test_encode_layout) {
     zassert_equal(esb_keepalive_link_cost_x10(wire), 23, "link cost byte");
 }
 
+ZTEST(esb_keepalive, test_encode_length) {
+    uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
+    int64_t totals[1] = {0};
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(1)];
+    size_t length = esb_keepalive_encode(wire, sizeof(wire), 0x00, bitmap, 50, 10, totals, 1);
+    zassert_equal(length, ESB_KEEPALIVE_LENGTH(1), "full buffer returns encoded length");
+}
+
+ZTEST(esb_keepalive, test_encode_short_buffer) {
+    uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
+    int64_t totals[1] = {0};
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(1)];
+    uint8_t untouched[sizeof(wire)];
+    memset(wire, 0xAA, sizeof(wire));
+    memcpy(untouched, wire, sizeof(untouched));
+    size_t length = esb_keepalive_encode(wire, sizeof(wire) - 1, 0x00, bitmap, 50, 10, totals, 1);
+    zassert_equal(length, 0, "short buffer returns 0");
+    zassert_mem_equal(wire, untouched, sizeof(wire), "short buffer left unwritten");
+}
+
 ZTEST(esb_keepalive, test_matches) {
     uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
     uint8_t wire[ESB_KEEPALIVE_LENGTH(0)];

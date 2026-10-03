@@ -32,10 +32,11 @@
 #define ESB_KEEPALIVE_LENGTH(sensor_count)                                                         \
     (ESB_KEEPALIVE_BASE_LENGTH + (sensor_count) * ESB_KEEPALIVE_SENSOR_BYTES)
 
-void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
-                          const uint8_t *position_bitmap, uint8_t battery_level,
-                          uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
-                          uint8_t sensor_count);
+/* Returns the encoded length, 0 when out_size is too small. */
+size_t esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
+                            const uint8_t *position_bitmap, uint8_t battery_level,
+                            uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
+                            uint8_t sensor_count);
 
 bool esb_keepalive_matches(const uint8_t *data, uint8_t length);
 

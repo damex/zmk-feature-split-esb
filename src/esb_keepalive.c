@@ -8,14 +8,17 @@
 
 #include "esb_keepalive.h"
 
-void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
-                          const uint8_t *position_bitmap, uint8_t battery_level,
-                          uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
-                          uint8_t sensor_count) {
+size_t esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
+                            const uint8_t *position_bitmap, uint8_t battery_level,
+                            uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
+                            uint8_t sensor_count) {
     __ASSERT_NO_MSG(out != NULL);
-    __ASSERT_NO_MSG(out_size >= (size_t)ESB_KEEPALIVE_LENGTH(sensor_count));
     __ASSERT_NO_MSG(position_bitmap != NULL);
     __ASSERT_NO_MSG(sensor_count == 0 || sensor_totals_udeg != NULL);
+    size_t length = (size_t)ESB_KEEPALIVE_LENGTH(sensor_count);
+    if (out_size < length) {
+        return 0;
+    }
     out[ESB_KEEPALIVE_TAG_OFFSET] = ESB_KEEPALIVE_TAG;
     out[ESB_KEEPALIVE_STATE_OFFSET] = state;
     memcpy(&out[ESB_KEEPALIVE_BITMAP_OFFSET], position_bitmap, ESB_KEEPALIVE_BITMAP_BYTES);
@@ -26,6 +29,7 @@ void esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
                      &out[ESB_KEEPALIVE_SENSOR_OFFSET +
                           (size_t)sensor_index * ESB_KEEPALIVE_SENSOR_BYTES]);
     }
+    return length;
 }
 
 bool esb_keepalive_matches(const uint8_t *data, uint8_t length) {
