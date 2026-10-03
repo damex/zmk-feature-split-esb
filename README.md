@@ -19,7 +19,7 @@ workspace lacks (`zmk` and Zephyr come from your own manifest):
   projects:
     - name: zmk-feature-split-esb
       remote: damex
-      revision: v0.6.8
+      revision: v0.6.9
       import: true
 ```
 Then `west update`. Module's `modules/modules.cmake` applies sdk-nrf Kconfig
