@@ -17,6 +17,12 @@ if(CONFIG_ZMK_SPLIT_ESB)
       -Wwrite-strings
       -Winit-self
       -Wold-style-definition
+      -Wswitch-enum
+      -Wswitch-default
+      -Wimplicit-fallthrough=5
+      -Wmissing-declarations
+      -Wnull-dereference
+      -Wstack-usage=256
       -fanalyzer
   )
   zephyr_library_sources(src/esb_keepalive.c)
