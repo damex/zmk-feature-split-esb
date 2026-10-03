@@ -47,7 +47,10 @@ uint8_t peripheral_battery_level(void) {
     }
     uint8_t level = zmk_battery_state_of_charge();
     /* Zero is pre-first-sample, not 0% charge. */
-    return (level == 0) ? ESB_KEEPALIVE_BATTERY_UNKNOWN : level;
+    if (level == 0) {
+        return ESB_KEEPALIVE_BATTERY_UNKNOWN;
+    }
+    return level;
 }
 
 #if ZMK_KEYMAP_HAS_SENSORS

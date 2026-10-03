@@ -26,7 +26,10 @@ struct esb_mask_update {
 #define ESB_MASK_UPDATE_LENGTH (1 + ESB_HOP_MASK_BYTES)
 
 static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
-    return length == ESB_MASK_UPDATE_LENGTH && data[0] == ESB_MASK_UPDATE_TAG;
+    if (length != ESB_MASK_UPDATE_LENGTH) {
+        return false;
+    }
+    return data[offsetof(struct esb_mask_update, tag)] == ESB_MASK_UPDATE_TAG;
 }
 
 #define ESB_BEACON_TAG 0xFE
@@ -48,7 +51,10 @@ struct esb_beacon {
 BUILD_ASSERT(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
 
 static inline bool esb_is_beacon(const uint8_t *data, uint8_t length) {
-    return length == ESB_BEACON_LENGTH && data[0] == ESB_BEACON_TAG;
+    if (length != ESB_BEACON_LENGTH) {
+        return false;
+    }
+    return data[offsetof(struct esb_beacon, tag)] == ESB_BEACON_TAG;
 }
 
 extern uint8_t hop_index;
