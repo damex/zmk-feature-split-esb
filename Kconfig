@@ -111,9 +111,8 @@ config ZMK_SPLIT_ESB_WIRE_RELAY
     depends on ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_ESB
     select ZMK_SPLIT_ESB_WIRE
     help
-      Peripheral acts as wire central for another split peripheral over the
-      wire link. Received events land at wire_relay for future forwarding
-      through the ESB uplink.
+      Peripheral acts as wire central for another split peripheral.
+      Wire peer frames forward to the central on the peer's ESB pipe.
 
 config ZMK_SPLIT_ESB_WIRE_PEER
     bool "Central has a wire peer"
