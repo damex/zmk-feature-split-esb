@@ -1,5 +1,8 @@
+#include "esb_shared.dtsi"
+
 / {
     chosen {
+        zmk,esb-self = &right;
         zmk,esb-wire = &wire_uart;
     };
 
