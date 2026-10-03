@@ -111,6 +111,7 @@ initialized.
 |       v                                                                      |
 |   [esb_link_send]                       esb_link_peripheral.c                |
 |   noack for lossy-codes input,                                               |
+|   first send per tick acked as link probe,                                   |
 |   keepalives enter here from the tick                                        |
 |       |                                                                      |
 |       v                                                                      |

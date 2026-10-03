@@ -227,6 +227,8 @@ Lossy-codes lists the input axes peripherals fire-and-forget. Reserve for
 high-rate, self-correcting axes (pointer motion). Non-input split events
 (key-position, sensor, battery) are always ACK'd. Every input event is ACK'd
 unless its (type, code) is listed here. Omitted = fully lossless link.
+First send of each keepalive tick requests an ACK regardless, so a moving
+pointer still proves the link every window.
 
 Sensor rotation is cumulative on air: a peripheral sends its running total and
 the central forwards the difference, so motion lost with a dropped packet
