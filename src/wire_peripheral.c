@@ -19,16 +19,8 @@
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static bool transport_enabled;
-static uint32_t last_wire_send_ms;
+static atomic_t last_wire_send_ms;
 static uint8_t wire_keepalive_buffer[PERIPHERAL_KEEPALIVE_MAX_LENGTH];
-
-static int wire_peripheral_send(const uint8_t *data, size_t length) {
-    int result = wire_link_send_event(data, length);
-    if (result == 0) {
-        last_wire_send_ms = k_uptime_get_32();
-    }
-    return result;
-}
 
 static int wire_peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {
     uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];
@@ -36,7 +28,16 @@ static int wire_peripheral_report_event(const struct zmk_split_transport_periphe
     if (encoded < 0) {
         return encoded;
     }
-    return wire_peripheral_send(wire, (size_t)encoded);
+    int result;
+    if (event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
+        result = wire_link_send_input(wire, (size_t)encoded);
+    } else {
+        result = wire_link_send_event(wire, (size_t)encoded);
+    }
+    if (result == 0) {
+        atomic_set(&last_wire_send_ms, (atomic_val_t)k_uptime_get_32());
+    }
+    return result;
 }
 
 static int wire_peripheral_set_enabled(bool enabled) {
@@ -86,7 +87,7 @@ static K_WORK_DELAYABLE_DEFINE(wire_peripheral_keepalive_work, wire_peripheral_k
 static void wire_peripheral_keepalive_fire(struct k_work *work) {
     ARG_UNUSED(work);
     const uint32_t now_ms = k_uptime_get_32();
-    const uint32_t last_ms = last_wire_send_ms;
+    const uint32_t last_ms = (uint32_t)atomic_get(&last_wire_send_ms);
     const uint32_t idle_ms = now_ms - last_ms;
     if (idle_ms < CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS) {
         k_work_reschedule(&wire_peripheral_keepalive_work,
@@ -100,7 +101,7 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
     if (length > 0) {
         int result = wire_link_send_keepalive(wire_keepalive_buffer, length);
         if (result == 0) {
-            last_wire_send_ms = k_uptime_get_32();
+            atomic_set(&last_wire_send_ms, (atomic_val_t)k_uptime_get_32());
         }
     }
     k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS));

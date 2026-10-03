@@ -23,6 +23,7 @@ BUILD_ASSERT(DT_NODE_EXISTS(WIRE_LINK_UART_NODE),
 
 #define WIRE_LINK_RX_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_TX_EVENT_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
+#define WIRE_LINK_TX_INPUT_RING_BYTES      (WIRE_FRAME_MAX_ENCODED * 2)
 #define WIRE_LINK_TX_KEEPALIVE_RING_BYTES  WIRE_FRAME_MAX_ENCODED
 #define WIRE_LINK_CHUNK_BYTES        64
 #define WIRE_LINK_RX_STACK_SIZE      1024
@@ -32,6 +33,7 @@ static const struct device *const wire_uart_device = DEVICE_DT_GET(WIRE_LINK_UAR
 
 RING_BUF_DECLARE(wire_rx_ring, WIRE_LINK_RX_RING_BYTES);
 RING_BUF_DECLARE(wire_tx_event_ring, WIRE_LINK_TX_EVENT_RING_BYTES);
+RING_BUF_DECLARE(wire_tx_input_ring, WIRE_LINK_TX_INPUT_RING_BYTES);
 RING_BUF_DECLARE(wire_tx_keepalive_ring, WIRE_LINK_TX_KEEPALIVE_RING_BYTES);
 
 static struct wire_frame_parser wire_parser;
@@ -86,6 +88,9 @@ static struct ring_buf *wire_tx_pick_ring(void) {
     }
     if (!ring_buf_is_empty(&wire_tx_event_ring)) {
         return &wire_tx_event_ring;
+    }
+    if (!ring_buf_is_empty(&wire_tx_input_ring)) {
+        return &wire_tx_input_ring;
     }
     return &wire_tx_keepalive_ring;
 }
@@ -159,6 +164,13 @@ int wire_link_send_event(const uint8_t *payload, size_t length) {
         return -EMSGSIZE;
     }
     return wire_link_enqueue(&wire_tx_event_ring, payload, length);
+}
+
+int wire_link_send_input(const uint8_t *payload, size_t length) {
+    if (length > WIRE_FRAME_MAX_PAYLOAD) {
+        return -EMSGSIZE;
+    }
+    return wire_link_enqueue(&wire_tx_input_ring, payload, length);
 }
 
 int wire_link_send_keepalive(const uint8_t *payload, size_t length) {

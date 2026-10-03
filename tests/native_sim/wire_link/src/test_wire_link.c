@@ -166,6 +166,25 @@ ZTEST(wire_link, test_event_goes_before_queued_keepalive) {
     zassert_mem_equal(log.payloads[2], keepalive, sizeof(keepalive), "keepalive follows");
 }
 
+ZTEST(wire_link, test_input_frames_go_between_events_and_keepalive) {
+    const uint8_t filler[] = {0x01};
+    const uint8_t keepalive[] = {0xA1, 0xA2, 0xA3};
+    const uint8_t input[] = {0xF1, 0xF2, 0xF3};
+    const uint8_t event[] = {0xB1, 0xB2, 0xB3};
+    zassert_ok(wire_link_send_event(filler, sizeof(filler)));
+    k_sleep(K_MSEC(1));
+    zassert_ok(wire_link_send_keepalive(keepalive, sizeof(keepalive)));
+    zassert_ok(wire_link_send_input(input, sizeof(input)));
+    zassert_ok(wire_link_send_event(event, sizeof(event)));
+    uint8_t wire[CAPTURE_BYTES];
+    struct frame_log log = {0};
+    decode(wire, pump_tx(wire, sizeof(wire)), &log);
+    zassert_equal(log.count, 4, "all frames decode whole");
+    zassert_mem_equal(log.payloads[1], event, sizeof(event), "event first");
+    zassert_mem_equal(log.payloads[2], input, sizeof(input), "input second");
+    zassert_mem_equal(log.payloads[3], keepalive, sizeof(keepalive), "keepalive last");
+}
+
 ZTEST(wire_link, test_rx_back_to_back_frames_keep_order) {
     const uint8_t first[] = {0xD1, 0xD2};
     const uint8_t second[] = {0xE1, 0x00, 0xE3};
