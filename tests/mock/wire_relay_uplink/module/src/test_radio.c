@@ -1,0 +1,247 @@
+// Copyright 2026 Roman Kuzmitskii (@damex)
+// SPDX-License-Identifier: MIT
+
+/*
+ * Test radio standing in for NCS ESB on a wire relay half.
+ * Exits 0 once own events leave on own pipe and wire peer frames on the peer pipe, each in order.
+ * Exits 1 on a wrong packet or at deadline.
+ */
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/serial/uart_emul.h>
+#include <zephyr/init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
+
+#include <zmk/split/transport/types.h>
+
+#include <esb.h>
+
+#include "esb_link.h"
+#include "esb_link_internal.h"
+#include "esb_wire.h"
+#include "hop.h"
+#include "wire_frame.h"
+
+LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+
+#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
+#define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
+#define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)
+#define WIRE_INJECT_DELAY_MS 50
+#define VERDICT_DEADLINE_MS 1000
+#define OWN_POSITION 0
+#define PEER_POSITION 5
+
+static const struct zmk_split_transport_peripheral_event own_events[] = {
+    {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
+        .data.key_position_event = {.position = OWN_POSITION, .pressed = true},
+    },
+    {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
+        .data.key_position_event = {.position = OWN_POSITION, .pressed = false},
+    },
+};
+
+static const struct zmk_split_transport_peripheral_event peer_events[] = {
+    {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
+        .data.key_position_event = {.position = PEER_POSITION, .pressed = true},
+    },
+    {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT,
+        .data.key_position_event = {.position = PEER_POSITION, .pressed = false},
+    },
+};
+
+struct pipe_stream {
+    uint8_t pipe;
+    const struct zmk_split_transport_peripheral_event *events;
+    size_t count;
+    size_t next;
+};
+
+static struct pipe_stream streams[] = {
+    {.pipe = SELF_PIPE, .events = own_events, .count = ARRAY_SIZE(own_events)},
+    {.pipe = PEER_PIPE, .events = peer_events, .count = ARRAY_SIZE(peer_events)},
+};
+
+static void print_bytes(const uint8_t *data, size_t length) {
+    for (size_t index = 0; index < length; index++) {
+        printk(" %02x", data[index]);
+    }
+    printk("\n");
+}
+
+static struct pipe_stream *stream_for_pipe(uint8_t pipe) {
+    for (size_t index = 0; index < ARRAY_SIZE(streams); index++) {
+        if (streams[index].pipe == pipe) {
+            return &streams[index];
+        }
+    }
+    return NULL;
+}
+
+static bool streams_complete(void) {
+    for (size_t index = 0; index < ARRAY_SIZE(streams); index++) {
+        if (streams[index].next < streams[index].count) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void check_payload(const struct esb_payload *payload) {
+    struct pipe_stream *stream = stream_for_pipe(payload->pipe);
+    if (stream == NULL) {
+        printk("FAIL: packet on unexpected pipe %u\n", payload->pipe);
+        exit(1);
+    }
+    if (stream->next == stream->count) {
+        printk("FAIL: extra packet on pipe %u\n", payload->pipe);
+        exit(1);
+    }
+    uint8_t expected[ESB_WIRE_MAX_EVENT_SIZE];
+    size_t expected_length =
+        esb_wire_encode_event(expected, sizeof(expected), &stream->events[stream->next]);
+    if (payload->length != expected_length || memcmp(payload->data, expected, expected_length) != 0) {
+        printk("FAIL: pipe %u step %u of %u, expected", payload->pipe,
+               (unsigned int)(stream->next + 1), (unsigned int)stream->count);
+        print_bytes(expected, expected_length);
+        printk("FAIL: got");
+        print_bytes(payload->data, payload->length);
+        exit(1);
+    }
+    if (payload->noack) {
+        printk("FAIL: pipe %u step %u sent without ack\n", payload->pipe,
+               (unsigned int)(stream->next + 1));
+        exit(1);
+    }
+    stream->next++;
+    if (streams_complete()) {
+        printk("PASS: own events on pipe %u, wire peer frames on pipe %u, each in order\n",
+               SELF_PIPE, PEER_PIPE);
+        exit(0);
+    }
+}
+
+int esb_write_payload(const struct esb_payload *payload) {
+    check_payload(payload);
+    return 0;
+}
+
+bool esb_is_idle(void) {
+    return true;
+}
+
+int esb_flush_tx(void) {
+    return 0;
+}
+
+int esb_set_tx_power(int8_t tx_output_power) {
+    ARG_UNUSED(tx_output_power);
+    return 0;
+}
+
+int esb_set_retransmit_delay(uint16_t delay) {
+    ARG_UNUSED(delay);
+    return 0;
+}
+
+int esb_set_retransmit_count(uint16_t count) {
+    ARG_UNUSED(count);
+    return 0;
+}
+
+int esb_link_init(esb_link_rx_callback_t callback) {
+    ARG_UNUSED(callback);
+    return 0;
+}
+
+int esb_link_set_enabled(bool enabled) {
+    ARG_UNUSED(enabled);
+    return 0;
+}
+
+int esb_link_hfclk_acquire(void) {
+    return 0;
+}
+
+void esb_link_hfclk_release(void) {
+}
+
+void esb_link_mark_tx_event(void) {
+}
+
+uint32_t esb_link_tx_last_event_ms(void) {
+    return 0;
+}
+
+void hop_restore(void) {
+}
+
+uint8_t hop_link_cost_x10(void) {
+    return 0;
+}
+
+bool hop_ack_probe_due(void) {
+    return false;
+}
+
+void hop_note_data_sent(bool acked) {
+    ARG_UNUSED(acked);
+}
+
+static size_t append_wire_frame(const struct zmk_split_transport_peripheral_event *event,
+                                uint8_t *out, size_t out_size) {
+    uint8_t payload[ESB_WIRE_MAX_EVENT_SIZE];
+    size_t payload_length = esb_wire_encode_event(payload, sizeof(payload), event);
+    int frame_length = wire_frame_encode(payload, payload_length, out, out_size);
+    if (frame_length < 0) {
+        printk("FAIL: wire frame encode returned %d\n", frame_length);
+        exit(1);
+    }
+    return (size_t)frame_length;
+}
+
+static void wire_inject_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    uint8_t frames[ARRAY_SIZE(peer_events) * WIRE_FRAME_MAX_ENCODED];
+    size_t length = 0;
+    for (size_t index = 0; index < ARRAY_SIZE(peer_events); index++) {
+        length += append_wire_frame(&peer_events[index], &frames[length], sizeof(frames) - length);
+    }
+    uint32_t accepted = uart_emul_put_rx_data(WIRE_UART, frames, length);
+    if (accepted != length) {
+        printk("FAIL: wire rx took %u of %u bytes\n", (unsigned int)accepted,
+               (unsigned int)length);
+        exit(1);
+    }
+}
+static K_WORK_DELAYABLE_DEFINE(wire_inject_work, wire_inject_fn);
+
+static void verdict_deadline_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    for (size_t index = 0; index < ARRAY_SIZE(streams); index++) {
+        printk("FAIL: pipe %u stopped at step %u of %u\n", streams[index].pipe,
+               (unsigned int)(streams[index].next + 1), (unsigned int)streams[index].count);
+    }
+    exit(1);
+}
+static K_WORK_DELAYABLE_DEFINE(verdict_deadline_work, verdict_deadline_fn);
+
+static int test_radio_init(void) {
+    k_work_reschedule(&wire_inject_work, K_MSEC(WIRE_INJECT_DELAY_MS));
+    k_work_reschedule(&verdict_deadline_work, K_MSEC(VERDICT_DEADLINE_MS));
+    return 0;
+}
+SYS_INIT(test_radio_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
