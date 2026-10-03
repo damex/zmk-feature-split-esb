@@ -19,7 +19,8 @@ int wire_link_register_rx(struct wire_link_subscription *subscription);
 
 /* One producer each.
  * send_input: input thread.
- * send_event and send_keepalive: system workqueue. */
+ * send_keepalive: system workqueue.
+ * send_event: system workqueue, ESB RX thread on a wire relay. */
 int wire_link_send_event(const uint8_t *payload, size_t length);
 int wire_link_send_input(const uint8_t *payload, size_t length);
 int wire_link_send_keepalive(const uint8_t *payload, size_t length);

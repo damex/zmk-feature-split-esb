@@ -1,8 +1,11 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* Wire relay, wire peer frames onto the peer's ESB pipe. */
+/* Wire relay between the wire peer and its ESB pipe. */
 
+#include "wire_relay.h"
+
+#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 
@@ -10,6 +13,19 @@
 #include "wire_link.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+
+static const uint8_t peer_pipe = DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe);
+
+bool wire_relay_owns_pipe(uint8_t pipe) {
+    return pipe == peer_pipe;
+}
+
+void wire_relay_forward_to_peer(const uint8_t *data, size_t length) {
+    int error = wire_link_send_event(data, length);
+    if (error != 0) {
+        LOG_WRN("wire relay to peer failed (%d)", error);
+    }
+}
 
 static void wire_relay_on_frame(const uint8_t *payload, size_t length, void *user_data) {
     ARG_UNUSED(user_data);

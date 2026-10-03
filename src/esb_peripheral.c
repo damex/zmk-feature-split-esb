@@ -22,6 +22,7 @@
 #include "esb_link.h"
 #include "esb_wire.h"
 #include "hop.h"
+#include "wire_relay.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -116,7 +117,10 @@ ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(esb_peripheral, &esb_peripheral_api,
 #define SELF_IS_RELAY DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay)
 
 static void esb_peripheral_on_rx(uint8_t pipe, const uint8_t *data, size_t length) {
-    ARG_UNUSED(pipe);
+    if (wire_relay_owns_pipe(pipe)) {
+        wire_relay_forward_to_peer(data, length);
+        return;
+    }
     if (SELF_IS_RELAY) {
         esb_hid_relay_deliver(data, length);
     } else {
