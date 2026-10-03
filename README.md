@@ -19,7 +19,7 @@ workspace lacks (`zmk` and Zephyr come from your own manifest):
   projects:
     - name: zmk-feature-split-esb
       remote: damex
-      revision: v0.6.1
+      revision: v0.6.7
       import: true
 ```
 Then `west update`. Module's `modules/modules.cmake` applies sdk-nrf Kconfig
@@ -41,13 +41,10 @@ CONFIG_ESB_MAX_PAYLOAD_LENGTH=48
 ```
 Central also sets `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`. Peripheral leaves it unset.
 
-Set `CONFIG_ESB_MAX_PAYLOAD_LENGTH` to at least `ZMK_SPLIT_ESB_MAX_PAYLOAD` (48).
-Raise `CONFIG_ESB_TX_FIFO_SIZE` to 16 on a peripheral with bursty senders (a
-chattery encoder): the default 8 drops events at the source under a burst.
-Both are NCS symbols, their defaults win over module Kconfig on parse order.
-Module defaults it, but sdk-nrf default (32) can win on Kconfig parse order, so set
-it explicitly on every device. Build assert catches value too small for largest
-split message.
+Set `CONFIG_ESB_MAX_PAYLOAD_LENGTH` to at least `ZMK_SPLIT_ESB_MAX_PAYLOAD` (48)
+on every device. sdk-nrf default is 32, build assert catches it.
+Raise `CONFIG_ESB_TX_FIFO_SIZE` to 16 on a peripheral with bursty senders
+(chattery encoder). sdk-nrf default 8 drops events at source under a burst.
 
 DT side: shared dtsi every device includes, plus role-specific lines. Everything
 reports to the dongle (central). Two examples, by peripheral count and what each
@@ -294,10 +291,9 @@ List two or more channels in `hop-channels` and the link hops between them, step
 off a channel that degrades. The central drives the hop: it counts a served
 peripheral's window bad when motion goes missing or arrives weaker than
 `rssi-floor-dbm`, and a weighted vote across peripherals (`hop-threshold`) moves the
-whole link to the next channel. A peripheral that loses the central sweeps the list
-to re-find it, sweeping faster the more its acked transmits retried. One channel is a
-fixed link, no hopping. Every peripheral must carry the central's list, so flash them
-as a set.
+whole link to the next channel. A peripheral that loses the central sweeps the full
+list to re-find it, then camps the anchors. One channel is a fixed link, no hopping.
+Every peripheral must carry the central's list, so flash them as a set.
 
 A few channels (the anchors) are held unmaskable, the rendezvous set both ends meet on
 when the link is lost. Omit `hop-anchors` and the engine spreads three of them evenly
