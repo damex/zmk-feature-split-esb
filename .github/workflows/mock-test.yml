@@ -22,7 +22,7 @@ jobs:
           path: zmk
       - run: pip install west
       - run: west init -l zmk/app
-      - run: west update zephyr
+      - run: west update zephyr lvgl
         working-directory: zmk
       - run: pip install -r zmk/zephyr/scripts/requirements-base.txt
       - run: make mock-test ZMK_APP=${{ github.workspace }}/zmk/app
