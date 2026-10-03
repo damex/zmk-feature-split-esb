@@ -1,0 +1,20 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+
+config ZMK_SPLIT_ESB_PRIORITY
+    int
+    default 50
+
+config ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS
+    int
+    default 60000
+
+config ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS
+    int
+    default 500
+
+module = ZMK_SPLIT_ESB
+module-str = ZMK ESB split transport
+source "subsys/logging/Kconfig.template.log_config"
+
+source "Kconfig.zephyr"

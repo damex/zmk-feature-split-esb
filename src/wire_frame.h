@@ -9,6 +9,7 @@
 
 #include "cobs.h"
 
+#define WIRE_FRAME_DELIMITER          0x00
 #define WIRE_FRAME_MAX_PAYLOAD        128
 #define WIRE_FRAME_CRC_BYTES          1
 #define WIRE_FRAME_MAX_ENCODED        COBS_MAX_ENCODED(WIRE_FRAME_MAX_PAYLOAD + \

@@ -1,0 +1,13 @@
+/ {
+    chosen {
+        zmk,esb-wire = &wire_uart;
+    };
+
+    wire_uart: wire_uart {
+        compatible = "zephyr,uart-emul";
+        status = "okay";
+        current-speed = <460800>;
+        tx-fifo-size = <4>;
+        rx-fifo-size = <256>;
+    };
+};

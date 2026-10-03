@@ -82,6 +82,25 @@ static void wire_rx_thread_entry(void *unused_a, void *unused_b, void *unused_c)
     }
 }
 
+/* ISR-only. Switching rings mid-frame splices two frames on the wire. */
+static struct ring_buf *wire_tx_frame_ring;
+
+static struct ring_buf *wire_tx_pick_ring(void) {
+    if (wire_tx_frame_ring != NULL) {
+        return wire_tx_frame_ring;
+    }
+    if (!ring_buf_is_empty(&wire_tx_event_ring)) {
+        return &wire_tx_event_ring;
+    }
+    return &wire_tx_keepalive_ring;
+}
+
+static void wire_tx_track_frame(struct ring_buf *ring, const uint8_t *chunk, int sent) {
+    for (int index = 0; index < sent; index++) {
+        wire_tx_frame_ring = (chunk[index] == WIRE_FRAME_DELIMITER) ? NULL : ring;
+    }
+}
+
 static void wire_uart_isr(const struct device *uart_device, void *user_data) {
     ARG_UNUSED(user_data);
     if (uart_irq_update(uart_device) <= 0) {
@@ -104,10 +123,7 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
         atomic_set(&wire_peer_last_rx_uptime, (atomic_val_t)k_uptime_get_32());
     }
     while (uart_irq_tx_ready(uart_device) > 0) {
-        struct ring_buf *active = &wire_tx_event_ring;
-        if (ring_buf_is_empty(active)) {
-            active = &wire_tx_keepalive_ring;
-        }
+        struct ring_buf *active = wire_tx_pick_ring();
         uint8_t *chunk = NULL;
         const uint32_t claim = ring_buf_get_claim(active, &chunk, WIRE_LINK_CHUNK_BYTES);
         if (claim == 0) {
@@ -115,6 +131,7 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
             break;
         }
         const int sent = uart_fifo_fill(uart_device, chunk, (int)claim);
+        wire_tx_track_frame(active, chunk, sent);
         ring_buf_get_finish(active, (uint32_t)(sent < 0 ? 0 : sent));
         if (sent < (int)claim) {
             break;
@@ -134,10 +151,10 @@ static int wire_link_enqueue(struct ring_buf *ring, const uint8_t *payload, size
     if (encoded < 0) {
         return encoded;
     }
-    const uint32_t written = ring_buf_put(ring, framed, (uint32_t)encoded);
-    if (written < (uint32_t)encoded) {
+    if (ring_buf_space_get(ring) < (uint32_t)encoded) {
         return -ENOBUFS;
     }
+    (void)ring_buf_put(ring, framed, (uint32_t)encoded);
     uart_irq_tx_enable(wire_uart_device);
     return 0;
 }

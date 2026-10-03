@@ -36,7 +36,7 @@ void wire_frame_parser_ingest(struct wire_frame_parser *parser,
                               wire_frame_ingest_callback_t callback, void *user_data) {
     for (size_t index = 0; index < length; index++) {
         const uint8_t byte = bytes[index];
-        if (byte == 0x00) {
+        if (byte == WIRE_FRAME_DELIMITER) {
             if (!parser->discarding && parser->accumulator_length > 0) {
                 deliver_frame(parser, callback, user_data);
             }
