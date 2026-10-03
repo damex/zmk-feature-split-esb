@@ -346,7 +346,15 @@ ZTEST(hop_policy, test_ewma_update) {
     for (uint8_t window = 0; window < 32; window++) {
         ewma = hop_policy_ewma_update(ewma, 8);
     }
-    zassert_within(ewma, 80, 3, "converges to the sample");
+    zassert_equal(ewma, 80, "converges to the sample");
+}
+
+ZTEST(hop_policy, test_ewma_recovers_to_clean) {
+    uint16_t ewma = 40;
+    for (uint8_t window = 0; window < 32; window++) {
+        ewma = hop_policy_ewma_update(ewma, 1);
+    }
+    zassert_equal(ewma, 10, "clean link returns to first-try cost");
 }
 
 ZTEST(hop_policy, test_adaptive_retransmits) {

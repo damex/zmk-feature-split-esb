@@ -45,7 +45,11 @@ uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts) {
 
 uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample) {
     int32_t sample_x10 = (int32_t)sample * 10;
-    int32_t delta = (sample_x10 - (int32_t)ewma_x10) / (1 << HOP_POLICY_ATTEMPTS_EWMA_SHIFT);
+    int32_t difference = sample_x10 - (int32_t)ewma_x10;
+    int32_t delta = difference / (1 << HOP_POLICY_ATTEMPTS_EWMA_SHIFT);
+    if (delta == 0 && difference != 0) {
+        delta = (difference > 0) ? 1 : -1;
+    }
     return (uint16_t)((int32_t)ewma_x10 + delta);
 }
 
