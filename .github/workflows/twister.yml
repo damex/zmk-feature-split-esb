@@ -1,0 +1,34 @@
+---
+name: twister
+"on":
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+
+jobs:
+  twister:
+    runs-on: ubuntu-24.04
+    env:
+      ZEPHYR_BASE: ${{ github.workspace }}/zephyr
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: zmk-feature-split-esb
+      - uses: actions/checkout@v4
+        with:
+          repository: zmkfirmware/zephyr
+          ref: 10ba6d0cb38bc3d258775d27982f707599320085
+          path: zephyr
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            zephyr/scripts/requirements-base.txt
+            zephyr/scripts/requirements-build-test.txt
+            zephyr/scripts/requirements-run-test.txt
+      - run: pip install -r zephyr/scripts/requirements-base.txt -r zephyr/scripts/requirements-build-test.txt -r zephyr/scripts/requirements-run-test.txt
+      - run: make ${{ inputs.target }}
+        working-directory: zmk-feature-split-esb

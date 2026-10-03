@@ -1,12 +1,12 @@
 ---
-name: unit test
+name: native sim test
 "on":
   - push
   - pull_request
   - workflow_dispatch
 
 jobs:
-  unit-test:
+  native-sim-test:
     uses: ./.github/workflows/twister.yml
     with:
-      target: unit-test
+      target: native-sim-test
