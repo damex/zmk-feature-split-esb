@@ -5,6 +5,9 @@ PYTHON ?= python3
 ZEPHYR_BASE ?= $(error ZEPHYR_BASE is not set)
 ZEPHYR_TOOLCHAIN_VARIANT ?= host
 
-.PHONY: unit-test
+.PHONY: unit-test native-sim-test
 unit-test:
 	ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) $(PYTHON) $(ZEPHYR_BASE)/scripts/twister --testsuite-root tests/unit --platform unit_testing --inline-logs --clobber-output
+
+native-sim-test:
+	ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) $(PYTHON) $(ZEPHYR_BASE)/scripts/twister --testsuite-root tests --platform native_sim/native/64 --inline-logs --clobber-output --outdir twister-out-native-sim
