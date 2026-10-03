@@ -65,3 +65,5 @@ rules:
 
 yaml-files:
   - "*.yml"
+
+ignore-from-file: .gitignore
