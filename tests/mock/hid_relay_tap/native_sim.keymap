@@ -24,7 +24,22 @@
                 &mt LSHFT A &kp C_VOL_UP
                 &none &none
             >;
+            sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
         };
+    };
+
+    mock_encoder: mock_encoder {
+        compatible = "zmk,sensor-encoder-mock";
+        status = "okay";
+        event-startup-delay = <100>;
+        event-period = <10>;
+        events = <18 18 18 18 18>;
+    };
+
+    sensors: sensors {
+        compatible = "zmk,keymap-sensors";
+        sensors = <&mock_encoder>;
+        triggers-per-rotation = <20>;
     };
 };
 

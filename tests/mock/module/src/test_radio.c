@@ -3,8 +3,7 @@
 
 /*
  * Test radio standing in for NCS ESB on the central.
- * Exits 0 once keyboard and consumer reports each reach the relay pressed then empty.
- * Exits 1 at deadline.
+ * Exits 0 once the expected keyboard and consumer taps reach the relay, 1 at deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
@@ -35,12 +34,19 @@ LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
 
-static const uint8_t tracked_report_ids[] = {
-    ZMK_HID_REPORT_ID_KEYBOARD,
-    ZMK_HID_REPORT_ID_CONSUMER,
+struct tracked_report {
+    uint8_t report_id;
+    uint32_t expected_taps;
 };
-static bool report_pressed[ARRAY_SIZE(tracked_report_ids)];
-static bool report_released[ARRAY_SIZE(tracked_report_ids)];
+
+static const struct tracked_report tracked_reports[] = {
+    {.report_id = ZMK_HID_REPORT_ID_KEYBOARD,
+     .expected_taps = CONFIG_ZMK_SPLIT_ESB_TEST_KEYBOARD_TAPS},
+    {.report_id = ZMK_HID_REPORT_ID_CONSUMER,
+     .expected_taps = CONFIG_ZMK_SPLIT_ESB_TEST_CONSUMER_TAPS},
+};
+static bool report_pressed[ARRAY_SIZE(tracked_reports)];
+static uint32_t report_taps[ARRAY_SIZE(tracked_reports)];
 static const uint8_t zero_bytes[CONFIG_ESB_MAX_PAYLOAD_LENGTH];
 
 static bool report_is_empty(const struct esb_payload *payload) {
@@ -48,9 +54,9 @@ static bool report_is_empty(const struct esb_payload *payload) {
     return memcmp(&payload->data[REPORT_BODY_OFFSET], zero_bytes, body_length) == 0;
 }
 
-static bool all_reports_released(void) {
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_report_ids); index++) {
-        if (!report_released[index]) {
+static bool all_taps_delivered(void) {
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
+        if (report_taps[index] < tracked_reports[index].expected_taps) {
             return false;
         }
     }
@@ -61,18 +67,19 @@ int esb_write_payload(const struct esb_payload *payload) {
     if (payload->length <= REPORT_BODY_OFFSET || payload->length > CONFIG_ESB_MAX_PAYLOAD_LENGTH) {
         return -EMSGSIZE;
     }
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_report_ids); index++) {
-        if (payload->data[REPORT_ID_OFFSET] != tracked_report_ids[index]) {
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
+        if (payload->data[REPORT_ID_OFFSET] != tracked_reports[index].report_id) {
             continue;
         }
         if (!report_is_empty(payload)) {
             report_pressed[index] = true;
         } else if (report_pressed[index]) {
-            report_released[index] = true;
+            report_pressed[index] = false;
+            report_taps[index]++;
         }
     }
-    if (all_reports_released()) {
-        printk("PASS: relay delivered keyboard and consumer taps\n");
+    if (all_taps_delivered()) {
+        printk("PASS: relay delivered every keyboard and consumer tap\n");
         exit(0);
     }
     return 0;
@@ -93,10 +100,11 @@ static void relay_poll_fn(struct k_work *work) {
 
 static void verdict_deadline_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    for (size_t index = 0; index < ARRAY_SIZE(tracked_report_ids); index++) {
-        if (!report_released[index]) {
-            printk("FAIL: relay never delivered report 0x%02x pressed then empty\n",
-                   tracked_report_ids[index]);
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_reports); index++) {
+        if (report_taps[index] < tracked_reports[index].expected_taps) {
+            printk("FAIL: relay delivered %u of %u taps on report 0x%02x\n",
+                   report_taps[index], tracked_reports[index].expected_taps,
+                   tracked_reports[index].report_id);
         }
     }
     exit(1);
