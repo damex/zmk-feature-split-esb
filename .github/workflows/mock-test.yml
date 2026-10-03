@@ -1,0 +1,28 @@
+---
+name: mock test
+"on":
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  mock-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: zmk-feature-split-esb
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/checkout@v4
+        with:
+          repository: zmkfirmware/zmk
+          ref: 753d8b467125fe860eec05ee71cb7ebefa08fba6
+          path: zmk
+      - run: pip install west
+      - run: west init -l zmk/app
+      - run: west update zephyr
+      - run: pip install -r zephyr/scripts/requirements-base.txt
+      - run: make mock-test ZMK_APP=${{ github.workspace }}/zmk/app
+        working-directory: zmk-feature-split-esb
