@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,6 +20,7 @@ typedef void (*wire_frame_ingest_callback_t)(const uint8_t *payload, size_t leng
 struct wire_frame_parser {
     uint8_t accumulator[WIRE_FRAME_MAX_ENCODED];
     size_t accumulator_length;
+    bool discarding;
 };
 
 void wire_frame_parser_ingest(struct wire_frame_parser *parser,
