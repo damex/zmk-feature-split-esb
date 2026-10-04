@@ -11,14 +11,14 @@
 
 #if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_PEER)
 bool wire_central_owns_pipe(uint8_t pipe);
-int wire_central_send_command(const uint8_t *data, size_t length);
+int wire_central_send(const uint8_t *data, size_t length);
 bool wire_central_peer_is_up(void);
 #else
 static inline bool wire_central_owns_pipe(uint8_t pipe) {
     (void)pipe;
     return false;
 }
-static inline int wire_central_send_command(const uint8_t *data, size_t length) {
+static inline int wire_central_send(const uint8_t *data, size_t length) {
     (void)data;
     (void)length;
     return -ENOSYS;

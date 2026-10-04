@@ -26,6 +26,7 @@
 #include "hop_internal.h"
 #include "hop_policy.h"
 #include "peripheral.h"
+#include "wire_relay.h"
 
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
@@ -278,7 +279,6 @@ void hop_stop(void) {
 }
 
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi) {
-    ARG_UNUSED(pipe);
     ARG_UNUSED(rssi);
     /* Fixed link beacons HID state too. */
     if (esb_is_beacon(data, length)) {
@@ -290,7 +290,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
             atomic_set(&peer_table[peer], peer_pack(beacon->peers[peer].battery,
                                                     beacon->peers[peer].rssi_dbm));
         }
-        return true;
+        return !wire_relay_owns_pipe(pipe);
     }
     if (HOP_COUNT <= 1) {
         return false;

@@ -222,6 +222,9 @@ int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators
         beacon.peers[peer].battery = esb_central_battery_level(peer);
         beacon.peers[peer].rssi_dbm = pipe_rssi_dbm_get(peer);
     }
+    if (wire_central_owns_pipe(pipe)) {
+        return wire_central_send((const uint8_t *)&beacon, sizeof(beacon));
+    }
     return esb_link_latch_control(pipe, ESB_LINK_CONTROL_BEACON, (const uint8_t *)&beacon,
                                   sizeof(beacon));
 }
@@ -290,6 +293,13 @@ static void escape_silent_channel(void) {
     hop_to_next_epoch();
 }
 
+static bool pipe_heard_in_window(uint8_t pipe, uint32_t heard) {
+    if (wire_central_owns_pipe(pipe)) {
+        return wire_central_peer_is_up();
+    }
+    return (heard & BIT(pipe)) != 0;
+}
+
 static void stage_beacon(uint32_t heard) {
     bool burst = hop_policy_should_beacon(hop_epoch, &beaconed_epoch, &beacon_repeats_left,
                                           BEACON_REPEAT_WINDOWS);
@@ -298,10 +308,10 @@ static void stage_beacon(uint32_t heard) {
         return;
     }
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {
-        if (esb_link_pipe_is_self(pipe) || wire_central_owns_pipe(pipe)) {
+        if (esb_link_pipe_is_self(pipe)) {
             continue;
         }
-        if (!burst && !(heard & BIT(pipe))) {
+        if (!burst && !pipe_heard_in_window(pipe, heard)) {
             continue;
         }
         stage_beacon_to(pipe);

@@ -282,6 +282,7 @@ num, scroll), for display widgets. Central beacon carries them.
 A change stages a beacon at once.
 A periodic refresh repeats it, so a rejoining half catches up by itself.
 Fixed-channel links beacon too.
+Wire halves get the same beacon over the wire, via a relay half or the central.
 Indicators need `CONFIG_ZMK_HID_INDICATORS` on the central.
 
 ## Channel hopping

@@ -25,7 +25,7 @@ bool wire_central_owns_pipe(uint8_t pipe) {
     return pipe == peer_pipe;
 }
 
-int wire_central_send_command(const uint8_t *data, size_t length) {
+int wire_central_send(const uint8_t *data, size_t length) {
     return wire_link_send_event(data, length);
 }
 

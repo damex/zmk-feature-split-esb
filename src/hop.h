@@ -26,7 +26,7 @@ void hop_stop(void);
  * rssi is the ESB sample magnitude (dBm is its negative).
  * Returns true for control packets the caller must not queue.
  * Central: always false, keepalives queue up for position reconcile.
- * Peripheral: epoch beacon. */
+ * Peripheral: beacon and mask update, except a beacon on a wire relay's peer pipe. */
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi);
 
 /* Central: no-op.

@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-wire-relay-hid-state
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..

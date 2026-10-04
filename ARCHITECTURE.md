@@ -173,6 +173,8 @@ initialized.
 |                                     v                                        |
 |                         [control latch pipe N]  esb_link_central.c           |
 |                         latest value wins                                    |
+|                                                                              |
+|   wire peer pipe: command and beacon go to wire_central_send instead         |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | RADIO ISR                                                                    |
 |                                                                              |
@@ -268,14 +270,14 @@ initialized.
 +------------------------------------------------------------------------------+
 ```
 
-## Wire downlink: central command to wire peer
+## Wire downlink: central command and HID state to wire peer
 
 ```
 +-- relay half ----------------------------------------------------------------+
 | RADIO ISR                                                                    |
 |                                                                              |
 |   [ACK payload on wire peer's pipe] --> [hop_consume_rx]                     |
-|   beacon and mask update stop here, command goes on                          |
+|   mask update stops here, beacon applies locally and goes on with command    |
 |       |                                                                      |
 |       v                                                                      |
 |   [SPSC ring]                                                                |
@@ -309,6 +311,9 @@ initialized.
 |       v                                                                      |
 |   [wire_on_frame] --> [wire_peripheral_on_frame]  wire_peripheral.c          |
 |       |                                                                      |
+|       |--beacon--> [peripheral_hid_state_store]   peripheral.c               |
+|       |                                                                      |
+|       |command                                                               |
 |       v                                                                      |
 |   [peripheral_deliver_command] --> [command msgq] peripheral.c               |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|

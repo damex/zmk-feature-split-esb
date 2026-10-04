@@ -54,7 +54,7 @@ static enum zmk_split_transport_connections_status central_connections_status(vo
 static int central_send_command(uint8_t source,
                                 struct zmk_split_transport_central_command command) {
     if (wire_central_owns_pipe(source)) {
-        return wire_central_send_command((const uint8_t *)&command, sizeof(command));
+        return wire_central_send((const uint8_t *)&command, sizeof(command));
     }
     return esb_link_stage_reply(source, (const uint8_t *)&command, sizeof(command));
 }

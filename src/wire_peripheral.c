@@ -6,6 +6,8 @@
 
 #include "peripheral.h"
 
+#include <string.h>
+
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
@@ -16,6 +18,7 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_wire.h"
+#include "hop_internal.h"
 #include "wire_link.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -77,6 +80,12 @@ ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(wire_peripheral, &wire_peripheral_api,
 
 static void wire_peripheral_on_frame(const uint8_t *payload, size_t length, void *user_data) {
     ARG_UNUSED(user_data);
+    if (esb_is_beacon(payload, (uint8_t)length)) {
+        struct esb_beacon beacon;
+        memcpy(&beacon, payload, sizeof(beacon));
+        peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
+        return;
+    }
     peripheral_deliver_command(payload, length);
 }
 
