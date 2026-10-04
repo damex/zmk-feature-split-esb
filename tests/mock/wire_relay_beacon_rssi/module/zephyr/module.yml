@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-wire-relay-beacon-rssi
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..

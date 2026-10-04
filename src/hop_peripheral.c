@@ -31,6 +31,10 @@ static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
              "hop-threshold above 255 never fires, sweep streak saturates at UINT8_MAX");
 
+static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
+BUILD_ASSERT(DT_PROP(DT_CHOSEN(zmk_esb_self), pipe) < ESB_BEACON_PEER_COUNT,
+             "self pipe outside beacon peer table");
+
 #define ADAPTIVE_RETRANSMITS_MIN 2
 #define RETRANSMIT_CEILING_MAX DT_INST_PROP(0, retransmit_count)
 BUILD_ASSERT(RETRANSMIT_CEILING_MAX <= UINT8_MAX, "retransmit-count above 255");
@@ -274,14 +278,13 @@ void hop_stop(void) {
 }
 
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi) {
+    ARG_UNUSED(pipe);
     ARG_UNUSED(rssi);
     /* Fixed link beacons HID state too. */
     if (esb_is_beacon(data, length)) {
         const struct esb_beacon *beacon = (const struct esb_beacon *)data;
         atomic_set(&beacon_epoch, beacon->epoch); /* adopted in keepalive_work, not queued */
-        if (pipe < ESB_BEACON_PEER_COUNT) {
-            atomic_set(&uplink_rssi_dbm, beacon->peers[pipe].rssi_dbm);
-        }
+        atomic_set(&uplink_rssi_dbm, beacon->peers[self_pipe].rssi_dbm);
         peripheral_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
         for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
             atomic_set(&peer_table[peer], peer_pack(beacon->peers[peer].battery,
