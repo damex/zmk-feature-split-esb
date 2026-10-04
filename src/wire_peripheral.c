@@ -13,7 +13,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include <zmk/activity.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
@@ -106,10 +105,8 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
         k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(idle_keepalive_ms - idle_ms));
         return;
     }
-    const bool active = zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE;
-    const uint8_t state = esb_keepalive_peripheral_state(active, !wire_link_is_up());
-    uint8_t length = peripheral_keepalive_fill(wire_keepalive_buffer,
-                                               sizeof(wire_keepalive_buffer), state, 0);
+    uint8_t length = peripheral_keepalive_fill(wire_keepalive_buffer, sizeof(wire_keepalive_buffer),
+                                               ESB_KEEPALIVE_IDLE, 0);
     if (length > 0) {
         int result = wire_link_send_keepalive(wire_keepalive_buffer, length);
         if (result == 0) {

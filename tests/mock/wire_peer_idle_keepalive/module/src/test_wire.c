@@ -3,8 +3,8 @@
 
 /*
  * Test tap on an idle wire peer's UART.
- * Exits 0 once idle keepalives hold the ESB idle-keepalive-ms cadence.
- * Exits 1 on a longer gap or at deadline.
+ * Exits 0 once idle keepalives hold the ESB idle-keepalive-ms cadence and report idle.
+ * Exits 1 on a longer gap, a non-idle state or at deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
@@ -44,6 +44,12 @@ static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) 
     if (!esb_keepalive_matches(payload, (uint8_t)length)) {
         return;
     }
+    uint8_t state = esb_keepalive_state(payload);
+    if (state != ESB_KEEPALIVE_IDLE) {
+        printk("FAIL: wire peer keepalive reports state 0x%02x, expected idle 0x%02x\n", state,
+               ESB_KEEPALIVE_IDLE);
+        exit(1);
+    }
     uint32_t now_ms = k_uptime_get_32();
     if (keepalive_seen) {
         uint32_t gap_ms = now_ms - last_keepalive_ms;
@@ -54,7 +60,7 @@ static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) 
         }
         gaps_checked++;
         if (gaps_checked == GAPS_CHECKED) {
-            printk("PASS: %u idle keepalive gaps, each within %u ms\n",
+            printk("PASS: %u idle keepalive gaps, each within %u ms, all reporting idle\n",
                    (unsigned int)GAPS_CHECKED, (unsigned int)idle_keepalive_ms);
             exit(0);
         }
