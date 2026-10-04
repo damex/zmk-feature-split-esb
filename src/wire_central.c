@@ -26,6 +26,10 @@ bool wire_central_owns_pipe(uint8_t pipe) {
 }
 
 int wire_central_send(const uint8_t *data, size_t length) {
+    /* ZMK stops a per-source command loop at the first error. */
+    if (!wire_link_can_transmit()) {
+        return 0;
+    }
     return wire_link_send_event(data, length);
 }
 

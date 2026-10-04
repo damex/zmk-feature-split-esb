@@ -1,0 +1,32 @@
+/ {
+    chosen {
+        zmk,esb-self = &right;
+        zmk,esb-wire = &wire_uart;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+        wire-mode = "simplex";
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+
+            right: peripheral_right {
+                pipe = <1>;
+                prefix = <0xC3>;
+            };
+        };
+    };
+
+    wire_uart: wire_uart {
+        compatible = "zephyr,uart-emul";
+        status = "okay";
+        current-speed = <460800>;
+        tx-fifo-size = <256>;
+        rx-fifo-size = <256>;
+    };
+};

@@ -21,6 +21,9 @@ bool wire_relay_owns_pipe(uint8_t pipe) {
 }
 
 void wire_relay_forward_to_peer(const uint8_t *data, size_t length) {
+    if (!wire_link_can_transmit()) {
+        return;
+    }
     int error = wire_link_send_event(data, length);
     if (error != 0) {
         LOG_WRN("wire relay to peer failed (%d)", error);

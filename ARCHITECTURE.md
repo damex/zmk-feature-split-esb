@@ -297,7 +297,7 @@ initialized.
 |                                                                              |
 |   [wire_tx_event_ring] --> [uart_fifo_fill]                                  |
 +---------------|--------------------------------------------------------------+
-                | UART bytes, bidirectional wiring only
+                | UART bytes, full-duplex wiring only, simplex never transmits
 +-- wire peer --|--------------------------------------------------------------+
 | UART ISR      v                                                              |
 |                                                                              |

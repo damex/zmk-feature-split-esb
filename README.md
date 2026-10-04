@@ -182,13 +182,14 @@ Wire half (no radio):
 CONFIG_ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE=y
 ```
 
-Bidirectional (two pins, TX + RX between halves): full-duplex, stock pinctrl on
-both sides. Central commands (behaviors, HID indicators) reach wire half.
+Full duplex (two pins, TX + RX between halves): `wire-mode` default, stock
+pinctrl on both sides. Central commands (behaviors, HID indicators) reach wire
+half.
 
-Unidirectional (single data pin, TRRS with one signal line): wire peer pushes,
-relay listens. Uplink only. Wire side needs pinctrl override so its TX lands on
-the shared pin. `nice_nano` defaults to TX=P0.06 and RX=P0.08. Here we put
-wire on P0.08:
+Simplex (single data pin, TRRS with one signal line): `wire-mode = "simplex"`
+in the shared node. Wire peer only sends, its receiver only listens, nothing
+travels back. Wire side needs pinctrl override so its TX lands on the shared
+pin. `nice_nano` defaults to TX=P0.06 and RX=P0.08. Here we put wire on P0.08:
 ```dts
 &uart0_default {
     group1 { psels = <NRF_PSEL(UART_RX, 0, 6)>; bias-pull-up; };
@@ -219,6 +220,7 @@ wire on P0.08:
 | `crc-bits` | CRC width 0/8/16, all peripherals must match the central (default 16) |
 | `bitrate-kbps` | radio bitrate 1000/2000, all peripherals must match the central (default 2000) |
 | `lossy-codes` | optional list of `<INPUT_EV_* code>` pairs sent without ACK |
+| `wire-mode` | wire link wiring `full-duplex` or `simplex`, both halves must match (default full-duplex) |
 
 Lossy-codes lists the input axes peripherals fire-and-forget. Reserve for
 high-rate, self-correcting axes (pointer motion). Non-input split events

@@ -28,6 +28,7 @@ BUILD_ASSERT(DT_NODE_EXISTS(WIRE_LINK_UART_NODE),
 #define WIRE_LINK_CHUNK_BYTES        64
 #define WIRE_LINK_RX_STACK_SIZE      1024
 #define WIRE_LINK_RX_PRIORITY        4
+#define WIRE_LINK_SIMPLEX DT_ENUM_HAS_VALUE(DT_INST(0, zmk_split_esb), wire_mode, simplex)
 
 static const struct device *const wire_uart_device = DEVICE_DT_GET(WIRE_LINK_UART_NODE);
 
@@ -140,12 +141,29 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
     k_sem_give(&wire_rx_wake);
 }
 
+bool wire_link_can_transmit(void) {
+    if (!WIRE_LINK_SIMPLEX) {
+        return true;
+    }
+    return IS_ENABLED(CONFIG_ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE);
+}
+
+bool wire_link_can_receive(void) {
+    if (!WIRE_LINK_SIMPLEX) {
+        return true;
+    }
+    return !IS_ENABLED(CONFIG_ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE);
+}
+
 int wire_link_register_rx(struct wire_link_subscription *subscription) {
     atomic_ptr_set(&wire_rx_subscription, subscription);
     return 0;
 }
 
 static int wire_link_enqueue(struct ring_buf *ring, const uint8_t *payload, size_t length) {
+    if (!wire_link_can_transmit()) {
+        return -ENOTSUP;
+    }
     uint8_t framed[WIRE_FRAME_MAX_ENCODED];
     const int encoded = wire_frame_encode(payload, length, framed, sizeof(framed));
     if (encoded < 0) {
@@ -206,14 +224,18 @@ static int wire_link_init(void) {
     uart_irq_rx_disable(wire_uart_device);
     uart_irq_tx_disable(wire_uart_device);
     uart_irq_callback_set(wire_uart_device, wire_uart_isr);
-    uart_irq_rx_enable(wire_uart_device);
+    if (wire_link_can_receive()) {
+        uart_irq_rx_enable(wire_uart_device);
+    }
     k_thread_create(&wire_rx_thread_data, wire_rx_stack,
                     K_THREAD_STACK_SIZEOF(wire_rx_stack),
                     wire_rx_thread_entry, NULL, NULL, NULL,
                     WIRE_LINK_RX_PRIORITY, 0, K_NO_WAIT);
     k_thread_name_set(&wire_rx_thread_data, "wire_link_rx");
     k_work_init_delayable(&wire_keepalive_work, wire_keepalive_fire);
-    k_work_reschedule(&wire_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS));
+    if (wire_link_can_transmit()) {
+        k_work_reschedule(&wire_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS));
+    }
     LOG_INF("wire link up on %s", wire_uart_device->name);
     return 0;
 }

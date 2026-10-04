@@ -25,3 +25,8 @@ int wire_link_send_event(const uint8_t *payload, size_t length);
 int wire_link_send_input(const uint8_t *payload, size_t length);
 int wire_link_send_keepalive(const uint8_t *payload, size_t length);
 bool wire_link_is_up(void);
+
+/* Full duplex: both true.
+ * Simplex: wire peer transmits only, its receiver receives only. */
+bool wire_link_can_transmit(void);
+bool wire_link_can_receive(void);

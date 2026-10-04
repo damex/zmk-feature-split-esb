@@ -164,6 +164,16 @@ properties:
       every other input event is ACK'd unless listed.
       First send per keepalive tick requests an ACK regardless.
       Omit for fully lossless link.
+  wire-mode:
+    type: string
+    default: full-duplex
+    enum:
+      - full-duplex
+      - simplex
+    description: |
+      Wire link wiring. full-duplex: TX and RX lines, both directions.
+      simplex: one line, wire peer to its receiver only, no traffic back.
+      Both halves must match.
 
 child-binding:
   description: Peripheral table container.

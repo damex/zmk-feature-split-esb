@@ -87,9 +87,9 @@ menuconfig ZMK_SPLIT_ESB_WIRE
     select RING_BUFFER
     select CRC
     help
-      Bidirectional UART link between two split peripherals. Reuses the ESB
-      wire packet format above raw framing. Base transport for wire-central
-      and wire-peripheral sub-roles.
+      UART link between two split peripherals, full duplex or simplex per DT
+      wire-mode. Reuses the ESB wire packet format above raw framing. Base
+      transport for wire-central and wire-peripheral sub-roles.
 
 choice ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT
     prompt "Peripheral transport"

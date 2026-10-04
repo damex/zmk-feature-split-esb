@@ -51,13 +51,21 @@ static int wire_peripheral_set_enabled(bool enabled) {
     return 0;
 }
 
+static enum zmk_split_transport_connections_status wire_peripheral_connections(void) {
+    if (!wire_link_can_receive()) {
+        return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED;
+    }
+    if (wire_link_is_up()) {
+        return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED;
+    }
+    return ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED;
+}
+
 static struct zmk_split_transport_status wire_peripheral_get_status(void) {
     return (struct zmk_split_transport_status){
         .available = true,
         .enabled = transport_enabled,
-        .connections = wire_link_is_up()
-                           ? ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED
-                           : ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_DISCONNECTED,
+        .connections = wire_peripheral_connections(),
     };
 }
 
