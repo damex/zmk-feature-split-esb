@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 /* Wire transport for a split peripheral. */
+#define DT_DRV_COMPAT zmk_split_esb
 
 #include "peripheral.h"
 
+#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -17,6 +19,8 @@
 #include "wire_link.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+
+static const uint32_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 
 static bool transport_enabled;
 static atomic_t last_wire_send_ms;
@@ -89,9 +93,8 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
     const uint32_t now_ms = k_uptime_get_32();
     const uint32_t last_ms = (uint32_t)atomic_get(&last_wire_send_ms);
     const uint32_t idle_ms = now_ms - last_ms;
-    if (idle_ms < CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS) {
-        k_work_reschedule(&wire_peripheral_keepalive_work,
-                          K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS - idle_ms));
+    if (idle_ms < idle_keepalive_ms) {
+        k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(idle_keepalive_ms - idle_ms));
         return;
     }
     const bool active = zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE;
@@ -104,7 +107,7 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
             atomic_set(&last_wire_send_ms, (atomic_val_t)k_uptime_get_32());
         }
     }
-    k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS));
+    k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(idle_keepalive_ms));
 }
 
 static int wire_peripheral_init(void) {
@@ -113,7 +116,7 @@ static int wire_peripheral_init(void) {
     if (error != 0) {
         return error;
     }
-    k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_WIRE_STATE_MS));
+    k_work_reschedule(&wire_peripheral_keepalive_work, K_MSEC(idle_keepalive_ms));
     return 0;
 }
 

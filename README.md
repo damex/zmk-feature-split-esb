@@ -210,7 +210,7 @@ wire on P0.08:
 | `hop-window-ms` | peripheral keepalive period while data flows (default 32) |
 | `rssi-floor-dbm` | central counts a served peripheral's motion weaker than this (dBm) as a degraded window (default -85) |
 | `survey-threshold-dbm` | boot survey masks pool channels sampling at or above this ambient energy, anchors exempt (default -65) |
-| `idle-keepalive-ms` | peripheral idle keepalive period, also central hop-decision window (default 128) |
+| `idle-keepalive-ms` | peripheral idle keepalive period, ESB and wire, also central hop-decision window (default 128) |
 | `peripheral-timeout-ms` | silence before the central releases a peripheral's held state (default 3000) |
 | `tx-power-dbm` | boot TX power in dBm, raise for range (default 0) |
 | `retransmit-count` | retransmit ceiling before drop, peripheral adapts 2..ceiling from link quality (default 12) |
@@ -254,7 +254,6 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_SPLIT_ESB_COMMAND_QUEUE_SIZE` | 8 | peripheral queue for inbound central commands |
 | `ZMK_SPLIT_ESB_PRIORITY` | 50 | transport registration priority |
 | `ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS` | 100 | wire link-layer heartbeat period |
-| `ZMK_SPLIT_ESB_WIRE_STATE_MS` | 500 | wire peer state broadcast period |
 | `ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS` | 500 | silence before wire link declared down |
 
 ## Lost-event reconcile
