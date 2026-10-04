@@ -195,7 +195,8 @@ initialized.
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | rx_thread                                                                    |
 |                                                                              |
-|   [SPSC ring] --> [peripheral_on_rx] --> [command msgq]                      |
+|   [SPSC ring] --> [esb_peripheral_on_rx] --> [command msgq]                  |
+|                   wire peer's pipe on a relay half: Wire downlink            |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |
@@ -264,6 +265,56 @@ initialized.
 |       v                                                                      |
 |   [esb_link_send_relay] --> [ESB TX FIFO]                                    |
 |   places frame on wire peer's ESB pipe for uplink to central                 |
++------------------------------------------------------------------------------+
+```
+
+## Wire downlink: central command to wire peer
+
+```
++-- relay half ----------------------------------------------------------------+
+| RADIO ISR                                                                    |
+|                                                                              |
+|   [ACK payload on wire peer's pipe] --> [hop_consume_rx]                     |
+|   beacon and mask update stop here, command goes on                          |
+|       |                                                                      |
+|       v                                                                      |
+|   [SPSC ring]                                                                |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| rx_thread                                                                    |
+|                                                                              |
+|   [SPSC ring] --> [esb_peripheral_on_rx]          esb_peripheral.c           |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_relay_forward_to_peer]                    wire_relay.c               |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_link_send_event]                          wire_link.c                |
+|   COBS wrap, CRC8-CCITT postfix, into wire_tx_event_ring                     |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| UART ISR                                                                     |
+|                                                                              |
+|   [wire_tx_event_ring] --> [uart_fifo_fill]                                  |
++---------------|--------------------------------------------------------------+
+                | UART bytes, bidirectional wiring only
++-- wire peer --|--------------------------------------------------------------+
+| UART ISR      v                                                              |
+|                                                                              |
+|   [uart_fifo_read] --> [wire_rx_ring]                                        |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| wire_link_rx thread                                                          |
+|                                                                              |
+|   [wire_rx_ring] --> [wire_frame_parser_ingest]   wire_link.c                |
+|                      COBS decode, CRC check                                  |
+|       |                                                                      |
+|       v                                                                      |
+|   [wire_on_frame] --> [wire_peripheral_on_frame]  wire_peripheral.c          |
+|       |                                                                      |
+|       v                                                                      |
+|   [peripheral_deliver_command] --> [command msgq] peripheral.c               |
+| - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+| system workqueue                                                             |
+|                                                                              |
+|   [command msgq] --> [behavior invocation]                                   |
 +------------------------------------------------------------------------------+
 ```
 

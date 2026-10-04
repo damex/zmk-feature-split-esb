@@ -183,7 +183,7 @@ CONFIG_ZMK_SPLIT_ESB_PERIPHERAL_TRANSPORT_WIRE=y
 ```
 
 Bidirectional (two pins, TX + RX between halves): full-duplex, stock pinctrl on
-both sides.
+both sides. Central commands (behaviors, HID indicators) reach wire half.
 
 Unidirectional (single data pin, TRRS with one signal line): wire peer pushes,
 relay listens. Uplink only. Wire side needs pinctrl override so its TX lands on
