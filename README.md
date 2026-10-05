@@ -255,6 +255,8 @@ Tunables (Kconfig, defaults shown):
 | `ZMK_SPLIT_ESB_EVENT_QUEUE_SIZE` | 16 | central queue for key/sensor/battery events bound for the system workqueue |
 | `ZMK_SPLIT_ESB_COMMAND_QUEUE_SIZE` | 8 | peripheral queue for inbound central commands |
 | `ZMK_SPLIT_ESB_PRIORITY` | 50 | transport registration priority |
+| `ZMK_SPLIT_ESB_HID_RELAY_POLL_MS` | 4 | relay dongle poll period, lower is faster HID, 1 suits a USB-powered dongle |
+| `ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS` | 4 | central re-sends current HID state on idle polls at this rate, match the poll period |
 | `ZMK_SPLIT_ESB_WIRE_KEEPALIVE_MS` | 100 | wire link-layer heartbeat period |
 | `ZMK_SPLIT_ESB_WIRE_TIMEOUT_MS` | 500 | silence before wire link declared down |
 
@@ -286,6 +288,16 @@ A periodic refresh repeats it, so a rejoining half catches up by itself.
 Fixed-channel links beacon too.
 Wire halves get the same beacon over the wire, via a relay half or the central.
 Indicators need `CONFIG_ZMK_HID_INDICATORS` on the central.
+
+## HID relay
+
+A `role = "relay"` peripheral is a USB dongle for the split. Set
+`CONFIG_ZMK_SPLIT_ESB_HID_RELAY=y` on it and on the central. Every HID report
+change rides the ACK of the dongle's next poll, so
+`ZMK_SPLIT_ESB_HID_RELAY_POLL_MS` sets the latency. Queued changes pack into one
+ACK, a burst lands in one poll. Idle polls carry the current state, so a lost
+change heals, and the dongle forwards only reports that differ. USB polls at
+1 ms on a relay dongle. Relay pipes get no ZMK commands.
 
 ## Channel hopping
 

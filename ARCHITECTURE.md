@@ -175,11 +175,13 @@ initialized.
 |                         latest value wins                                    |
 |                                                                              |
 |   wire peer pipe: command and beacon go to wire_central_send instead         |
+|   relay pipe: each HID report change queues, idle reply latches the latest   |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | RADIO ISR                                                                    |
 |                                                                              |
 |   [RX from pipe N] --> [fill ACK FIFO]                                       |
-|   control latch first, else one queued reply                                 |
+|   control latch first, else queued replies, else the idle reply              |
+|   relay pipe packs every queued HID report that fits into one ACK            |
 |                     |                                                        |
 +---------------------|--------------------------------------------------------+
                       | ACK rides peripheral's next transmit
@@ -199,6 +201,7 @@ initialized.
 |                                                                              |
 |   [SPSC ring] --> [esb_peripheral_on_rx] --> [command msgq]                  |
 |                   wire peer's pipe on a relay half: Wire downlink            |
+|                   relay dongle: esb_hid_relay_deliver splits, drops repeats  |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |
