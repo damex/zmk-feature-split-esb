@@ -7,7 +7,31 @@ ZEPHYR_TOOLCHAIN_VARIANT ?= host
 ZMK_APP ?= $(error ZMK_APP is not set)
 
 MOCK_ROOT := $(CURDIR)/tests/mock
-MOCK_CASES ?= event_codec input_batch esb_link_rx_ring central_reconcile peripheral_held_input peripheral_keepalive peripheral_rendezvous peripheral_epoch_adoption hid_relay_tap hid_relay_burst hid_relay_commands hid_relay_sink hid_state_sync wire_central_hid_state wire_central_simplex wire_peer_idle_keepalive wire_peer_hid_state wire_peer_simplex wire_peer_held_input wire_relay_downlink wire_relay_beacon_rssi wire_relay_hid_state wire_relay_simplex wire_relay_uplink
+MOCK_CASES += \
+	central_reconcile \
+	esb_link_rx_ring \
+	event_codec \
+	hid_relay_burst \
+	hid_relay_commands \
+	hid_relay_sink \
+	hid_relay_tap \
+	hid_state_sync \
+	input_batch \
+	peripheral_epoch_adoption \
+	peripheral_held_input \
+	peripheral_keepalive \
+	peripheral_rendezvous \
+	wire_central_hid_state \
+	wire_central_simplex \
+	wire_peer_held_input \
+	wire_peer_hid_state \
+	wire_peer_idle_keepalive \
+	wire_peer_simplex \
+	wire_relay_beacon_rssi \
+	wire_relay_downlink \
+	wire_relay_hid_state \
+	wire_relay_simplex \
+	wire_relay_uplink
 MOCK_TARGETS := $(addprefix mock-test-,$(MOCK_CASES))
 
 .PHONY: unit-test native-sim-test mock-test $(MOCK_TARGETS)
