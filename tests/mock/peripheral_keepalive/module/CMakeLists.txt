@@ -14,6 +14,7 @@ zephyr_library_include_directories(
 zephyr_library_sources(
   src/test_radio.c
   ${mock_common}/src/mock.c
+  ${mock_common}/src/mock_radio.c
   ${esb_root}/src/esb_batch.c
   ${esb_root}/src/esb_hid_relay_peripheral.c
   ${esb_root}/src/esb_keepalive.c

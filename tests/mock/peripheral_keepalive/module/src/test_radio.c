@@ -7,7 +7,6 @@
  * Exits 1 on a wrong field or at deadline.
  */
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,8 +23,6 @@
 #include <esb.h>
 
 #include "esb_keepalive.h"
-#include "esb_link.h"
-#include "esb_link_internal.h"
 #include "esb_sensor_sync.h"
 #include "hop.h"
 #include "mock.h"
@@ -91,58 +88,6 @@ int esb_write_payload(const struct esb_payload *payload) {
     if (esb_keepalive_matches(payload->data, payload->length)) {
         check_keepalive(payload->data, payload->length);
     }
-    return 0;
-}
-
-bool esb_is_idle(void) {
-    return true;
-}
-
-int esb_flush_tx(void) {
-    return 0;
-}
-
-int esb_set_tx_power(int8_t tx_output_power) {
-    ARG_UNUSED(tx_output_power);
-    return 0;
-}
-
-int esb_set_retransmit_delay(uint16_t delay) {
-    ARG_UNUSED(delay);
-    return 0;
-}
-
-int esb_set_retransmit_count(uint16_t count) {
-    ARG_UNUSED(count);
-    return 0;
-}
-
-int esb_set_rf_channel(uint32_t channel) {
-    ARG_UNUSED(channel);
-    return 0;
-}
-
-int esb_link_init(esb_link_rx_callback_t callback) {
-    ARG_UNUSED(callback);
-    return 0;
-}
-
-int esb_link_set_enabled(bool enabled) {
-    ARG_UNUSED(enabled);
-    return 0;
-}
-
-int esb_link_hfclk_acquire(void) {
-    return 0;
-}
-
-void esb_link_hfclk_release(void) {
-}
-
-void esb_link_mark_tx_event(void) {
-}
-
-uint32_t esb_link_tx_last_event_ms(void) {
     return 0;
 }
 
