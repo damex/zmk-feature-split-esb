@@ -17,6 +17,8 @@
 #include "esb_link_internal.h"
 
 static esb_link_rx_callback_t rx_callback;
+static uint32_t rf_channel;
+static size_t rf_channel_sets;
 
 bool esb_is_idle(void) {
     return true;
@@ -42,7 +44,8 @@ int esb_set_retransmit_count(uint16_t count) {
 }
 
 int esb_set_rf_channel(uint32_t channel) {
-    ARG_UNUSED(channel);
+    rf_channel = channel;
+    rf_channel_sets++;
     return 0;
 }
 
@@ -76,4 +79,12 @@ void mock_radio_peripheral_rx_deliver(uint8_t pipe, const uint8_t *data, size_t 
         exit(1);
     }
     rx_callback(pipe, data, length);
+}
+
+uint32_t mock_radio_peripheral_channel(void) {
+    return rf_channel;
+}
+
+size_t mock_radio_peripheral_channel_set_count(void) {
+    return rf_channel_sets;
 }

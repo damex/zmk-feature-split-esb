@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-rendezvous
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..
