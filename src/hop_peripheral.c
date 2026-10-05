@@ -45,7 +45,8 @@ static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
 static atomic_t data_sent_since_tick;
-static atomic_t acked_sent_since_tick;
+static atomic_t acked_data_since_tick;
+static atomic_t ack_probe_done_since_tick;
 static atomic_t tx_succeeded_since_tick;
 static atomic_t tx_failed_since_tick;
 static atomic_t link_acked;
@@ -254,7 +255,8 @@ static void keepalive_work_fn(struct k_work *work) {
     esb_link_set_retransmit_count(retransmit_budget());
     esb_link_apply_pending();
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
-    bool acked_sent = atomic_set(&acked_sent_since_tick, 0) != 0;
+    bool acked_data = atomic_set(&acked_data_since_tick, 0) != 0;
+    atomic_set(&ack_probe_done_since_tick, 0);
     bool searching = atomic_get(&link_acked) == 0;
     bool force_fast = DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay);
     uint16_t period_ms;
@@ -263,9 +265,10 @@ static void keepalive_work_fn(struct k_work *work) {
     } else {
         period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
     }
-    if (!acked_sent || searching) {
+    if (!acked_data || searching) {
         esb_link_send_keepalive(esb_keepalive_peripheral_state(active, searching));
-        atomic_set(&acked_sent_since_tick, 1);
+        /* Probe for this window only, counted as acked data it would skip the next keepalive. */
+        atomic_set(&ack_probe_done_since_tick, 1);
     }
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
@@ -329,12 +332,13 @@ void hop_note_tx_failed(void) {
 void hop_note_data_sent(bool acked) {
     atomic_set(&data_sent_since_tick, 1);
     if (acked) {
-        atomic_set(&acked_sent_since_tick, 1);
+        atomic_set(&acked_data_since_tick, 1);
+        atomic_set(&ack_probe_done_since_tick, 1);
     }
 }
 
 bool hop_ack_probe_due(void) {
-    return atomic_get(&acked_sent_since_tick) == 0;
+    return atomic_get(&ack_probe_done_since_tick) == 0;
 }
 
 int hop_set_retransmit_ceiling(uint32_t ceiling) {
