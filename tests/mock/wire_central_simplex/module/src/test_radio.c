@@ -6,14 +6,10 @@
  * Exits 0 once modifier changes and beacon refreshes pass with nothing on the wire.
  * Exits 1 on a wire transmit or without key activity.
  */
-#define DT_DRV_COMPAT zmk_split_esb
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -26,8 +22,6 @@
 
 #include "central.h"
 #include "esb_keepalive.h"
-#include "esb_link_internal.h"
-#include "esb_survey.h"
 #include "hop.h"
 #include "mock_wire.h"
 
@@ -35,31 +29,11 @@
 #define HEARTBEAT_MS 100
 #define VERDICT_MS 1200
 
-const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
-
 static size_t keycode_changes;
 
 int esb_write_payload(const struct esb_payload *payload) {
     ARG_UNUSED(payload);
     return 0;
-}
-
-int esb_start_rx(void) {
-    return 0;
-}
-
-int esb_stop_rx(void) {
-    return 0;
-}
-
-int esb_set_rf_channel(uint32_t channel) {
-    ARG_UNUSED(channel);
-    return 0;
-}
-
-void esb_survey_run(const uint8_t *channels, size_t count, int8_t *energy_dbm) {
-    ARG_UNUSED(channels);
-    memset(energy_dbm, INT8_MIN, count);
 }
 
 uint8_t esb_central_battery_level(uint8_t pipe) {

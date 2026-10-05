@@ -7,14 +7,11 @@
  * Exits 0 once every burst change is written at the first poll after its key event.
  * Exits 1 on a late change, a re-send ahead of a waiting change or at deadline.
  */
-#define DT_DRV_COMPAT zmk_split_esb
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -30,8 +27,6 @@
 
 #define VERDICT_DEADLINE_MS 1000
 #define CHANGES_EXPECTED 4
-
-const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
 
 static uint32_t polls_done;
 static uint32_t change_event_poll[CHANGES_EXPECTED];
@@ -110,10 +105,6 @@ int esb_write_payload(const struct esb_payload *payload) {
         check_report(&payload->data[offset], last, length);
         offset += length;
     }
-    return 0;
-}
-
-int esb_start_rx(void) {
     return 0;
 }
 

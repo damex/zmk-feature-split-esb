@@ -6,8 +6,6 @@
  * Exits 0 once lost, stray and silent-peripheral traffic reconciles into the expected events.
  * Exits 1 on a wrong or extra event or at deadline.
  */
-#define DT_DRV_COMPAT zmk_split_esb
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -51,8 +49,6 @@
 #define STEP_UDEG (15 * ESB_SENSOR_MICRODEG_PER_DEG)
 #define RELEASED 0
 #define PRESSED 1
-
-const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
 
 enum observation_kind {
     OBSERVED_POSITION,
@@ -154,10 +150,6 @@ static bool peripheral_silent;
 
 int esb_write_payload(const struct esb_payload *payload) {
     ARG_UNUSED(payload);
-    return 0;
-}
-
-int esb_start_rx(void) {
     return 0;
 }
 

@@ -6,13 +6,10 @@
  * Exits 0 once the relay delivers the expected report changes in order.
  * Exits 1 on the first wrong change or at deadline.
  */
-#define DT_DRV_COMPAT zmk_split_esb
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -29,8 +26,6 @@
 #define VERDICT_DEADLINE_MS 1000
 #define REPORT_ID_OFFSET offsetof(struct zmk_hid_keyboard_report, report_id)
 #define RELEASED 0
-
-const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
 
 struct expected_change {
     uint8_t report_id;
@@ -122,10 +117,6 @@ int esb_write_payload(const struct esb_payload *payload) {
         }
         offset += size;
     }
-    return 0;
-}
-
-int esb_start_rx(void) {
     return 0;
 }
 

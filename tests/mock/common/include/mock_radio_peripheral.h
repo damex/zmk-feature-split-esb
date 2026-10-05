@@ -11,4 +11,4 @@
 #include <stdint.h>
 
 /* Hands a received payload to the transport, exits 1 before esb_link_init. */
-void mock_radio_rx_deliver(uint8_t pipe, const uint8_t *data, size_t length);
+void mock_radio_peripheral_rx_deliver(uint8_t pipe, const uint8_t *data, size_t length);

@@ -3,7 +3,7 @@
 
 /* Fake NCS ESB radio and ESB link core under a real esb_link_peripheral.c. */
 
-#include "mock_radio.h"
+#include "mock_radio_peripheral.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -70,7 +70,7 @@ uint32_t esb_link_tx_last_event_ms(void) {
     return 0;
 }
 
-void mock_radio_rx_deliver(uint8_t pipe, const uint8_t *data, size_t length) {
+void mock_radio_peripheral_rx_deliver(uint8_t pipe, const uint8_t *data, size_t length) {
     if (rx_callback == NULL) {
         printk("FAIL: radio delivery before esb_link_init\n");
         exit(1);

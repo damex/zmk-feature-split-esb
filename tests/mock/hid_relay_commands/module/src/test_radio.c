@@ -6,8 +6,6 @@
  * Exits 0 once a behavior sent to the relay source never reaches its replies.
  * Exits 1 on a reply that is not whole HID reports.
  */
-#define DT_DRV_COMPAT zmk_split_esb
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -34,8 +32,6 @@
 #define POLLS_CHECKED 10
 #define REPORT_ID_OFFSET 0
 
-const uint8_t esb_link_pipe_count = DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals));
-
 static uint32_t polls_done;
 
 static size_t report_length(uint8_t report_id) {
@@ -59,10 +55,6 @@ int esb_write_payload(const struct esb_payload *payload) {
         }
         offset += length;
     }
-    return 0;
-}
-
-int esb_start_rx(void) {
     return 0;
 }
 

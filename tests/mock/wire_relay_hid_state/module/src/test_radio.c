@@ -28,7 +28,7 @@
 
 #include "hop.h"
 #include "hop_internal.h"
-#include "mock_radio.h"
+#include "mock_radio_peripheral.h"
 #include "mock_wire.h"
 
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
@@ -58,7 +58,7 @@ int esb_write_payload(const struct esb_payload *payload) {
 static void radio_receive(uint8_t pipe, const struct esb_beacon *beacon) {
     const uint8_t *data = (const uint8_t *)beacon;
     if (!hop_consume_rx(pipe, data, sizeof(*beacon), 0)) {
-        mock_radio_rx_deliver(pipe, data, sizeof(*beacon));
+        mock_radio_peripheral_rx_deliver(pipe, data, sizeof(*beacon));
     }
 }
 
