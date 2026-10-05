@@ -1,0 +1,53 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    chosen {
+        zmk,esb-self = &left;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+
+    mock_input: mock_input {
+        compatible = "zmk,input-mock";
+        status = "okay";
+        event-startup-delay = <100>;
+        event-period = <300>;
+        events = <INPUT_EV_KEY INPUT_BTN_0 1 1>;
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_input: split_input@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+            device = <&mock_input>;
+        };
+    };
+
+    mock_encoder: mock_encoder {
+        compatible = "zmk,sensor-encoder-mock";
+        status = "okay";
+        /* Fires while the keymap's key is held. */
+        event-startup-delay = <1100>;
+        event-period = <20>;
+        events = <18 18>;
+    };
+
+    sensors: sensors {
+        compatible = "zmk,keymap-sensors";
+        sensors = <&mock_encoder>;
+        triggers-per-rotation = <20>;
+    };
+};
