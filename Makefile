@@ -11,6 +11,7 @@ MOCK_CASES += \
 	central_reconcile \
 	esb_link_rx_ring \
 	esb_link_tx_failed \
+	esb_link_tx_stall \
 	event_codec \
 	hid_relay_burst \
 	hid_relay_commands \
@@ -20,6 +21,7 @@ MOCK_CASES += \
 	input_batch \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
+	peripheral_idle_keepalive \
 	peripheral_keepalive \
 	peripheral_rendezvous \
 	wire_central_hid_state \
