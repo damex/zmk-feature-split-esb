@@ -10,6 +10,7 @@ MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central_reconcile \
 	esb_link_rx_ring \
+	esb_link_tx_failed \
 	event_codec \
 	hid_relay_burst \
 	hid_relay_commands \
