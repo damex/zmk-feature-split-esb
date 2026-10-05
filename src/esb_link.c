@@ -73,9 +73,9 @@ static enum esb_bitrate esb_bitrate_from_kbps(uint16_t kbps) {
 }
 
 /* NCS's CONFIG_ESB_MAX_PAYLOAD_LENGTH default (32) wins over ours on Kconfig parse order.
- * Raise it in your .conf or the radio rejects oversized payloads. */
-BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD <= CONFIG_ESB_MAX_PAYLOAD_LENGTH,
-             "set CONFIG_ESB_MAX_PAYLOAD_LENGTH >= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD in your .conf");
+ * Equal sizes make the radio drop whole any packet the RX slot cannot hold. */
+BUILD_ASSERT(CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD == CONFIG_ESB_MAX_PAYLOAD_LENGTH,
+             "set CONFIG_ESB_MAX_PAYLOAD_LENGTH equal to CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD in your .conf");
 
 /* RX path: the radio ISR writes each payload straight into a lock-free SPSC ring
  * (no irq_lock, zero-copy slot) and signals the dispatch thread, which hands packets
@@ -135,7 +135,7 @@ static void on_esb_event(const struct esb_evt *event) {
                 continue; /* keep draining the radio FIFO */
             }
             slot->pipe = payload.pipe;
-            slot->length = (uint8_t)MIN(payload.length, (int)sizeof(slot->data));
+            slot->length = payload.length;
             memcpy(slot->data, payload.data, slot->length);
             spsc_produce(&rx_spsc);
             received = true;

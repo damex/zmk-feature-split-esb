@@ -41,7 +41,7 @@ CONFIG_ESB_MAX_PAYLOAD_LENGTH=48
 ```
 Central also sets `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`. Peripheral leaves it unset.
 
-Set `CONFIG_ESB_MAX_PAYLOAD_LENGTH` to at least `ZMK_SPLIT_ESB_MAX_PAYLOAD` (48)
+Set `CONFIG_ESB_MAX_PAYLOAD_LENGTH` equal to `ZMK_SPLIT_ESB_MAX_PAYLOAD` (48)
 on every device. sdk-nrf default is 32, build assert catches it.
 Raise `CONFIG_ESB_TX_FIFO_SIZE` to 16 on a peripheral with bursty senders
 (chattery encoder). sdk-nrf default 8 drops events at source under a burst.
