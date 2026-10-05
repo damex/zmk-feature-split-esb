@@ -8,7 +8,6 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -105,26 +104,34 @@ static void check_change(const uint8_t *data, size_t length) {
     }
 }
 
+static void *last_report_for(uint8_t report_id, size_t *size) {
+    if (report_id == ZMK_HID_REPORT_ID_KEYBOARD) {
+        *size = sizeof(last_keyboard);
+        return &last_keyboard;
+    }
+    if (report_id == ZMK_HID_REPORT_ID_CONSUMER) {
+        *size = sizeof(last_consumer);
+        return &last_consumer;
+    }
+    *size = 0;
+    return NULL;
+}
+
 int esb_write_payload(const struct esb_payload *payload) {
-    void *last;
-    size_t size;
-    if (payload->data[REPORT_ID_OFFSET] == ZMK_HID_REPORT_ID_KEYBOARD) {
-        last = &last_keyboard;
-        size = sizeof(last_keyboard);
-    } else if (payload->data[REPORT_ID_OFFSET] == ZMK_HID_REPORT_ID_CONSUMER) {
-        last = &last_consumer;
-        size = sizeof(last_consumer);
-    } else {
-        return 0;
+    size_t offset = 0;
+    while (offset < payload->length) {
+        size_t size = 0;
+        void *last = last_report_for(payload->data[offset + REPORT_ID_OFFSET], &size);
+        if (last == NULL || offset + size > payload->length) {
+            printk("FAIL: reply does not split into whole reports\n");
+            exit(1);
+        }
+        if (memcmp(last, &payload->data[offset], size) != 0) {
+            memcpy(last, &payload->data[offset], size);
+            check_change(&payload->data[offset], size);
+        }
+        offset += size;
     }
-    if (payload->length != size) {
-        return -EMSGSIZE;
-    }
-    if (memcmp(last, payload->data, size) == 0) {
-        return 0;
-    }
-    memcpy(last, payload->data, size);
-    check_change(payload->data, size);
     return 0;
 }
 
