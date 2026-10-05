@@ -14,6 +14,10 @@ native-sim-test:
 	ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) $(PYTHON) $(ZEPHYR_BASE)/scripts/twister --testsuite-root tests/native_sim --platform native_sim/native/64 --inline-logs --clobber-output --outdir twister-out-native-sim
 
 mock-test:
+	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/event_codec -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/event_codec -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/event_codec/module
+	mock-test-out/event_codec/zephyr/zmk.exe
+	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/input_batch -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/input_batch -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/input_batch/module
+	mock-test-out/input_batch/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/hid_relay_tap -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/hid_relay_tap -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/hid_relay_tap/module
 	mock-test-out/hid_relay_tap/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/hid_relay_burst -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/hid_relay_burst -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/hid_relay_burst/module
