@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-esb-link-tx-stall
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..
