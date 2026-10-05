@@ -7,11 +7,7 @@
 
 #include <stdlib.h>
 
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
-
-/* Module sources only declare this log module. */
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static size_t checks_passed;
 

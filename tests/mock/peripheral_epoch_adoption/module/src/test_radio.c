@@ -28,7 +28,7 @@
 #include "hop_internal.h"
 #include "hop_policy.h"
 #include "mock.h"
-#include "mock_radio_peripheral.h"
+#include "mock_esb.h"
 
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define EPOCH 1
@@ -58,8 +58,8 @@ static void check_adopted(const uint8_t *keepalive) {
     struct zmk_split_esb_status status;
     zmk_split_esb_get_status(&status);
     mock_check(status.epoch == EPOCH, "peripheral adopts the beacon epoch");
-    mock_check(mock_radio_peripheral_channel_set_count() == 1, "one retune for the new epoch");
-    mock_check(mock_radio_peripheral_channel() == pool_channels[ADOPTED_INDEX],
+    mock_check(mock_esb_channel_set_count() == 1, "one retune for the new epoch");
+    mock_check(mock_esb_channel() == pool_channels[ADOPTED_INDEX],
                "retune skips the channel the staged mask dropped");
     mock_check(esb_keepalive_link_cost_x10(keepalive) == FIRST_TRY_COST_X10,
                "epoch adoption resets the link cost");
@@ -75,7 +75,7 @@ static void check_window(const uint8_t *keepalive) {
     if (windows == WARMUP_WINDOWS) {
         mock_check(esb_keepalive_link_cost_x10(keepalive) > FIRST_TRY_COST_X10,
                    "retried transmits raise the link cost");
-        mock_check(mock_radio_peripheral_channel_set_count() == 0, "no retune before the beacon");
+        mock_check(mock_esb_channel_set_count() == 0, "no retune before the beacon");
         deliver_epoch();
         return;
     }

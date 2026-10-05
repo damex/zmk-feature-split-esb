@@ -1,7 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* Fake NCS ESB radio and ESB link core under a real esb_link_peripheral.c. */
+/* ESB link core stand-in under a real esb_link_peripheral.c. */
 
 #include "mock_radio_peripheral.h"
 
@@ -11,43 +11,10 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
-#include <esb.h>
-
 #include "esb_link.h"
 #include "esb_link_internal.h"
 
 static esb_link_rx_callback_t rx_callback;
-static uint32_t rf_channel;
-static size_t rf_channel_sets;
-
-bool esb_is_idle(void) {
-    return true;
-}
-
-int esb_flush_tx(void) {
-    return 0;
-}
-
-int esb_set_tx_power(int8_t tx_output_power) {
-    ARG_UNUSED(tx_output_power);
-    return 0;
-}
-
-int esb_set_retransmit_delay(uint16_t delay) {
-    ARG_UNUSED(delay);
-    return 0;
-}
-
-int esb_set_retransmit_count(uint16_t count) {
-    ARG_UNUSED(count);
-    return 0;
-}
-
-int esb_set_rf_channel(uint32_t channel) {
-    rf_channel = channel;
-    rf_channel_sets++;
-    return 0;
-}
 
 int esb_link_init(esb_link_rx_callback_t callback) {
     rx_callback = callback;
@@ -57,13 +24,6 @@ int esb_link_init(esb_link_rx_callback_t callback) {
 int esb_link_set_enabled(bool enabled) {
     ARG_UNUSED(enabled);
     return 0;
-}
-
-int esb_link_hfclk_acquire(void) {
-    return 0;
-}
-
-void esb_link_hfclk_release(void) {
 }
 
 void esb_link_mark_tx_event(void) {
@@ -79,12 +39,4 @@ void mock_radio_peripheral_rx_deliver(uint8_t pipe, const uint8_t *data, size_t 
         exit(1);
     }
     rx_callback(pipe, data, length);
-}
-
-uint32_t mock_radio_peripheral_channel(void) {
-    return rf_channel;
-}
-
-size_t mock_radio_peripheral_channel_set_count(void) {
-    return rf_channel_sets;
 }

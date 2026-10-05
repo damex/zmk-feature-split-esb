@@ -25,7 +25,7 @@
 #include "esb_keepalive.h"
 #include "hop.h"
 #include "hop_internal.h"
-#include "mock_radio_peripheral.h"
+#include "mock_esb.h"
 
 #define POOL_CHANNEL(index) DT_INST_PROP_BY_IDX(0, hop_channels, index)
 #define ANCHOR_CHANNEL(slot) DT_INST_PROP_BY_IDX(0, hop_anchors, slot)
@@ -83,13 +83,13 @@ static void check_window(void) {
         printk("FAIL: window %u reports the link found\n", (unsigned int)windows);
         exit(1);
     }
-    size_t retunes = mock_radio_peripheral_channel_set_count();
+    size_t retunes = mock_esb_channel_set_count();
     if (retunes != retunes_due(windows)) {
         printk("FAIL: window %u after %u retunes, expected %u\n", (unsigned int)windows,
                (unsigned int)retunes, (unsigned int)retunes_due(windows));
         exit(1);
     }
-    uint32_t channel = mock_radio_peripheral_channel();
+    uint32_t channel = mock_esb_channel();
     if (channel != channel_due(windows)) {
         printk("FAIL: window %u on channel %u, expected %u\n", (unsigned int)windows,
                (unsigned int)channel, (unsigned int)channel_due(windows));

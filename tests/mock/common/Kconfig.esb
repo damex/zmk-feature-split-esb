@@ -1,0 +1,21 @@
+# Copyright 2026 Roman Kuzmitskii (@damex)
+# SPDX-License-Identifier: MIT
+
+# NCS ESB symbols the module reads, with NCS prompts, defaults and ranges.
+
+menuconfig ESB
+    bool "Enhanced ShockBurst"
+
+if ESB
+
+config ESB_MAX_PAYLOAD_LENGTH
+    int "Maximum payload size"
+    default 32
+    range 1 252
+
+config ESB_PIPE_COUNT
+    int "Maximum number of pipes"
+    default 8
+    range 1 8
+
+endif

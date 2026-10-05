@@ -8,8 +8,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/spsc_lockfree.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/drivers/clock_control.h>
-#include <zephyr/drivers/clock_control/nrf_clock_control.h>
 
 #include <esb.h>
 
@@ -20,7 +18,7 @@
 #define RX_THREAD_STACK_SIZE 1536
 #define RX_THREAD_PRIORITY   2
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(DT_HAS_COMPAT_STATUS_OKAY(zmk_split_esb),
              "a zmk,split-esb node (base-address/peripherals/hop-channels) is required");
@@ -167,50 +165,6 @@ static void on_esb_event(const struct esb_evt *event) {
         /* other ESB events carry nothing this layer acts on */
         break;
     }
-}
-
-static int hfclk_request(void) {
-    struct onoff_manager *manager = z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
-    struct onoff_client client;
-    sys_notify_init_spinwait(&client.notify);
-    int error = onoff_request(manager, &client);
-    if (error < 0) {
-        return error;
-    }
-    int result;
-    while (sys_notify_fetch_result(&client.notify, &result) == -EAGAIN) {
-    }
-    return result;
-}
-
-static K_MUTEX_DEFINE(hfclk_mutex);
-static bool hfclk_held;
-
-int esb_link_hfclk_acquire(void) {
-    k_mutex_lock(&hfclk_mutex, K_FOREVER);
-    int error = 0;
-    if (!hfclk_held) {
-        error = hfclk_request();
-        if (error == 0) {
-            hfclk_held = true;
-        }
-    }
-    k_mutex_unlock(&hfclk_mutex);
-    return error;
-}
-
-void esb_link_hfclk_release(void) {
-    k_mutex_lock(&hfclk_mutex, K_FOREVER);
-    if (hfclk_held) {
-        struct onoff_manager *manager =
-            z_nrf_clock_control_get_onoff(CLOCK_CONTROL_NRF_SUBSYS_HF);
-        int release_error = onoff_release(manager);
-        if (release_error < 0) {
-            LOG_DBG("onoff_release returned %d", release_error);
-        }
-        hfclk_held = false;
-    }
-    k_mutex_unlock(&hfclk_mutex);
 }
 
 /* Push base addresses, prefix, channel, TX power into the radio.

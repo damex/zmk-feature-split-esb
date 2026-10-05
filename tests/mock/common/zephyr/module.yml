@@ -1,0 +1,4 @@
+---
+name: zmk-feature-split-esb-test-common
+build:
+  kconfig: Kconfig.esb

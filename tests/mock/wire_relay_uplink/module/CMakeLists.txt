@@ -6,6 +6,8 @@ include(${CMAKE_CURRENT_LIST_DIR}/../../common/mock.cmake)
 zephyr_library_sources(
   src/test_radio.c
   ${mock_common}/src/mock.c
+  ${mock_common}/src/mock_esb.c
+  ${mock_common}/src/mock_hfclk.c
   ${mock_common}/src/mock_radio_peripheral.c
   ${mock_common}/src/mock_wire.c
   ${esb_root}/src/cobs.c
