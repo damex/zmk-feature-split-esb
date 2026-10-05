@@ -8,7 +8,6 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +15,6 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -26,8 +24,7 @@
 #include <esb.h>
 
 #include "esb_link_internal.h"
-
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+#include "mock.h"
 
 #define VERDICT_DEADLINE_MS 1000
 #define REPORT_ID_OFFSET offsetof(struct zmk_hid_keyboard_report, report_id)
@@ -78,22 +75,15 @@ static size_t build_expected(const struct expected_change *change, union relay_r
     return sizeof(report->consumer);
 }
 
-static void print_bytes(const uint8_t *data, size_t length) {
-    for (size_t index = 0; index < length; index++) {
-        printk(" %02x", data[index]);
-    }
-    printk("\n");
-}
-
 static void check_change(const uint8_t *data, size_t length) {
     union relay_report expected;
     size_t expected_length = build_expected(&expected_changes[next_change], &expected);
     if (length != expected_length || memcmp(data, &expected, length) != 0) {
         printk("FAIL: step %u of %u, expected", (unsigned int)(next_change + 1),
                (unsigned int)ARRAY_SIZE(expected_changes));
-        print_bytes((const uint8_t *)&expected, expected_length);
+        mock_print_bytes((const uint8_t *)&expected, expected_length);
         printk("FAIL: got");
-        print_bytes(data, length);
+        mock_print_bytes(data, length);
         exit(1);
     }
     next_change++;

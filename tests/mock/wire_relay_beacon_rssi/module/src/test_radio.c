@@ -16,7 +16,6 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -28,8 +27,6 @@
 #include "esb_link_internal.h"
 #include "hop.h"
 #include "hop_internal.h"
-
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)

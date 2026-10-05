@@ -8,17 +8,13 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/iterable_sections.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
@@ -32,21 +28,16 @@
 
 #include "esb_keepalive.h"
 #include "hop_internal.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define INJECT_DELAY_MS 50
 #define TX_POLL_MS 4
 #define KEEPALIVES_MIN 2
 #define VERDICT_MS (5 * DT_INST_PROP(0, idle_keepalive_ms))
 
-static struct wire_frame_parser tx_parser;
 static size_t keepalives_seen;
 
-static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) {
-    ARG_UNUSED(user_data);
+static void on_tx_frame(const uint8_t *payload, size_t length) {
     if (esb_keepalive_matches(payload, (uint8_t)length)) {
         keepalives_seen++;
     }
@@ -57,9 +48,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
-    wire_frame_parser_ingest(&tx_parser, bytes, tx_length, on_tx_frame, NULL);
+    (void)mock_wire_tx_drain(on_tx_frame);
     k_work_reschedule(&tx_poll_work, K_MSEC(TX_POLL_MS));
 }
 
@@ -69,14 +58,7 @@ static void inject_fn(struct k_work *work) {
         .tag = ESB_BEACON_TAG,
         .hid_modifiers = MOD_LSFT,
     };
-    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
-    int frame_length =
-        wire_frame_encode((const uint8_t *)&beacon, sizeof(beacon), frame, sizeof(frame));
-    if (frame_length < 0) {
-        printk("FAIL: beacon frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    (void)uart_emul_put_rx_data(WIRE_UART, frame, (size_t)frame_length);
+    mock_wire_rx_inject((const uint8_t *)&beacon, sizeof(beacon));
 }
 static K_WORK_DELAYABLE_DEFINE(inject_work, inject_fn);
 

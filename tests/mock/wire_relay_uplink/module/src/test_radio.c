@@ -12,12 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -29,11 +26,9 @@
 #include "esb_link_internal.h"
 #include "esb_wire.h"
 #include "hop.h"
-#include "wire_frame.h"
+#include "mock.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)
 #define WIRE_INJECT_DELAY_MS 50
@@ -75,13 +70,6 @@ static struct pipe_stream streams[] = {
     {.pipe = PEER_PIPE, .events = peer_events, .count = ARRAY_SIZE(peer_events)},
 };
 
-static void print_bytes(const uint8_t *data, size_t length) {
-    for (size_t index = 0; index < length; index++) {
-        printk(" %02x", data[index]);
-    }
-    printk("\n");
-}
-
 static struct pipe_stream *stream_for_pipe(uint8_t pipe) {
     for (size_t index = 0; index < ARRAY_SIZE(streams); index++) {
         if (streams[index].pipe == pipe) {
@@ -116,9 +104,9 @@ static void check_payload(const struct esb_payload *payload) {
     if (payload->length != expected_length || memcmp(payload->data, expected, expected_length) != 0) {
         printk("FAIL: pipe %u step %u of %u, expected", payload->pipe,
                (unsigned int)(stream->next + 1), (unsigned int)stream->count);
-        print_bytes(expected, expected_length);
+        mock_print_bytes(expected, expected_length);
         printk("FAIL: got");
-        print_bytes(payload->data, payload->length);
+        mock_print_bytes(payload->data, payload->length);
         exit(1);
     }
     if (payload->noack) {
@@ -201,30 +189,12 @@ void hop_note_data_sent(bool acked) {
     ARG_UNUSED(acked);
 }
 
-static size_t append_wire_frame(const struct zmk_split_transport_peripheral_event *event,
-                                uint8_t *out, size_t out_size) {
-    uint8_t payload[ESB_WIRE_MAX_EVENT_SIZE];
-    size_t payload_length = esb_wire_encode_event(payload, sizeof(payload), event);
-    int frame_length = wire_frame_encode(payload, payload_length, out, out_size);
-    if (frame_length < 0) {
-        printk("FAIL: wire frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    return (size_t)frame_length;
-}
-
 static void wire_inject_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t frames[ARRAY_SIZE(peer_events) * WIRE_FRAME_MAX_ENCODED];
-    size_t length = 0;
     for (size_t index = 0; index < ARRAY_SIZE(peer_events); index++) {
-        length += append_wire_frame(&peer_events[index], &frames[length], sizeof(frames) - length);
-    }
-    uint32_t accepted = uart_emul_put_rx_data(WIRE_UART, frames, length);
-    if (accepted != length) {
-        printk("FAIL: wire rx took %u of %u bytes\n", (unsigned int)accepted,
-               (unsigned int)length);
-        exit(1);
+        uint8_t payload[ESB_WIRE_MAX_EVENT_SIZE];
+        size_t length = esb_wire_encode_event(payload, sizeof(payload), &peer_events[index]);
+        mock_wire_rx_inject(payload, length);
     }
 }
 static K_WORK_DELAYABLE_DEFINE(wire_inject_work, wire_inject_fn);

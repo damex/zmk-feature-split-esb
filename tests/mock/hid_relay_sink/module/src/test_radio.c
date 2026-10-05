@@ -17,7 +17,6 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -28,8 +27,7 @@
 
 #include "esb_link.h"
 #include "hop.h"
-
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+#include "mock.h"
 
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define DELIVER_DELAY_MS 50
@@ -82,32 +80,25 @@ static struct zmk_hid_keyboard_report keyboard_report(uint32_t usage) {
     return report;
 }
 
-static void print_bytes(const uint8_t *data, size_t length) {
-    for (size_t index = 0; index < length; index++) {
-        printk(" %02x", data[index]);
-    }
-    printk("\n");
-}
-
 static int sink(const uint8_t *bytes, size_t length) {
     if (length == last_sink_length && memcmp(bytes, last_sink_report, length) == 0) {
         printk("FAIL: duplicate report reached the sink at step %u:",
                (unsigned int)(next_expected + 1));
-        print_bytes(bytes, length);
+        mock_print_bytes(bytes, length);
         exit(1);
     }
     if (next_expected == ARRAY_SIZE(expected_usages)) {
         printk("FAIL: extra report reached the sink:");
-        print_bytes(bytes, length);
+        mock_print_bytes(bytes, length);
         exit(1);
     }
     struct zmk_hid_keyboard_report expected = keyboard_report(expected_usages[next_expected]);
     if (length != sizeof(expected) || memcmp(bytes, &expected, length) != 0) {
         printk("FAIL: sink step %u of %u, expected", (unsigned int)(next_expected + 1),
                (unsigned int)ARRAY_SIZE(expected_usages));
-        print_bytes((const uint8_t *)&expected, sizeof(expected));
+        mock_print_bytes((const uint8_t *)&expected, sizeof(expected));
         printk("FAIL: got");
-        print_bytes(bytes, length);
+        mock_print_bytes(bytes, length);
         exit(1);
     }
     size_t step = next_expected;

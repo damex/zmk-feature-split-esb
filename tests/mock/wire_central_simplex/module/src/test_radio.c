@@ -8,18 +8,14 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -33,11 +29,8 @@
 #include "esb_link_internal.h"
 #include "esb_survey.h"
 #include "hop.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define TX_POLL_MS 4
 #define HEARTBEAT_MS 100
 #define VERDICT_MS 1200
@@ -95,8 +88,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
+    size_t tx_length = mock_wire_tx_drain(NULL);
     if (tx_length > 0) {
         printk("FAIL: central transmitted %u bytes on a simplex wire\n", (unsigned int)tx_length);
         exit(1);
@@ -109,13 +101,7 @@ static K_WORK_DELAYABLE_DEFINE(heartbeat_work, heartbeat_fn);
 
 static void heartbeat_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
-    int frame_length = wire_frame_encode(NULL, 0, frame, sizeof(frame));
-    if (frame_length < 0) {
-        printk("FAIL: heartbeat frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    (void)uart_emul_put_rx_data(WIRE_UART, frame, (size_t)frame_length);
+    mock_wire_rx_inject(NULL, 0);
     k_work_reschedule(&heartbeat_work, K_MSEC(HEARTBEAT_MS));
 }
 

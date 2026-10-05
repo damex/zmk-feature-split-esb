@@ -8,18 +8,14 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -33,11 +29,8 @@
 #include "esb_survey.h"
 #include "hop.h"
 #include "hop_internal.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define TX_POLL_MS 4
 #define HEARTBEAT_MS 100
 #define VERDICT_DEADLINE_MS 2000
@@ -50,7 +43,6 @@ static const uint8_t expected_modifiers[] = {
 };
 static size_t next_change;
 static uint8_t last_modifiers;
-static struct wire_frame_parser tx_parser;
 
 int esb_write_payload(const struct esb_payload *payload) {
     ARG_UNUSED(payload);
@@ -86,8 +78,7 @@ void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
     ARG_UNUSED(length);
 }
 
-static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) {
-    ARG_UNUSED(user_data);
+static void on_tx_frame(const uint8_t *payload, size_t length) {
     if (!esb_is_beacon(payload, (uint8_t)length)) {
         return;
     }
@@ -121,9 +112,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
-    wire_frame_parser_ingest(&tx_parser, bytes, tx_length, on_tx_frame, NULL);
+    (void)mock_wire_tx_drain(on_tx_frame);
     k_work_reschedule(&tx_poll_work, K_MSEC(TX_POLL_MS));
 }
 
@@ -132,13 +121,7 @@ static K_WORK_DELAYABLE_DEFINE(heartbeat_work, heartbeat_fn);
 
 static void heartbeat_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
-    int frame_length = wire_frame_encode(NULL, 0, frame, sizeof(frame));
-    if (frame_length < 0) {
-        printk("FAIL: heartbeat frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    (void)uart_emul_put_rx_data(WIRE_UART, frame, (size_t)frame_length);
+    mock_wire_rx_inject(NULL, 0);
     k_work_reschedule(&heartbeat_work, K_MSEC(HEARTBEAT_MS));
 }
 

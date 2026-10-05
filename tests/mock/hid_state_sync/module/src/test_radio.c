@@ -8,7 +8,6 @@
 #define DT_DRV_COMPAT zmk_split_esb
 
 #include <errno.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +15,6 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -29,8 +27,6 @@
 #include "esb_survey.h"
 #include "hop.h"
 #include "hop_internal.h"
-
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 #define POLL_MS 4
 #define VERDICT_DEADLINE_MS 1000

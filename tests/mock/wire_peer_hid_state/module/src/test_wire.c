@@ -8,17 +8,13 @@
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -27,11 +23,8 @@
 #include <zmk_split_esb.h>
 
 #include "hop_internal.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define INJECT_DELAY_MS 50
 #define STATE_POLL_MS 4
 #define VERDICT_DEADLINE_MS 500
@@ -45,18 +38,7 @@ static void inject_fn(struct k_work *work) {
         .hid_modifiers = MODIFIERS,
         .hid_indicators = INDICATORS,
     };
-    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
-    int frame_length =
-        wire_frame_encode((const uint8_t *)&beacon, sizeof(beacon), frame, sizeof(frame));
-    if (frame_length < 0) {
-        printk("FAIL: beacon frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    uint32_t accepted = uart_emul_put_rx_data(WIRE_UART, frame, (size_t)frame_length);
-    if (accepted != (uint32_t)frame_length) {
-        printk("FAIL: wire rx took %u of %d bytes\n", (unsigned int)accepted, frame_length);
-        exit(1);
-    }
+    mock_wire_rx_inject((const uint8_t *)&beacon, sizeof(beacon));
 }
 static K_WORK_DELAYABLE_DEFINE(inject_work, inject_fn);
 

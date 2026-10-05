@@ -12,12 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -27,11 +24,8 @@
 
 #include "esb_link.h"
 #include "hop.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)
 #define DELIVER_DELAY_MS 50
@@ -111,8 +105,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
+    size_t tx_length = mock_wire_tx_drain(NULL);
     if (tx_length > 0) {
         printk("FAIL: relay half transmitted %u bytes on a simplex wire\n",
                (unsigned int)tx_length);
@@ -125,14 +118,7 @@ static void deliver_fn(struct k_work *work) {
     ARG_UNUSED(work);
     rx_callback(PEER_PIPE, (const uint8_t *)&peer_command, sizeof(peer_command));
     rx_callback(SELF_PIPE, (const uint8_t *)&own_command, sizeof(own_command));
-    uint8_t frame[WIRE_FRAME_MAX_ENCODED];
-    int frame_length = wire_frame_encode(uplink_payload, sizeof(uplink_payload), frame,
-                                         sizeof(frame));
-    if (frame_length < 0) {
-        printk("FAIL: uplink frame encode returned %d\n", frame_length);
-        exit(1);
-    }
-    (void)uart_emul_put_rx_data(WIRE_UART, frame, (size_t)frame_length);
+    mock_wire_rx_inject(uplink_payload, sizeof(uplink_payload));
 }
 static K_WORK_DELAYABLE_DEFINE(deliver_work, deliver_fn);
 

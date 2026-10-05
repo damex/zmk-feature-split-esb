@@ -14,12 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -33,11 +30,8 @@
 #include "esb_link_internal.h"
 #include "hop.h"
 #include "hop_internal.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)
 #define DELIVER_DELAY_MS 50
@@ -58,7 +52,6 @@ static const struct esb_beacon peer_beacon = {
 };
 
 static esb_link_rx_callback_t rx_callback;
-static struct wire_frame_parser tx_parser;
 
 int esb_write_payload(const struct esb_payload *payload) {
     ARG_UNUSED(payload);
@@ -125,7 +118,10 @@ static void radio_receive(uint8_t pipe, const struct esb_beacon *beacon) {
 }
 
 static bool beacon_matches(const uint8_t *payload, size_t length, const struct esb_beacon *beacon) {
-    return length == sizeof(*beacon) && memcmp(payload, beacon, length) == 0;
+    if (length != sizeof(*beacon)) {
+        return false;
+    }
+    return memcmp(payload, beacon, length) == 0;
 }
 
 static void check_verdict(void) {
@@ -139,8 +135,7 @@ static void check_verdict(void) {
     exit(0);
 }
 
-static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) {
-    ARG_UNUSED(user_data);
+static void on_tx_frame(const uint8_t *payload, size_t length) {
     if (beacon_matches(payload, length, &own_beacon)) {
         printk("FAIL: relay half own beacon left on the wire\n");
         exit(1);
@@ -155,9 +150,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
-    wire_frame_parser_ingest(&tx_parser, bytes, tx_length, on_tx_frame, NULL);
+    (void)mock_wire_tx_drain(on_tx_frame);
     k_work_reschedule(&tx_poll_work, K_MSEC(TX_POLL_MS));
 }
 

@@ -12,12 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-#include <zephyr/drivers/serial/uart_emul.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -27,11 +24,8 @@
 
 #include "esb_link.h"
 #include "hop.h"
-#include "wire_frame.h"
+#include "mock_wire.h"
 
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
-
-#define WIRE_UART DEVICE_DT_GET(DT_CHOSEN(zmk_esb_wire))
 #define SELF_PIPE DT_PROP(DT_CHOSEN(zmk_esb_self), pipe)
 #define PEER_PIPE DT_PROP(DT_CHOSEN(zmk_esb_wire_peer), pipe)
 #define DELIVER_DELAY_MS 50
@@ -51,7 +45,6 @@ static const struct zmk_split_transport_central_command peer_command = {
 };
 
 static esb_link_rx_callback_t rx_callback;
-static struct wire_frame_parser tx_parser;
 static bool own_command_ran;
 static bool peer_command_forwarded;
 
@@ -114,11 +107,13 @@ ZMK_SUBSCRIPTION(wire_relay_downlink_test, zmk_hid_indicators_changed);
 
 static bool frame_matches(const uint8_t *payload, size_t length,
                           const struct zmk_split_transport_central_command *command) {
-    return length == sizeof(*command) && memcmp(payload, command, length) == 0;
+    if (length != sizeof(*command)) {
+        return false;
+    }
+    return memcmp(payload, command, length) == 0;
 }
 
-static void on_tx_frame(const uint8_t *payload, size_t length, void *user_data) {
-    ARG_UNUSED(user_data);
+static void on_tx_frame(const uint8_t *payload, size_t length) {
     if (frame_matches(payload, length, &own_command)) {
         printk("FAIL: relay half own command left on the wire\n");
         exit(1);
@@ -134,9 +129,7 @@ static K_WORK_DELAYABLE_DEFINE(tx_poll_work, tx_poll_fn);
 
 static void tx_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint8_t bytes[WIRE_FRAME_MAX_ENCODED];
-    uint32_t tx_length = uart_emul_get_tx_data(WIRE_UART, bytes, sizeof(bytes));
-    wire_frame_parser_ingest(&tx_parser, bytes, tx_length, on_tx_frame, NULL);
+    (void)mock_wire_tx_drain(on_tx_frame);
     k_work_reschedule(&tx_poll_work, K_MSEC(TX_POLL_MS));
 }
 

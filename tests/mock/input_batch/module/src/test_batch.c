@@ -15,7 +15,6 @@
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
@@ -24,8 +23,7 @@
 #include "esb_batch.h"
 #include "esb_link.h"
 #include "esb_wire.h"
-
-LOG_MODULE_REGISTER(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
+#include "mock.h"
 
 #define PACKETS_MAX 4
 
@@ -39,7 +37,6 @@ static struct sent_packet sent[PACKETS_MAX];
 static size_t sent_count;
 static int send_result;
 static struct esb_batch batch;
-static size_t checks_passed;
 
 int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     if (sent_count < PACKETS_MAX) {
@@ -49,14 +46,6 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack) {
     }
     sent_count++;
     return send_result;
-}
-
-static void check(bool passed, const char *what) {
-    if (!passed) {
-        printk("FAIL: %s\n", what);
-        exit(1);
-    }
-    checks_passed++;
 }
 
 static struct zmk_split_transport_peripheral_event pointer_event(uint16_t code, int32_t value,
@@ -83,7 +72,7 @@ static bool packet_holds(const struct sent_packet *packet,
 }
 
 static void report(const struct zmk_split_transport_peripheral_event *event, bool wants_ack) {
-    check(esb_batch_report_event(&batch, event, wants_ack) == 0, "report accepted");
+    mock_check(esb_batch_report_event(&batch, event, wants_ack) == 0, "report accepted");
 }
 
 static void check_sync_flushes(void) {
@@ -93,11 +82,12 @@ static void check_sync_flushes(void) {
         pointer_event(INPUT_REL_Y, -4, true),
     };
     report(&events[0], false);
-    check(sent_count == 0, "no packet before the sync event");
+    mock_check(sent_count == 0, "no packet before the sync event");
     report(&events[1], false);
-    check(sent_count == 1, "sync event flushes one packet");
-    check(packet_holds(&sent[0], events, ARRAY_SIZE(events)), "packet holds both axes in order");
-    check(!sent[0].ack, "lossy batch sends without ack");
+    mock_check(sent_count == 1, "sync event flushes one packet");
+    mock_check(packet_holds(&sent[0], events, ARRAY_SIZE(events)),
+               "packet holds both axes in order");
+    mock_check(!sent[0].ack, "lossy batch sends without ack");
 }
 
 static void check_ack_sticks(void) {
@@ -110,17 +100,17 @@ static void check_ack_sticks(void) {
     report(&events[0], false);
     report(&events[1], true);
     report(&events[2], false);
-    check(sent_count == 1, "ack batch flushes one packet");
-    check(sent[0].ack, "one ack-wanting event makes the batch acked");
+    mock_check(sent_count == 1, "ack batch flushes one packet");
+    mock_check(sent[0].ack, "one ack-wanting event makes the batch acked");
 }
 
 static void check_flush_resets(void) {
     sent_count = 0;
     const struct zmk_split_transport_peripheral_event event = pointer_event(INPUT_REL_X, 9, true);
     report(&event, false);
-    check(sent_count == 1, "next batch flushes on its own sync");
-    check(packet_holds(&sent[0], &event, 1), "flushed batch starts empty");
-    check(!sent[0].ack, "ack request does not carry into the next batch");
+    mock_check(sent_count == 1, "next batch flushes on its own sync");
+    mock_check(packet_holds(&sent[0], &event, 1), "flushed batch starts empty");
+    mock_check(!sent[0].ack, "ack request does not carry into the next batch");
 }
 
 static void check_full_batch_flushes(void) {
@@ -132,24 +122,24 @@ static void check_full_batch_flushes(void) {
     for (size_t index = 0; index + 1 < ARRAY_SIZE(events); index++) {
         report(&events[index], false);
     }
-    check(sent_count == 0, "no packet before the batch fills");
+    mock_check(sent_count == 0, "no packet before the batch fills");
     report(&events[ARRAY_SIZE(events) - 1], false);
-    check(sent_count == 1, "full batch flushes without a sync event");
-    check(packet_holds(&sent[0], events, ARRAY_SIZE(events)), "full packet holds every event");
+    mock_check(sent_count == 1, "full batch flushes without a sync event");
+    mock_check(packet_holds(&sent[0], events, ARRAY_SIZE(events)), "full packet holds every event");
 }
 
 static void check_empty_flush(void) {
     sent_count = 0;
-    check(esb_batch_flush(&batch) == 0, "empty flush succeeds");
-    check(sent_count == 0, "empty flush sends nothing");
+    mock_check(esb_batch_flush(&batch) == 0, "empty flush succeeds");
+    mock_check(sent_count == 0, "empty flush sends nothing");
 }
 
 static void check_send_error(void) {
     sent_count = 0;
     send_result = -ENOMEM;
     const struct zmk_split_transport_peripheral_event event = pointer_event(INPUT_REL_X, 1, true);
-    check(esb_batch_report_event(&batch, &event, false) == -ENOMEM,
-          "link send error reaches the caller");
+    mock_check(esb_batch_report_event(&batch, &event, false) == -ENOMEM,
+               "link send error reaches the caller");
     send_result = 0;
 }
 
@@ -160,7 +150,7 @@ static int test_batch_init(void) {
     check_full_batch_flushes();
     check_empty_flush();
     check_send_error();
-    printk("PASS: all %u input batch checks\n", (unsigned int)checks_passed);
+    printk("PASS: all %u input batch checks\n", (unsigned int)mock_checks_passed());
     exit(0);
     return 0;
 }
