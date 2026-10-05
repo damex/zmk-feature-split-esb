@@ -80,6 +80,10 @@ config ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS
       is idle, so a rare dropped release report heals within one period.
       Match this to ZMK_SPLIT_ESB_HID_RELAY_POLL_MS so every relay poll has a fresh report.
 
+# ZMK sets 1 ms only under ZMK_USB, which a relay dongle leaves off.
+config USB_HID_POLL_INTERVAL_MS
+    default 1 if ZMK_SPLIT_ESB_HID_RELAY && !ZMK_SPLIT_ROLE_CENTRAL
+
 menuconfig ZMK_SPLIT_ESB_WIRE
     bool "Wire link between split peripherals"
     select SERIAL

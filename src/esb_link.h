@@ -63,7 +63,7 @@ bool esb_link_pipe_is_relay(uint8_t pipe);
 bool esb_link_pipe_is_self(uint8_t pipe);
 
 /* Central only.
- * Fill out_ids with the peripheral source ids (= pipe numbers).
+ * Fill out_ids with the peripheral source ids (= pipe numbers), self and relay pipes left out.
  * Returns the count. */
 uint8_t esb_link_source_ids(uint8_t *out_ids);
 
@@ -72,7 +72,10 @@ uint8_t esb_link_source_ids(uint8_t *out_ids);
  * Returns -EMSGSIZE on empty or oversize payload, -ENOBUFS if the reply queue is full. */
 int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length);
 
-bool esb_link_reply_queue_empty(uint8_t pipe);
+/* Central only.
+ * Latest value for a poll with nothing queued, newest call wins.
+ * Dropped once a reply is staged after it, so it never undoes a queued change. */
+int esb_link_latch_idle_reply(uint8_t pipe, const uint8_t *data, size_t length);
 
 uint8_t esb_central_battery_level(uint8_t pipe);
 

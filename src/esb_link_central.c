@@ -65,7 +65,7 @@ uint8_t esb_link_source_ids(uint8_t *out_ids) {
     __ASSERT_NO_MSG(out_ids != NULL);
     uint8_t out_count = 0;
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
-        if (esb_link_pipe_is_self(pipe)) {
+        if (esb_link_pipe_is_self(pipe) || esb_link_pipe_is_relay(pipe)) {
             continue;
         }
         out_ids[out_count++] = pipe;
@@ -87,11 +87,24 @@ static struct control_payload
     control_pool[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT][CONTROL_LATCH_SLOTS];
 static struct spsc_latch control_latch[REPLY_PIPE_COUNT][ESB_LINK_CONTROL_COUNT];
 
+#define IDLE_REPLY_SLOTS 2
+
+struct idle_reply {
+    uint8_t data[CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD];
+    uint8_t length;
+    atomic_val_t replies_staged;
+};
+
+static struct idle_reply idle_reply_pool[REPLY_PIPE_COUNT][IDLE_REPLY_SLOTS];
+static struct spsc_latch idle_reply_latch[REPLY_PIPE_COUNT];
+static atomic_t replies_staged[REPLY_PIPE_COUNT];
+
 static int reply_latches_init(void) {
     for (size_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
         for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
             control_latch[pipe][kind].slot_count = CONTROL_LATCH_SLOTS;
         }
+        idle_reply_latch[pipe].slot_count = IDLE_REPLY_SLOTS;
     }
     return 0;
 }
@@ -128,14 +141,25 @@ int esb_link_stage_reply(uint8_t pipe, const uint8_t *data, size_t length) {
     if (k_msgq_put(reply_queue[pipe], &packet, K_NO_WAIT) != 0) {
         return -ENOBUFS;
     }
+    atomic_inc(&replies_staged[pipe]);
     return 0;
 }
 
-bool esb_link_reply_queue_empty(uint8_t pipe) {
+int esb_link_latch_idle_reply(uint8_t pipe, const uint8_t *data, size_t length) {
+    __ASSERT_NO_MSG(data != NULL);
     if (pipe >= REPLY_PIPE_COUNT) {
-        return true;
+        return -EINVAL;
     }
-    return k_msgq_num_used_get(reply_queue[pipe]) == 0;
+    if (length == 0 || length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+        return -EMSGSIZE;
+    }
+    uint8_t index = spsc_latch_claim(&idle_reply_latch[pipe]);
+    struct idle_reply *slot = &idle_reply_pool[pipe][index];
+    memcpy(slot->data, data, length);
+    slot->length = (uint8_t)length;
+    slot->replies_staged = atomic_get(&replies_staged[pipe]);
+    spsc_latch_publish(&idle_reply_latch[pipe], slot);
+    return 0;
 }
 
 int esb_link_role_start(void) {
@@ -164,6 +188,52 @@ static bool write_pending_control(uint8_t pipe) {
     return false;
 }
 
+static bool write_queued_replies(uint8_t pipe) {
+    struct esb_payload payload = {0};
+    payload.pipe = pipe;
+    uint32_t taken = 0;
+    struct esb_link_packet packet;
+    while (k_msgq_peek_at(reply_queue[pipe], &packet, taken) == 0) {
+        if (payload.length + packet.length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+            break;
+        }
+        memcpy(&payload.data[payload.length], packet.data, packet.length);
+        payload.length = (uint8_t)(payload.length + packet.length);
+        taken++;
+        /* Relay replies are whole HID reports the dongle splits again, commands are not. */
+        if (!esb_link_pipe_is_relay(pipe)) {
+            break;
+        }
+    }
+    if (taken == 0) {
+        return false;
+    }
+    if (esb_write_payload(&payload) == 0) {
+        for (uint32_t index = 0; index < taken; index++) {
+            (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
+        }
+    }
+    return true;
+}
+
+static void write_idle_reply(uint8_t pipe) {
+    struct idle_reply *slot = spsc_latch_peek(&idle_reply_latch[pipe]);
+    if (slot == NULL) {
+        return;
+    }
+    if (slot->replies_staged != atomic_get(&replies_staged[pipe])) {
+        (void)spsc_latch_release(&idle_reply_latch[pipe], slot);
+        return;
+    }
+    struct esb_payload payload = {0};
+    payload.pipe = pipe;
+    payload.length = slot->length;
+    memcpy(payload.data, slot->data, slot->length);
+    if (esb_write_payload(&payload) == 0) {
+        (void)spsc_latch_release(&idle_reply_latch[pipe], slot);
+    }
+}
+
 /* ISR-only, so esb_write_payload has a single caller context, no lock.
  * ACK FIFO is shared across pipes: reply only for a pipe that just RXed, one write
  * per RX, so an idle pipe never head-of-line blocks others and a dying one leaks a
@@ -176,16 +246,9 @@ void esb_link_role_rx_done(uint8_t pipes_seen) {
         if (write_pending_control(pipe)) {
             continue;
         }
-        struct esb_link_packet packet;
-        if (k_msgq_peek(reply_queue[pipe], &packet) != 0) {
+        if (write_queued_replies(pipe)) {
             continue;
         }
-        struct esb_payload payload = {0};
-        payload.pipe = packet.pipe;
-        payload.length = packet.length;
-        memcpy(payload.data, packet.data, packet.length);
-        if (esb_write_payload(&payload) == 0) {
-            (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
-        }
+        write_idle_reply(pipe);
     }
 }

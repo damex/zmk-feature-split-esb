@@ -53,6 +53,10 @@ static enum zmk_split_transport_connections_status central_connections_status(vo
 
 static int central_send_command(uint8_t source,
                                 struct zmk_split_transport_central_command command) {
+    /* ZMK sends global behaviors to every source index, a relay dongle runs none. */
+    if (esb_link_pipe_is_relay(source)) {
+        return 0;
+    }
     if (wire_central_owns_pipe(source)) {
         return wire_central_send((const uint8_t *)&command, sizeof(command));
     }
