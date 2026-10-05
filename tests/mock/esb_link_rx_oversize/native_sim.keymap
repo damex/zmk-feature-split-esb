@@ -1,9 +1,0 @@
-#include <dt-bindings/zmk/kscan_mock.h>
-
-&kscan {
-    /delete-property/ exit-after;
-    events = <
-        ZMK_MOCK_PRESS(0,0,5000)
-        ZMK_MOCK_RELEASE(0,0,10)
-    >;
-};
