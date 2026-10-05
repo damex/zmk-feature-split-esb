@@ -19,13 +19,13 @@
 
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_esb_peripheral_changed.h>
-#include <zmk/pointing/input_split.h>
 #include <zmk/sensors.h>
 #include <zmk/split/central.h>
 #include <zmk/split/transport/central.h>
 #include <zmk/split/transport/types.h>
 
 #include "central.h"
+#include "central_input.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
@@ -101,11 +101,7 @@ enum central_inbound_kind {
     CENTRAL_INBOUND_KEEPALIVE = 1,
 };
 
-#if ZMK_KEYMAP_HAS_SENSORS
-#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN)
-#else
-#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(0)
-#endif
+#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(CENTRAL_INPUT_HELD_KEYS_MAX, ZMK_KEYMAP_SENSORS_LEN)
 
 struct central_inbound {
     uint8_t source;
@@ -128,12 +124,7 @@ K_MSGQ_DEFINE(central_event_msgq, sizeof(struct central_inbound),
 static uint8_t tracked_positions[ESB_LINK_PIPE_MAX][ESB_KEEPALIVE_BITMAP_BYTES];
 static uint8_t tracked_battery_levels[ESB_LINK_PIPE_MAX];
 
-#define CENTRAL_INPUT_REG_MAX 32
 static const uint32_t peripheral_timeout_ms = DT_INST_PROP(0, peripheral_timeout_ms);
-
-/* Written on the RX thread, read by the staleness tick: single writer per slot,
- * aligned loads, no lock needed. */
-static uint32_t pipe_seen_input_regs[ESB_LINK_PIPE_MAX];
 
 static bool pipe_stale[ESB_LINK_PIPE_MAX];
 static bool pipe_connected[ESB_LINK_PIPE_MAX];
@@ -270,13 +261,7 @@ static void release_stale_pipe(uint8_t pipe) {
     LOG_WRN("Releasing held state of silent peripheral %u", pipe);
     static const uint8_t no_positions[ESB_KEEPALIVE_BITMAP_BYTES];
     replay_position_diff(pipe, no_positions, "Release stale");
-    if (IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT)) {
-        for (uint8_t reg = 0; reg < CENTRAL_INPUT_REG_MAX; reg++) {
-            if ((pipe_seen_input_regs[pipe] & BIT(reg)) != 0) {
-                zmk_input_split_peripheral_disconnected(reg);
-            }
-        }
-    }
+    central_input_release_pipe(pipe);
 }
 
 #define STALENESS_CHECK_PERIOD_MS 500
@@ -355,7 +340,7 @@ static void reconcile_battery(uint8_t source, uint8_t level) {
 
 #if ZMK_KEYMAP_HAS_SENSORS
 static void reconcile_sensor_totals(uint8_t source, const uint8_t *keepalive, uint8_t length) {
-    uint8_t sensor_count = esb_keepalive_sensor_count(length);
+    uint8_t sensor_count = esb_keepalive_sensor_count(keepalive, length);
 
     for (uint8_t sensor_index = 0; sensor_index < sensor_count; sensor_index++) {
         struct sensor_value value = {0};
@@ -424,12 +409,13 @@ static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
 void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
     if (esb_keepalive_matches(data, (uint8_t)length)) {
+        central_input_reconcile(&esb_central, pipe, data);
         struct central_inbound inbound = {
             .source = pipe,
             .kind = CENTRAL_INBOUND_KEEPALIVE,
         };
-        /* Totals beyond local sensors truncate with the copy.
-         * Count derives from the copied length. */
+        /* Held keys or totals beyond local capacity truncate with the copy.
+         * Sensor count derives from the copied length. */
         inbound.data.keepalive.length = (uint8_t)MIN(length, KEEPALIVE_COPY_LENGTH);
         memcpy(inbound.data.keepalive.data, data, inbound.data.keepalive.length);
         if (k_msgq_put(&central_event_msgq, &inbound, K_NO_WAIT) < 0) {
@@ -451,10 +437,7 @@ void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
         }
         offset += consumed;
         if (event.type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
-            if (pipe < ESB_LINK_PIPE_MAX && event.data.input_event.reg < CENTRAL_INPUT_REG_MAX) {
-                pipe_seen_input_regs[pipe] |= BIT(event.data.input_event.reg);
-            }
-            zmk_split_transport_central_peripheral_event_handler(&esb_central, pipe, event);
+            central_input_deliver_event(&esb_central, pipe, &event);
             continue;
         }
         struct central_inbound inbound = {

@@ -15,7 +15,9 @@
 
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/init.h>
+#include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
@@ -38,10 +40,12 @@
 #include "hop.h"
 
 #define PIPE DT_PROP(DT_NODELABEL(left), pipe)
+#define INPUT_REG DT_REG_ADDR(DT_NODELABEL(split_input))
 #define SCRIPT_START_MS 50
 #define STEP_MS 20
 #define SETTLE_MS 100
-#define VERDICT_DEADLINE_MS 2000
+#define STALE_WAIT_MS 1000 /* outlasts one staleness tick */
+#define VERDICT_DEADLINE_MS 3000
 #define SENSOR_INDEX 0
 #define BATTERY_LEVEL 87
 #define STEP_UDEG (15 * ESB_SENSOR_MICRODEG_PER_DEG)
@@ -54,6 +58,7 @@ enum observation_kind {
     OBSERVED_POSITION,
     OBSERVED_SENSOR,
     OBSERVED_BATTERY,
+    OBSERVED_INPUT,
 };
 
 struct observation {
@@ -73,15 +78,24 @@ static const struct observation expected[] = {
     {.kind = OBSERVED_SENSOR, .id = SENSOR_INDEX, .value = STEP_UDEG},
     {.kind = OBSERVED_SENSOR, .id = SENSOR_INDEX, .value = STEP_UDEG},
     {.kind = OBSERVED_BATTERY, .id = PIPE, .value = BATTERY_LEVEL},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_0, .value = PRESSED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_0, .value = RELEASED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_1, .value = PRESSED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_1, .value = RELEASED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_0, .value = PRESSED},
     {.kind = OBSERVED_POSITION, .id = 0, .value = PRESSED},
     {.kind = OBSERVED_POSITION, .id = 0, .value = RELEASED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_0, .value = RELEASED},
+    {.kind = OBSERVED_INPUT, .id = INPUT_BTN_0, .value = PRESSED},
 };
 
 enum step_kind {
     STEP_KEY,
     STEP_KEEPALIVE,
     STEP_SENSOR,
+    STEP_INPUT,
     STEP_GO_SILENT,
+    STEP_GO_LIVE,
 };
 
 struct script_step {
@@ -90,6 +104,8 @@ struct script_step {
     bool pressed;
     uint8_t battery;
     int32_t total_deg;
+    uint16_t input_code;
+    uint16_t held_codes[2];
 };
 
 static const struct script_step script[] = {
@@ -111,8 +127,25 @@ static const struct script_step script[] = {
     {.kind = STEP_KEEPALIVE, .battery = ESB_KEEPALIVE_BATTERY_UNKNOWN, .total_deg = 345},
     {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345},
     {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345},
+    {.kind = STEP_INPUT, .input_code = INPUT_BTN_0, .pressed = true},
+    /* Release of button 0 lost, the keepalive without it releases it. */
+    {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345},
+    /* Press of button 1 lost, the keepalive holding it presses it. */
+    /* Button 2 past the one tracked key never presses, not even on repeat. */
+    {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345,
+     .held_codes = {INPUT_BTN_1, INPUT_BTN_2}},
+    {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345,
+     .held_codes = {INPUT_BTN_1, INPUT_BTN_2}},
+    /* Keepalive raced ahead of the press, the late press drops. */
+    {.kind = STEP_INPUT, .input_code = INPUT_BTN_1, .pressed = true},
+    {.kind = STEP_INPUT, .input_code = INPUT_BTN_1, .pressed = false},
+    /* Button 0 held through silence, released stale, re-pressed by the next keepalive. */
+    {.kind = STEP_INPUT, .input_code = INPUT_BTN_0, .pressed = true},
     {.kind = STEP_KEY, .position = 0, .pressed = true},
     {.kind = STEP_GO_SILENT},
+    {.kind = STEP_GO_LIVE},
+    {.kind = STEP_KEEPALIVE, .battery = BATTERY_LEVEL, .total_deg = 345,
+     .held_codes = {INPUT_BTN_0}},
 };
 
 static size_t next_step;
@@ -214,6 +247,15 @@ ZMK_SUBSCRIPTION(central_reconcile_test, zmk_position_state_changed);
 ZMK_SUBSCRIPTION(central_reconcile_test, zmk_sensor_event);
 ZMK_SUBSCRIPTION(central_reconcile_test, zmk_peripheral_battery_state_changed);
 
+static void input_observer(struct input_event *event, void *user_data) {
+    ARG_UNUSED(user_data);
+    if (event->type == INPUT_EV_KEY) {
+        observe(OBSERVED_INPUT, event->code, event->value);
+    }
+}
+
+INPUT_CALLBACK_DEFINE(DEVICE_DT_GET(DT_NODELABEL(split_input)), input_observer, NULL);
+
 static void send_event(const struct zmk_split_transport_peripheral_event *event) {
     uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];
     size_t length = esb_wire_encode_event(wire, sizeof(wire), event);
@@ -243,6 +285,15 @@ static void send_sensor_total(const struct script_step *step) {
     send_event(&event);
 }
 
+static void send_input(const struct script_step *step) {
+    struct zmk_split_transport_peripheral_event event = {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
+        .data.input_event = {.reg = INPUT_REG, .type = INPUT_EV_KEY, .code = step->input_code,
+                             .value = step->pressed, .sync = true},
+    };
+    send_event(&event);
+}
+
 static void send_keepalive(const struct script_step *step) {
     uint8_t bitmap[ESB_KEEPALIVE_BITMAP_BYTES] = {0};
     if (step->pressed) {
@@ -250,9 +301,28 @@ static void send_keepalive(const struct script_step *step) {
     }
     int64_t totals[ZMK_KEYMAP_SENSORS_LEN] = {0};
     totals[SENSOR_INDEX] = esb_sensor_udeg(step->total_deg, 0);
-    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN)];
-    size_t length = esb_keepalive_encode(keepalive, sizeof(keepalive), ESB_KEEPALIVE_IDLE, bitmap,
-                                         step->battery, 0, totals, ZMK_KEYMAP_SENSORS_LEN);
+    struct esb_keepalive_held_key held[ARRAY_SIZE(step->held_codes)] = {0};
+    uint8_t held_count = 0;
+    for (size_t index = 0; index < ARRAY_SIZE(step->held_codes); index++) {
+        if (step->held_codes[index] != 0) {
+            held[held_count] = (struct esb_keepalive_held_key){
+                .reg = INPUT_REG,
+                .code = step->held_codes[index],
+            };
+            held_count++;
+        }
+    }
+    const struct esb_keepalive_snapshot snapshot = {
+        .state = ESB_KEEPALIVE_IDLE,
+        .battery_level = step->battery,
+        .position_bitmap = bitmap,
+        .held_keys = held,
+        .held_count = held_count,
+        .sensor_totals_udeg = totals,
+        .sensor_count = ZMK_KEYMAP_SENSORS_LEN,
+    };
+    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), ZMK_KEYMAP_SENSORS_LEN)];
+    size_t length = esb_keepalive_encode(keepalive, sizeof(keepalive), &snapshot);
     if (length == 0) {
         printk("FAIL: script keepalive does not encode\n");
         exit(1);
@@ -271,8 +341,14 @@ static void run_step(const struct script_step *step) {
     case STEP_SENSOR:
         send_sensor_total(step);
         break;
+    case STEP_INPUT:
+        send_input(step);
+        break;
     case STEP_GO_SILENT:
         peripheral_silent = true;
+        break;
+    case STEP_GO_LIVE:
+        peripheral_silent = false;
         break;
     default:
         printk("FAIL: unknown script step %d\n", (int)step->kind);
@@ -283,12 +359,20 @@ static void run_step(const struct script_step *step) {
 static void script_fn(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(script_work, script_fn);
 
+static uint32_t step_gap_ms(const struct script_step *step) {
+    if (step->kind == STEP_GO_SILENT) {
+        return STALE_WAIT_MS;
+    }
+    return STEP_MS;
+}
+
 static void script_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    run_step(&script[next_step]);
+    const struct script_step *step = &script[next_step];
+    run_step(step);
     next_step++;
     if (next_step < ARRAY_SIZE(script)) {
-        k_work_reschedule(&script_work, K_MSEC(STEP_MS));
+        k_work_reschedule(&script_work, K_MSEC(step_gap_ms(step)));
     }
 }
 

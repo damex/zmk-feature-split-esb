@@ -13,8 +13,9 @@
 #include <zmk/split/transport/types.h>
 
 #include "esb_keepalive.h"
+#include "peripheral_input.h"
 
-#define PERIPHERAL_KEEPALIVE_MAX_LENGTH ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN)
+#define PERIPHERAL_KEEPALIVE_MAX_LENGTH ESB_KEEPALIVE_LENGTH(PERIPHERAL_INPUT_HELD_KEYS_MAX, ZMK_KEYMAP_SENSORS_LEN)
 
 void peripheral_set_transport(const struct zmk_split_transport_peripheral *instance);
 

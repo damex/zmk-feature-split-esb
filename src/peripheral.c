@@ -22,11 +22,15 @@
 #include "esb_keepalive.h"
 #include "esb_sensor_sync.h"
 #include "esb_wire.h"
+#include "peripheral_input.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 BUILD_ASSERT(sizeof(struct zmk_split_transport_central_command) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "central command does not fit in one ESB payload; raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
+BUILD_ASSERT(PERIPHERAL_KEEPALIVE_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
+             "keepalive with held input keys and sensor totals does not fit one ESB payload; "
+             "raise ZMK_SPLIT_ESB_MAX_PAYLOAD");
 
 static uint8_t pressed_positions[ESB_KEEPALIVE_BITMAP_BYTES];
 
@@ -51,9 +55,6 @@ uint8_t peripheral_battery_level(void) {
 }
 
 #if ZMK_KEYMAP_HAS_SENSORS
-BUILD_ASSERT(ESB_KEEPALIVE_LENGTH(ZMK_KEYMAP_SENSORS_LEN) <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
-             "keepalive with sensor totals does not fit one ESB payload");
-
 static int64_t sensor_total_udeg[ZMK_KEYMAP_SENSORS_LEN];
 
 uint8_t peripheral_sensor_count(void) {
@@ -91,6 +92,7 @@ void peripheral_sensor_event_to_total(struct zmk_split_transport_peripheral_even
 
 int peripheral_encode_event(const struct zmk_split_transport_peripheral_event *event,
                             uint8_t *wire, size_t wire_size) {
+    peripheral_input_note_event(event);
     if (event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_KEY_POSITION_EVENT) {
         peripheral_note_key_event(event->data.key_position_event.position,
                                   event->data.key_position_event.pressed);
@@ -162,8 +164,16 @@ void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators) {
 
 uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state,
                                   uint8_t link_cost) {
-    size_t length = esb_keepalive_encode(out, out_size, state, peripheral_pressed_bitmap(),
-                                         peripheral_battery_level(), link_cost,
-                                         peripheral_sensor_totals(), peripheral_sensor_count());
-    return (uint8_t)length;
+    struct esb_keepalive_held_key held_keys[PERIPHERAL_INPUT_HELD_KEYS_MAX];
+    const struct esb_keepalive_snapshot snapshot = {
+        .state = state,
+        .link_cost_x10 = link_cost,
+        .battery_level = peripheral_battery_level(),
+        .position_bitmap = peripheral_pressed_bitmap(),
+        .held_keys = held_keys,
+        .held_count = peripheral_input_held_keys(held_keys),
+        .sensor_totals_udeg = peripheral_sensor_totals(),
+        .sensor_count = peripheral_sensor_count(),
+    };
+    return (uint8_t)esb_keepalive_encode(out, out_size, &snapshot);
 }

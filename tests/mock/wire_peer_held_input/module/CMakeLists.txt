@@ -12,14 +12,16 @@ zephyr_library_include_directories(
   ${APPLICATION_SOURCE_DIR}/include
 )
 zephyr_library_sources(
-  src/test_radio.c
+  src/test_wire.c
   ${mock_common}/src/mock.c
-  ${esb_root}/src/central.c
-  ${esb_root}/src/central_input.c
+  ${mock_common}/src/mock_wire.c
+  ${esb_root}/src/cobs.c
   ${esb_root}/src/esb_keepalive.c
-  ${esb_root}/src/esb_link_central.c
-  ${esb_root}/src/esb_peripheral_changed.c
   ${esb_root}/src/esb_sensor_sync.c
   ${esb_root}/src/esb_wire.c
-  ${esb_root}/src/spsc_latch.c
+  ${esb_root}/src/peripheral.c
+  ${esb_root}/src/peripheral_input.c
+  ${esb_root}/src/wire_frame.c
+  ${esb_root}/src/wire_link.c
+  ${esb_root}/src/wire_peripheral.c
 )

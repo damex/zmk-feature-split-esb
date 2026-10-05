@@ -263,10 +263,11 @@ Tunables (Kconfig, defaults shown):
 ## Lost-event reconcile
 
 Split events are deltas, the keepalive is the state: each peripheral keepalive
-carries a snapshot of its live state (activity, pressed-position bitmap, battery
-level, cumulative sensor totals). Events are ACK'd, but the radio gives up after
-`retransmit-count` tries, so a delta can still die in a bad-RF moment. The
-central reconciles its view against every snapshot and replays what was lost.
+carries a snapshot of its live state (activity, pressed-position bitmap, held
+input-split buttons, battery level, cumulative sensor totals). Events are ACK'd,
+but the radio gives up after `retransmit-count` tries, so a delta can still die
+in a bad-RF moment. The central reconciles its view against every snapshot and
+replays what was lost.
 
 A stuck key heals within one keepalive period (`hop-window-ms` while typing,
 `idle-keepalive-ms` at idle). The live stream is healed too: an orphan release
@@ -274,10 +275,13 @@ A stuck key heals within one keepalive period (`hop-window-ms` while typing,
 release first. A changed battery level reconciles the same way. Keepalives run on
 single-channel links too. Positions 64 and above are not covered.
 
+Input-split buttons reconcile from the keepalive too, up to
+`ZMK_INPUT_SPLIT_MAX_TRACKED_KEYS` held at once per peripheral.
+
 A peripheral silent past `peripheral-timeout-ms` (sleep, dead battery, out of
 range) gets its held keys and input-split buttons released, the connectionless
-equivalent of a disconnect. If it returns with a key still physically held, its
-first keepalive re-presses it.
+equivalent of a disconnect. If it returns with a key or button still physically
+held, its first keepalive re-presses it.
 
 ## HID state
 

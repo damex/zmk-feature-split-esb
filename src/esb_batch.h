@@ -20,7 +20,7 @@ struct esb_batch {
 };
 
 /* Input events only, single producer (the input thread), so no lock.
- * Buffer the event, flush on its sync flag or a full batch.
+ * Buffer the event, flush on its sync flag, a key event or a full batch.
  * Caller routes non-input events straight to esb_link_send. */
 int esb_batch_report_event(struct esb_batch *batch,
                            const struct zmk_split_transport_peripheral_event *event,

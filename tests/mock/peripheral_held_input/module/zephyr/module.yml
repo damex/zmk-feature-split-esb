@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-held-input
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..

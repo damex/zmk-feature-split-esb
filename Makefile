@@ -20,6 +20,8 @@ mock-test:
 	mock-test-out/input_batch/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/central_reconcile -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/central_reconcile -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/central_reconcile/module
 	mock-test-out/central_reconcile/zephyr/zmk.exe
+	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/peripheral_held_input -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/peripheral_held_input -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/peripheral_held_input/module
+	mock-test-out/peripheral_held_input/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/hid_relay_tap -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/hid_relay_tap -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/hid_relay_tap/module
 	mock-test-out/hid_relay_tap/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/hid_relay_burst -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/hid_relay_burst -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/hid_relay_burst/module
@@ -40,6 +42,8 @@ mock-test:
 	mock-test-out/wire_peer_hid_state/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/wire_peer_simplex -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/wire_peer_simplex -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/wire_peer_simplex/module
 	mock-test-out/wire_peer_simplex/zephyr/zmk.exe
+	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/wire_peer_held_input -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/wire_peer_held_input -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/wire_peer_held_input/module
+	mock-test-out/wire_peer_held_input/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/wire_relay_downlink -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/wire_relay_downlink -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/wire_relay_downlink/module
 	mock-test-out/wire_relay_downlink/zephyr/zmk.exe
 	cd $(ZMK_APP) && ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) west build -p -d $(CURDIR)/mock-test-out/wire_relay_beacon_rssi -b native_sim//zmk_test_mock -- -DZMK_CONFIG=$(CURDIR)/tests/mock/wire_relay_beacon_rssi -DZMK_EXTRA_MODULES=$(CURDIR)/tests/mock/wire_relay_beacon_rssi/module

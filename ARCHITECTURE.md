@@ -98,12 +98,13 @@ initialized.
 |   [peripheral_report_event]                       peripheral.c               |
 |       |                                                                      |
 |       |--key----> [pressed bitmap]    state taps, the keepalive              |
-|       |--sensor-> [running total]     carries and heals them                 |
+|       |--button-> [held input keys]   carries and heals them                 |
+|       |--sensor-> [running total]                                            |
 |       |                                                                      |
 |       |input only                                                            |
 |       v                                                                      |
 |   [esb_batch]                                     esb_batch.c                |
-|   coalesce to sync flag or full batch                                        |
+|   coalesce to sync flag, key event or full batch                             |
 |       |                                                                      |
 |       v         key/sensor/battery skip the batch                            |
 |   [esb_wire_encode_event]                         esb_wire.c                 |
@@ -143,7 +144,9 @@ initialized.
 |       v                          v                                           |
 |   [input subsystem]          [event msgq]                                    |
 |   direct, input_report is                                                    |
-|   safe from any context                                                      |
+|   safe from any context.                                                     |
+|   held input keys reconcile                                                  |
+|   here, repeated press drops                                                 |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |
@@ -349,7 +352,8 @@ All three run on the system workqueue.
 |                v                                                             |
 |  [send keepalive] --> [retained RAM]                                         |
 |  state, key bitmap,     last-acked channel,                                  |
-|  battery, cost, totals  epoch, mask                                          |
+|  held input keys,       epoch, mask                                          |
+|  battery, cost, totals                                                       |
 +------------------------------------------------------------------------------+
 
 +-- central decision tick -------- idle-keepalive-ms window -------------------+
@@ -456,7 +460,9 @@ keepalive        peripheral to central, every tick
   [2..9]  pressed-position bitmap, 64 keys
   [10]    battery percent, 0xFF unknown
   [11]    uplink link cost, attempts EWMA x10
-  [12..]  per-sensor running total, i64 le microdegrees each
+  [12]    held input key count, up to ZMK_INPUT_SPLIT_MAX_TRACKED_KEYS
+  [13..]  held input keys, reg u8 + code u16 le each
+  then    per-sensor running total, i64 le microdegrees each
 
 beacon           central to peripheral, rides an ACK
   [0]    0xFE

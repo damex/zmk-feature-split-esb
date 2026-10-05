@@ -1,0 +1,53 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    chosen {
+        zmk,esb-self = &right;
+        zmk,esb-wire = &wire_uart;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+
+            right: peripheral_right {
+                pipe = <1>;
+                prefix = <0xC3>;
+            };
+        };
+    };
+
+    wire_uart: wire_uart {
+        compatible = "zephyr,uart-emul";
+        status = "okay";
+        current-speed = <460800>;
+        tx-fifo-size = <256>;
+        rx-fifo-size = <256>;
+    };
+
+    mock_input: mock_input {
+        compatible = "zmk,input-mock";
+        status = "okay";
+        event-startup-delay = <100>;
+        event-period = <300>;
+        events = <INPUT_EV_KEY INPUT_BTN_0 1 1
+                  INPUT_EV_KEY INPUT_BTN_0 0 1>;
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_input: split_input@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+            device = <&mock_input>;
+        };
+    };
+};

@@ -100,9 +100,13 @@ static K_WORK_DELAYABLE_DEFINE(peripheral_poll_work, peripheral_poll_fn);
 static void peripheral_poll_fn(struct k_work *work) {
     ARG_UNUSED(work);
     static const uint8_t no_positions[ESB_KEEPALIVE_BITMAP_BYTES];
-    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0)];
-    esb_keepalive_encode(keepalive, sizeof(keepalive), ESB_KEEPALIVE_IDLE, no_positions,
-                         ESB_KEEPALIVE_BATTERY_UNKNOWN, 0, NULL, 0);
+    const struct esb_keepalive_snapshot snapshot = {
+        .state = ESB_KEEPALIVE_IDLE,
+        .battery_level = ESB_KEEPALIVE_BATTERY_UNKNOWN,
+        .position_bitmap = no_positions,
+    };
+    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0)];
+    esb_keepalive_encode(keepalive, sizeof(keepalive), &snapshot);
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
         (void)hop_consume_rx(pipe, keepalive, sizeof(keepalive), 0);
     }

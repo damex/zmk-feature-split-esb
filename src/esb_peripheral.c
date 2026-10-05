@@ -22,6 +22,7 @@
 #include "esb_link.h"
 #include "esb_wire.h"
 #include "hop.h"
+#include "peripheral_input.h"
 #include "wire_relay.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
@@ -74,6 +75,7 @@ uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state) {
 
 static int esb_peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {
     if (event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
+        peripheral_input_note_event(event);
         return esb_batch_report_event(&batch, event, event_wants_ack(event));
     }
     uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];

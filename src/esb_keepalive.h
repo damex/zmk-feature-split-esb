@@ -4,7 +4,8 @@
 /*
  * Uplink keepalive: periodic peripheral state snapshot the central reconciles against.
  * Wire: tag, hop-state byte, pressed-position bitmap, battery level, uplink
- * link cost, cumulative sensor totals.
+ * link cost, held input key count, held input keys, cumulative sensor totals.
+ * Held input key: input-split reg, then the input code little-endian.
  * Tag 0xFF cannot collide with event packets, whose first byte is an event type.
  * Positions above ESB_KEEPALIVE_POSITION_COUNT are not covered.
  * Battery level is ESB_KEEPALIVE_BATTERY_UNKNOWN when the peripheral does not report it.
@@ -26,21 +27,48 @@
 #define ESB_KEEPALIVE_BATTERY_OFFSET (ESB_KEEPALIVE_BITMAP_OFFSET + ESB_KEEPALIVE_BITMAP_BYTES)
 #define ESB_KEEPALIVE_BATTERY_UNKNOWN 0xFF
 #define ESB_KEEPALIVE_LINK_COST_OFFSET (ESB_KEEPALIVE_BATTERY_OFFSET + 1)
-#define ESB_KEEPALIVE_SENSOR_OFFSET (ESB_KEEPALIVE_LINK_COST_OFFSET + 1)
+#define ESB_KEEPALIVE_HELD_COUNT_OFFSET (ESB_KEEPALIVE_LINK_COST_OFFSET + 1)
+#define ESB_KEEPALIVE_HELD_OFFSET (ESB_KEEPALIVE_HELD_COUNT_OFFSET + 1)
+#define ESB_KEEPALIVE_HELD_BYTES 3
 #define ESB_KEEPALIVE_SENSOR_BYTES 8
-#define ESB_KEEPALIVE_BASE_LENGTH ESB_KEEPALIVE_SENSOR_OFFSET
-#define ESB_KEEPALIVE_LENGTH(sensor_count)                                                         \
-    (ESB_KEEPALIVE_BASE_LENGTH + (sensor_count) * ESB_KEEPALIVE_SENSOR_BYTES)
+#define ESB_KEEPALIVE_BASE_LENGTH ESB_KEEPALIVE_HELD_OFFSET
+#define ESB_KEEPALIVE_LENGTH(held_count, sensor_count)                                             \
+    (ESB_KEEPALIVE_BASE_LENGTH + (held_count) * ESB_KEEPALIVE_HELD_BYTES +                         \
+     (sensor_count) * ESB_KEEPALIVE_SENSOR_BYTES)
+
+struct esb_keepalive_held_key {
+    uint8_t reg;
+    uint16_t code;
+};
+
+struct esb_keepalive_snapshot {
+    /* Link */
+    uint8_t state;
+    uint8_t link_cost_x10;
+    uint8_t battery_level;
+
+    /* Keys */
+    const uint8_t *position_bitmap;
+    const struct esb_keepalive_held_key *held_keys;
+    uint8_t held_count;
+
+    /* Sensors */
+    const int64_t *sensor_totals_udeg;
+    uint8_t sensor_count;
+};
 
 /* Returns the encoded length, 0 when out_size is too small. */
-size_t esb_keepalive_encode(uint8_t *out, size_t out_size, uint8_t state,
-                            const uint8_t *position_bitmap, uint8_t battery_level,
-                            uint8_t link_cost_x10, const int64_t *sensor_totals_udeg,
-                            uint8_t sensor_count);
+size_t esb_keepalive_encode(uint8_t *out, size_t out_size,
+                            const struct esb_keepalive_snapshot *snapshot);
 
 bool esb_keepalive_matches(const uint8_t *data, uint8_t length);
 
-uint8_t esb_keepalive_sensor_count(uint8_t length);
+uint8_t esb_keepalive_held_count(const uint8_t *data);
+
+/* index bounded by esb_keepalive_held_count. */
+struct esb_keepalive_held_key esb_keepalive_held_key_at(const uint8_t *data, uint8_t index);
+
+uint8_t esb_keepalive_sensor_count(const uint8_t *data, uint8_t length);
 
 /* sensor_index bounded by esb_keepalive_sensor_count. */
 int64_t esb_keepalive_sensor_total_udeg(const uint8_t *data, uint8_t sensor_index);

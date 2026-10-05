@@ -128,6 +128,21 @@ static void check_full_batch_flushes(void) {
     mock_check(packet_holds(&sent[0], events, ARRAY_SIZE(events)), "full packet holds every event");
 }
 
+static void check_key_event_flushes(void) {
+    sent_count = 0;
+    const struct zmk_split_transport_peripheral_event motion = pointer_event(INPUT_REL_X, 2, false);
+    const struct zmk_split_transport_peripheral_event button = {
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
+        .data.input_event = {.type = INPUT_EV_KEY, .code = INPUT_BTN_0, .value = 1, .sync = false},
+    };
+    const struct zmk_split_transport_peripheral_event events[] = {motion, button};
+    report(&motion, false);
+    report(&button, true);
+    mock_check(sent_count == 1, "key event flushes without a sync event");
+    mock_check(packet_holds(&sent[0], events, ARRAY_SIZE(events)),
+               "key event packet holds the motion before it");
+}
+
 static void check_empty_flush(void) {
     sent_count = 0;
     mock_check(esb_batch_flush(&batch) == 0, "empty flush succeeds");
@@ -148,6 +163,7 @@ static int test_batch_init(void) {
     check_ack_sticks();
     check_flush_resets();
     check_full_batch_flushes();
+    check_key_event_flushes();
     check_empty_flush();
     check_send_error();
     printk("PASS: all %u input batch checks\n", (unsigned int)mock_checks_passed());

@@ -6,6 +6,7 @@
  * ZMK forwards each axis as its own event, doubling on-air packets at high rate.
  * Flush rides the sync event, the report boundary, so batching adds no latency.
  */
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/util.h>
 
@@ -37,6 +38,18 @@ int esb_batch_flush(struct esb_batch *batch) {
     return error;
 }
 
+static bool batch_flush_due(const struct esb_batch *batch,
+                            const struct zmk_split_transport_peripheral_event *event) {
+    if (event->data.input_event.sync) {
+        return true;
+    }
+    /* Keepalive lists held keys at once, a key event waiting here would trail it. */
+    if (event->data.input_event.type == INPUT_EV_KEY) {
+        return true;
+    }
+    return batch->count >= ESB_BATCH_MAX;
+}
+
 int esb_batch_report_event(struct esb_batch *batch,
                            const struct zmk_split_transport_peripheral_event *event,
                            bool wants_ack) {
@@ -48,7 +61,7 @@ int esb_batch_report_event(struct esb_batch *batch,
     if (wants_ack) {
         batch->wants_ack = true;
     }
-    if (event->data.input_event.sync || batch->count >= ESB_BATCH_MAX) {
+    if (batch_flush_due(batch, event)) {
         return esb_batch_flush(batch);
     }
     return 0;
