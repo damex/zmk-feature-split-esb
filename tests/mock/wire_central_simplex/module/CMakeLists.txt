@@ -8,6 +8,7 @@ zephyr_library_sources(
   ${mock_common}/src/mock.c
   ${mock_common}/src/mock_esb.c
   ${mock_common}/src/mock_radio_central.c
+  ${mock_common}/src/mock_survey.c
   ${mock_common}/src/mock_wire.c
   ${esb_root}/src/cobs.c
   ${esb_root}/src/esb_keepalive.c

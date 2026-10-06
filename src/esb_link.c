@@ -88,6 +88,7 @@ static K_THREAD_STACK_DEFINE(rx_thread_stack, RX_THREAD_STACK_SIZE);
 static struct k_thread rx_thread;
 
 static esb_link_rx_callback_t rx_callback;
+static atomic_t link_ready;
 
 static atomic_t tx_last_event_ms;
 
@@ -234,10 +235,15 @@ int esb_link_init(esb_link_rx_callback_t callback) {
         return error;
     }
     hop_start();
+    atomic_set(&link_ready, 1);
     return 0;
 }
 
 int esb_link_set_enabled(bool enabled) {
+    /* ZMK enables at our init priority and links first, esb_link_init starts the radio itself. */
+    if (atomic_get(&link_ready) == 0) {
+        return 0;
+    }
     if (!enabled) {
         hop_stop();
         int stop_error = esb_stop_rx();

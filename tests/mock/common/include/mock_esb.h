@@ -25,3 +25,4 @@ uint32_t mock_esb_channel(void);
 
 size_t mock_esb_channel_set_count(void);
 size_t mock_esb_flush_count(void);
+size_t mock_esb_calls_before_init(void);
