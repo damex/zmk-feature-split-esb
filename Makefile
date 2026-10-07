@@ -19,6 +19,8 @@ MOCK_CASES += \
 	event_codec \
 	hid_relay_burst \
 	hid_relay_commands \
+	hid_relay_host_leds \
+	hid_relay_indicators \
 	hid_relay_sink \
 	hid_relay_tap \
 	hid_state_sync \
