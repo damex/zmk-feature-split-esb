@@ -40,7 +40,7 @@ void hop_note_tx_failed(void);
 
 /* Central: no-op.
  * Peripheral: real data went out, next keepalive uses the fast rate. */
-void hop_note_data_sent(bool acked);
+void hop_note_data_sent(void);
 
 /* Channel the radio should currently tune to. */
 uint8_t hop_current_channel(void);
@@ -68,6 +68,4 @@ uint8_t hop_link_cost_x10(void);
 
 /* Returns -EINVAL above the DT retransmit-count. */
 int hop_set_retransmit_ceiling(uint32_t ceiling);
-
-bool hop_ack_probe_due(void);
 #endif

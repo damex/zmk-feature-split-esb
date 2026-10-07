@@ -226,8 +226,7 @@ Lossy-codes lists the input axes peripherals fire-and-forget. Reserve for
 high-rate, self-correcting axes (pointer motion). Non-input split events
 (key-position, sensor, battery) are always ACK'd. Every input event is ACK'd
 unless its (type, code) is listed here. Omitted = fully lossless link.
-First send of each keepalive tick requests an ACK regardless, so a moving
-pointer still proves the link every window.
+Keepalives stay ACK'd, so a lossy-only stream still proves the link every tick.
 
 Sensor rotation is cumulative on air: a peripheral sends its running total and
 the central forwards the difference, so motion lost with a dropped packet
@@ -269,8 +268,11 @@ but the radio gives up after `retransmit-count` tries, so a delta can still die
 in a bad-RF moment. The central reconciles its view against every snapshot and
 replays what was lost.
 
-A stuck key heals within one keepalive period (`hop-window-ms` while typing,
-`idle-keepalive-ms` at idle). The live stream is healed too: an orphan release
+A stuck key heals with the next keepalive.
+Every tick sends one, `hop-window-ms` apart while data flows and
+`idle-keepalive-ms` apart at idle.
+First tick of a burst still lands on the idle schedule.
+The live stream is healed too: an orphan release
 (lost press) drops before ZMK sees it, a repeated press synthesizes its lost
 release first. A changed battery level reconciles the same way. Keepalives run on
 single-channel links too. Positions 64 and above are not covered.

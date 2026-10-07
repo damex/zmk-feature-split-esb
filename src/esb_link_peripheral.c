@@ -207,15 +207,14 @@ static int send_on_pipe(uint8_t pipe, const uint8_t *data, size_t length, bool a
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
     }
-    bool wants_ack = ack || hop_ack_probe_due();
     struct esb_payload payload = {0};
     payload.pipe = pipe;
-    payload.noack = !wants_ack;
+    payload.noack = !ack;
     payload.length = (uint8_t)length;
     memcpy(payload.data, data, length);
     int error = submit_payload(&payload);
     if (error == 0) {
-        hop_note_data_sent(wants_ack);
+        hop_note_data_sent();
     }
     return error;
 }

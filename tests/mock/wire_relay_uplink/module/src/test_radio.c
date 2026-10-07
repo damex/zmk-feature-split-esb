@@ -132,12 +132,7 @@ uint8_t hop_link_cost_x10(void) {
     return 0;
 }
 
-bool hop_ack_probe_due(void) {
-    return false;
-}
-
-void hop_note_data_sent(bool acked) {
-    ARG_UNUSED(acked);
+void hop_note_data_sent(void) {
 }
 
 static void wire_inject_fn(struct k_work *work) {

@@ -22,7 +22,6 @@ MOCK_CASES += \
 	hid_relay_tap \
 	hid_state_sync \
 	input_batch \
-	peripheral_ack_probe \
 	peripheral_adaptive_retransmits \
 	peripheral_burst_keepalive \
 	peripheral_epoch_adoption \
