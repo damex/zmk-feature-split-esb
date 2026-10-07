@@ -50,9 +50,8 @@ properties:
   hop-anchors:
     type: uint8-array
     description: |
-      Rendezvous channels, a subset of hop-channels, kept unmaskable so a lost link always
-      re-finds the central on known spectrum. Pick channels clear of local WiFi, since the
-      engine can never mask these.
+      Channels the engine never masks, a subset of hop-channels. Pick channels clear of
+      local WiFi, since the engine can never drop these.
       Every entry must appear in hop-channels.
       Build assert rejects one that does not.
       Omit and the engine spreads min(3, hop-channels length) anchors evenly over the pool,

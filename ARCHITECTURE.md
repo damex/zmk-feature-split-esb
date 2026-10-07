@@ -344,8 +344,8 @@ All three run on the system workqueue.
 |   v                        v                    v                            |
 |  [adopt_epoch]        [connected_window]   [lost_window]                     |
 |  retune to epoch      attempts EWMA ->     degrade undo ->                   |
-|  channel, mask swap   retransmit budget,   sweep the pool ->                 |
-|                       degrade step         camp the anchors                  |
+|  channel, mask swap   retransmit budget,   sweep the pool                    |
+|                       degrade step                                           |
 |   |                        |                    |                            |
 |   +------------+-----------+--------------------+                            |
 |                v                                                             |
@@ -368,7 +368,7 @@ All three run on the system workqueue.
 |      v                                                                       |
 |  [epoch hop: retune, mask commits]                                           |
 |                                                                              |
-|  [anchor dip] --> [rejoin + mask beacons for lost pipes]                     |
+|  [silent walk] --> [rejoin beacon for a returning pipe]                      |
 +------------------------------------------------------------------------------+
 
 +-- central staleness tick ------- 500 ms -------------------------------------+
@@ -396,27 +396,22 @@ Time flows down, one column per device.
 |      v                                   |                                   |
 |  [degrade undo]                          v                                   |
 |  only after a failed degrade         [needs_rendezvous]                      |
-|  step: one step back first               |                                   |
-|      |                                   v                                   |
-|      v                               [anchor dip]                            |
-|  [sweep the pool]                    one window on the next                  |
-|  index_next each dwell,              anchor every dip period,                |
-|  ESB_HOP_SWEEP_WINDOWS long          rejoin beacon latched                   |
-|      |                                   |                                   |
+|  step: one step back first           stays on the live channel,              |
+|      |                               mask updates held back                  |
 |      v                                   |                                   |
-|  [camp the anchors]                      |                                   |
-|  hop_policy_camp_step, dwell             |                                   |
-|  outlasts a full dip cycle               |                                   |
+|  [sweep the pool]                        |                                   |
+|  index_next each dwell,                  |                                   |
+|  until a keepalive is acked              |                                   |
 |      |                                   |                                   |
 |      +------ keepalive lands on ---------+                                   |
-|             the dipped anchor                                                |
+|             the live channel                                                 |
 |                     |                                                        |
 |                     v                                                        |
-|  [ACK carries rejoin beacon + staged mask update]                            |
+|  [next decision tick latches the rejoin beacon, a later ACK carries it]      |
 |      |                                   |                                   |
 |      v                                   v                                   |
 |  [adopt_epoch]                       [pipe heard]                            |
-|  staged mask swapped in,             quiet resets, dips stop.                |
+|  staged mask swapped in,             quiet resets.                           |
 |  retune to the live channel          held state survives when                |
 |                                      rendezvous beats                        |
 |                                      peripheral-timeout-ms                   |

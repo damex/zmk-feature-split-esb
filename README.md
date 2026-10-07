@@ -203,7 +203,7 @@ pin. `nice_nano` defaults to TX=P0.06 and RX=P0.08. Here we put wire on P0.08:
 | `address-length` | on-air address bytes 3/4/5, shorter trims airtime, weakens selectivity, all devices must match (default 5) |
 | `peripherals` | one child node per peripheral: `pipe`, `prefix` (1 byte), `weight`, `reply-queue-depth` (central command backlog for this pipe, default 8) |
 | `hop-channels` | channel bytestring, each 0-100 (2400 + N MHz). 1 = fixed, 2+ = hopping set |
-| `hop-anchors` | unmaskable rendezvous set, a subset of hop-channels, build assert enforces. Omit and the engine spreads three across the pool. Pick channels clear of local WiFi |
+| `hop-anchors` | channels never masked, a subset of hop-channels, build assert enforces. Omit and the engine spreads three across the pool. Pick channels clear of local WiFi |
 | `hop-threshold` | graded loss before acting: central hop-vote sum, peripheral sweep streak; fully-lost window scores 4 (default 24) |
 | `hop-min-active` | floor of unmasked channels the engine keeps hoppable (default 6) |
 | `hop-mask-threshold` | per-channel bad score at which the central masks it, clean windows decay (default 16) |
@@ -312,16 +312,15 @@ off a channel that degrades. The central drives the hop: it counts a served
 peripheral's window bad when motion goes missing or arrives weaker than
 `rssi-floor-dbm`, and a weighted vote across peripherals (`hop-threshold`) moves the
 whole link to the next channel. A peripheral that loses the central sweeps the full
-list to re-find it, then camps the anchors. One channel is a fixed link, no hopping.
+list until the central answers. One channel is a fixed link, no hopping.
 Every peripheral must carry the central's list, so flash them as a set.
 
-A few channels (the anchors) are held unmaskable, the rendezvous set both ends meet on
-when the link is lost. Omit `hop-anchors` and the engine spreads three of them evenly
+A few channels (the anchors) are never masked, so the hop always keeps them.
+Omit `hop-anchors` and the engine spreads three of them evenly
 across `hop-channels`, so a custom pool still gets frequency-diverse anchors.
 `hop-anchors` overrides that pick, and every entry must appear in `hop-channels`.
-The engine can never mask an anchor, so pick channels clear of local WiFi, otherwise the
-link rendezvouses on contended spectrum. The rest of the pool carries data, AFH drops the
-channels that perform badly.
+The engine can never mask an anchor, so pick channels clear of local WiFi.
+AFH drops the other channels when they perform badly.
 
 The central seeds its boot mask before the radio starts: the mask learned last
 session (persisted to settings under `esb_hop/mask`) plus an ambient energy sweep

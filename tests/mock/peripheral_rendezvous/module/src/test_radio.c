@@ -3,7 +3,7 @@
 
 /*
  * Fake NCS ESB on a peripheral whose every transmit fails.
- * Exits 0 once retunes sweep the pool per dwell, then camp each anchor in turn, still searching.
+ * Exits 0 once retunes step through the pool every sweep dwell for several passes, still searching.
  * Exits 1 on a wrong, early or late retune, a link reported found, or at deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb
@@ -27,52 +27,24 @@
 #include "hop_internal.h"
 #include "mock_esb.h"
 
-#define POOL_CHANNEL(index) DT_INST_PROP_BY_IDX(0, hop_channels, index)
-#define ANCHOR_CHANNEL(slot) DT_INST_PROP_BY_IDX(0, hop_anchors, slot)
 #define DWELL_WINDOWS ESB_HOP_SWEEP_DWELL_WINDOWS
-#define CAMP_WINDOWS (ESB_HOP_ANCHOR_DWELL_WINDOWS + 1)
-#define LAST_RETUNE_WINDOW (ESB_HOP_SWEEP_WINDOWS + 2 * CAMP_WINDOWS)
+#define SWEEP_PASSES 3
+#define LAST_RETUNE_WINDOW (SWEEP_PASSES * HOP_COUNT * DWELL_WINDOWS)
 #define VERDICT_DEADLINE_MS 3000
 
-BUILD_ASSERT(HOP_COUNT == 4, "expected retunes walk a four-channel pool");
-BUILD_ASSERT(ESB_HOP_ANCHOR_COUNT == 2, "expected retunes camp two anchors");
-
-struct retune {
-    uint32_t window;
-    uint8_t channel;
-};
-
-static const struct retune expected[] = {
-    {.window = 1 * DWELL_WINDOWS, .channel = POOL_CHANNEL(1)},
-    {.window = 2 * DWELL_WINDOWS, .channel = POOL_CHANNEL(2)},
-    {.window = 3 * DWELL_WINDOWS, .channel = POOL_CHANNEL(3)},
-    {.window = 4 * DWELL_WINDOWS, .channel = POOL_CHANNEL(0)},
-    {.window = 5 * DWELL_WINDOWS, .channel = POOL_CHANNEL(1)},
-    {.window = ESB_HOP_SWEEP_WINDOWS, .channel = ANCHOR_CHANNEL(0)},
-    {.window = ESB_HOP_SWEEP_WINDOWS + CAMP_WINDOWS, .channel = ANCHOR_CHANNEL(1)},
-    {.window = LAST_RETUNE_WINDOW, .channel = ANCHOR_CHANNEL(0)},
-};
-
+static const uint8_t pool_channels[] = DT_INST_PROP(0, hop_channels);
 static uint32_t windows;
 
 static size_t retunes_due(uint32_t window) {
-    size_t due = 0;
-    for (size_t index = 0; index < ARRAY_SIZE(expected); index++) {
-        if (expected[index].window <= window) {
-            due++;
-        }
-    }
-    return due;
+    return window / DWELL_WINDOWS;
 }
 
 static uint32_t channel_due(uint32_t window) {
-    uint32_t channel = 0;
-    for (size_t index = 0; index < ARRAY_SIZE(expected); index++) {
-        if (expected[index].window <= window) {
-            channel = expected[index].channel;
-        }
+    size_t retunes = retunes_due(window);
+    if (retunes == 0) {
+        return 0;
     }
-    return channel;
+    return pool_channels[retunes % HOP_COUNT];
 }
 
 static void check_window(void) {
@@ -96,9 +68,8 @@ static void check_window(void) {
         exit(1);
     }
     if (windows > LAST_RETUNE_WINDOW) {
-        printk("PASS: %u retunes swept the pool every %u windows, camped anchors every %u, "
-               "searching throughout\n",
-               (unsigned int)retunes, (unsigned int)DWELL_WINDOWS, (unsigned int)CAMP_WINDOWS);
+        printk("PASS: %u retunes swept the pool %u times every %u windows, searching throughout\n",
+               (unsigned int)retunes, (unsigned int)SWEEP_PASSES, (unsigned int)DWELL_WINDOWS);
         exit(0);
     }
 }

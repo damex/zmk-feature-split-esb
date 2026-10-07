@@ -109,18 +109,6 @@ uint8_t hop_policy_index_next(uint8_t index, size_t count) {
     return (uint8_t)(((size_t)index + 1U) % count);
 }
 
-void hop_policy_camp_step(uint8_t *camp_anchor, uint16_t *camp_dwell, uint8_t anchor_count,
-                          uint16_t dwell_reload) {
-    __ASSERT_NO_MSG(camp_anchor != NULL);
-    __ASSERT_NO_MSG(camp_dwell != NULL);
-    if (*camp_dwell > 0) {
-        (*camp_dwell)--;
-        return;
-    }
-    *camp_anchor = hop_policy_index_next(*camp_anchor, anchor_count);
-    *camp_dwell = dwell_reload;
-}
-
 uint8_t hop_policy_channel_for_epoch(uint16_t epoch, size_t hop_count) {
     __ASSERT_NO_MSG(hop_count > 0);
     return (uint8_t)(epoch % hop_count);

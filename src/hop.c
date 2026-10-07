@@ -24,7 +24,7 @@ uint8_t hop_index;
  * Boot sentinel: esb_link_radio_setup tunes without updating applied_index. */
 BUILD_ASSERT(HOP_COUNT < UINT8_MAX, "sentinel needs one spare index value");
 static uint8_t applied_index = UINT8_MAX;
-void apply_channel_index(uint8_t index) {
+static void apply_channel_index(uint8_t index) {
     if (index == applied_index) {
         return;
     }
@@ -91,11 +91,6 @@ static void resolve_anchors(void) {
     }
 #endif
     anchors_resolved = true;
-}
-
-uint8_t hop_anchor_index_at(uint8_t slot) {
-    resolve_anchors();
-    return anchor_indices[slot];
 }
 
 bool hop_is_anchor_index(uint8_t index) {

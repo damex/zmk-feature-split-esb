@@ -3,10 +3,11 @@
 
 /*
  * Fake ESB driver and both halves under a real hop_central.c and esb_link_central.c.
- * Both halves go silent, then the right half returns camped and polls once per dip.
- * Exits 0 once dips land on anchors for one hop window, the silent walk covers the pool once,
- * and the right half reads the live epoch from the ACK of its one poll in a dip.
- * Exits 1 on a dip off the anchors or held too long, a wrong walk, a stale ACK, or at deadline.
+ * Both halves go silent, then the right half's sweep lands back on the live channel.
+ * Exits 0 once the dongle never leaves its live channel, the silent walk covers the pool once,
+ * and the returning half reads the live epoch from an ACK
+ * within one decision window and three polls.
+ * Exits 1 on a retune off the live channel, a wrong walk, a late beacon, or at deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 
@@ -34,18 +35,18 @@
 #define RIGHT_PIPE DT_PROP(DT_NODELABEL(right), pipe)
 #define PIPE_COUNT DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals))
 #define HOP_WINDOW_MS DT_INST_PROP(0, hop_window_ms)
+#define REJOIN_BOUND_MS (DT_INST_PROP(0, idle_keepalive_ms) + 3 * HOP_WINDOW_MS)
 #define START_MS 5
 #define SAMPLE_MS 1
 #define SILENCE_AT_MS 100
 #define RETURN_AFTER_MS 1000
-#define DIP_SLACK_MS 2
 #define ACK_QUEUE_DEPTH 8
 #define VERDICT_DEADLINE_MS 3000
 
 enum phase {
     PHASE_POLLING,
     PHASE_SILENT,
-    PHASE_CAMPED,
+    PHASE_RETURNED,
 };
 
 struct ack_queue {
@@ -55,17 +56,14 @@ struct ack_queue {
     bool head_sent;
 };
 
-static const uint8_t anchor_channels[] = DT_INST_PROP(0, hop_anchors);
-
 static enum phase phase = PHASE_POLLING;
 static struct ack_queue ack_queues[PIPE_COUNT];
 static uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0)];
 static size_t keepalive_length;
 static uint8_t epoch_at_silence;
-static size_t dips;
-static bool dip_open;
-static uint32_t dip_start_ms;
-static uint32_t camp_channel;
+static uint32_t return_ms;
+static bool left_live;
+static uint32_t off_live_channel;
 
 int esb_write_payload(const struct esb_payload *payload) {
     if (payload->pipe >= PIPE_COUNT) {
@@ -110,53 +108,23 @@ static struct zmk_split_esb_status dongle_status(void) {
     return status;
 }
 
-static bool is_anchor_channel(uint32_t channel) {
-    return memchr(anchor_channels, (int)channel, sizeof(anchor_channels)) != NULL;
+static bool on_live_channel(void) {
+    return mock_esb_channel() == dongle_status().channel;
 }
 
-static void check_rejoin_ack(bool carried, const struct esb_payload *ack) {
-    uint8_t live_epoch = dongle_status().epoch;
-    mock_check((uint8_t)(live_epoch - epoch_at_silence) == HOP_COUNT,
-               "silent walk stops after one pass over the pool");
-    bool beacon = carried && esb_is_beacon(ack->data, ack->length);
-    uint8_t beacon_epoch = beacon ? ack->data[offsetof(struct esb_beacon, epoch)] : 0;
-    if (!beacon || beacon_epoch != live_epoch) {
-        printk("right half ACK: %u bytes, beacon %d, epoch %u, live epoch %u\n",
-               carried ? ack->length : 0, beacon, beacon_epoch, live_epoch);
+static bool ack_carries_live_epoch(bool carried, const struct esb_payload *ack) {
+    if (!carried || !esb_is_beacon(ack->data, ack->length)) {
+        return false;
     }
-    mock_check(beacon && beacon_epoch == live_epoch,
-               "camped half reads the live epoch from the ACK of its one poll in a dip");
-    printk("PASS: all %u central rendezvous checks over %u dips\n",
-           (unsigned int)mock_checks_passed(), (unsigned int)dips);
-    exit(0);
+    return ack->data[offsetof(struct esb_beacon, epoch)] == dongle_status().epoch;
 }
 
-static void camp_poll_fn(struct k_work *work) {
-    ARG_UNUSED(work);
-    if (mock_esb_channel() != camp_channel) {
-        return;
+static void check_stayed_live(const char *what) {
+    if (left_live) {
+        printk("dongle radio on channel %u, live channel %u\n", (unsigned int)off_live_channel,
+               dongle_status().channel);
     }
-    struct esb_payload ack = {0};
-    bool carried = poll_from(RIGHT_PIPE, &ack);
-    check_rejoin_ack(carried, &ack);
-}
-static K_WORK_DELAYABLE_DEFINE(camp_poll_work, camp_poll_fn);
-
-static void open_dip(uint32_t channel, uint32_t now_ms) {
-    dip_open = true;
-    dip_start_ms = now_ms;
-    dips++;
-    mock_check(is_anchor_channel(channel), "dip lands on an anchor");
-    if (phase == PHASE_CAMPED) {
-        camp_channel = channel;
-        k_work_reschedule(&camp_poll_work, K_MSEC(HOP_WINDOW_MS / 2));
-    }
-}
-
-static void close_dip(uint32_t now_ms) {
-    dip_open = false;
-    mock_check(now_ms - dip_start_ms <= HOP_WINDOW_MS + DIP_SLACK_MS,
-               "dip returns to the live channel after one hop window");
+    mock_check(!left_live, what);
 }
 
 static void sampler_fn(struct k_work *work);
@@ -164,15 +132,32 @@ static K_WORK_DELAYABLE_DEFINE(sampler_work, sampler_fn);
 
 static void sampler_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    uint32_t radio_channel = mock_esb_channel();
-    bool on_live = radio_channel == dongle_status().channel;
-    uint32_t now_ms = k_uptime_get_32();
-    if (!on_live && !dip_open) {
-        open_dip(radio_channel, now_ms);
-    } else if (on_live && dip_open) {
-        close_dip(now_ms);
+    if (!left_live && !on_live_channel()) {
+        left_live = true;
+        off_live_channel = mock_esb_channel();
     }
     k_work_reschedule(&sampler_work, K_MSEC(SAMPLE_MS));
+}
+
+static void returned_poll_fn(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(returned_poll_work, returned_poll_fn);
+
+static void returned_poll_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    struct esb_payload ack = {0};
+    bool carried = false;
+    if (on_live_channel()) {
+        carried = poll_from(RIGHT_PIPE, &ack);
+    }
+    if (!ack_carries_live_epoch(carried, &ack)) {
+        k_work_reschedule(&returned_poll_work, K_MSEC(HOP_WINDOW_MS));
+        return;
+    }
+    mock_check(k_uptime_get_32() - return_ms <= REJOIN_BOUND_MS,
+               "returning half reads the live epoch within one decision window and three polls");
+    check_stayed_live("dongle stays on its live channel while the half rejoins");
+    printk("PASS: all %u central rendezvous checks\n", (unsigned int)mock_checks_passed());
+    exit(0);
 }
 
 static void halves_poll_fn(struct k_work *work);
@@ -183,7 +168,7 @@ static void halves_poll_fn(struct k_work *work) {
     if (phase != PHASE_POLLING) {
         return;
     }
-    if (mock_esb_channel() == dongle_status().channel) {
+    if (on_live_channel()) {
         struct esb_payload ack;
         for (uint8_t pipe = 0; pipe < PIPE_COUNT; pipe++) {
             (void)poll_from(pipe, &ack);
@@ -194,16 +179,18 @@ static void halves_poll_fn(struct k_work *work) {
 
 static void return_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    mock_check(dips > 0, "dongle dips to anchors while the halves are lost");
-    mock_check(dongle_status().epoch != epoch_at_silence,
-               "dongle walks off the live channel while every half is silent");
-    phase = PHASE_CAMPED;
+    check_stayed_live("dongle stays on its live channel while every half is lost");
+    mock_check((uint8_t)(dongle_status().epoch - epoch_at_silence) == HOP_COUNT,
+               "silent walk covers the pool once");
+    phase = PHASE_RETURNED;
+    return_ms = k_uptime_get_32();
+    k_work_reschedule(&returned_poll_work, K_NO_WAIT);
 }
 static K_WORK_DELAYABLE_DEFINE(return_work, return_fn);
 
 static void silence_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    mock_check(dips == 0, "no dip while both halves poll");
+    check_stayed_live("dongle stays on its live channel while both halves poll");
     epoch_at_silence = dongle_status().epoch;
     phase = PHASE_SILENT;
     k_work_reschedule(&return_work, K_MSEC(RETURN_AFTER_MS));
@@ -212,8 +199,7 @@ static K_WORK_DELAYABLE_DEFINE(silence_work, silence_fn);
 
 static void verdict_deadline_fn(struct k_work *work) {
     ARG_UNUSED(work);
-    printk("FAIL: no camped poll landed in a dip, %u dips, phase %u\n", (unsigned int)dips,
-           (unsigned int)phase);
+    printk("FAIL: no ACK carried the live epoch, phase %u\n", (unsigned int)phase);
     exit(1);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_deadline_work, verdict_deadline_fn);

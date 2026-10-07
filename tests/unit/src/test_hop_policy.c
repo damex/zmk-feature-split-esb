@@ -88,28 +88,6 @@ ZTEST(hop_policy, test_index_next_wraps) {
     zassert_equal(hop_policy_index_next(0, 1), 0, "single channel stays put");
 }
 
-ZTEST(hop_policy, test_camp_step_holds_then_rotates) {
-    uint8_t anchor = 2; /* ANCHOR_COUNT - 1, the peripheral's camp init */
-    uint16_t dwell = 0;
-    hop_policy_camp_step(&anchor, &dwell, 3, 4);
-    zassert_equal(anchor, 0, "empty dwell rotates to first anchor");
-    zassert_equal(dwell, 4, "reloads dwell on rotate");
-    for (int window = 0; window < 4; window++) {
-        hop_policy_camp_step(&anchor, &dwell, 3, 4);
-        zassert_equal(anchor, 0, "anchor steady through the hold");
-    }
-    zassert_equal(dwell, 0, "dwell drains over the hold");
-    hop_policy_camp_step(&anchor, &dwell, 3, 4);
-    zassert_equal(anchor, 1, "rotates once the hold expires");
-}
-
-ZTEST(hop_policy, test_camp_step_single_anchor_stays) {
-    uint8_t anchor = 0;
-    uint16_t dwell = 0;
-    hop_policy_camp_step(&anchor, &dwell, 1, 2);
-    zassert_equal(anchor, 0, "lone anchor never leaves");
-}
-
 ZTEST(hop_policy, test_score_update_accrues_and_saturates) {
     uint8_t score = 0;
     hop_policy_score_update(&score, 3, 1);

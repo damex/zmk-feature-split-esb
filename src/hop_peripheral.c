@@ -50,9 +50,7 @@ static atomic_t tx_failed_since_tick;
 static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
-static uint16_t lost_windows;
-static uint8_t camp_anchor = ESB_HOP_ANCHOR_COUNT - 1;
-static uint16_t camp_dwell;
+static uint16_t sweep_windows;
 static uint8_t degrade_undo_index;
 static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
@@ -153,7 +151,7 @@ static void adopt_staged_mask(void) {
 }
 
 /* Adopt the central's channel on a beacon epoch or mask change.
- * Otherwise sweep the pool to land on a stable central, then camp a hopping one.
+ * Otherwise sweep the pool until a window lands on the central.
  * The full pool is the rendezvous, so a stale mask still recovers.
  * Statically initialized for the same SYS_INIT-order reason as the central work. */
 static void keepalive_work_fn(struct k_work *work);
@@ -164,15 +162,14 @@ static void adopt_epoch(uint8_t epoch) {
     hop_index = hop_policy_channel_for_epoch_masked(epoch, active_mask, HOP_COUNT);
     apply_hop_channel();
     bad_windows = 0;
-    lost_windows = 0;
-    camp_dwell = 0;
+    sweep_windows = 0;
     degrade_undo_armed = false;
     attempts_ewma_x10 = 10;
     atomic_set(&max_tx_attempts, 0);
 }
 
 static void connected_window(void) {
-    lost_windows = 0;
+    sweep_windows = 0;
     degrade_undo_armed = false;
     uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
     if (attempts > 0) {
@@ -190,26 +187,14 @@ static void connected_window(void) {
 static void lost_window(void) {
     atomic_set(&max_tx_attempts, 0);
     bad_windows = 0;
-    if (lost_windows < UINT16_MAX) {
-        lost_windows++;
-    }
+    sweep_windows = (uint16_t)((sweep_windows + 1) % ESB_HOP_SWEEP_DWELL_WINDOWS);
     if (degrade_undo_armed) {
         degrade_undo_armed = false;
         hop_index = degrade_undo_index;
         apply_hop_channel();
-    } else if (lost_windows < ESB_HOP_SWEEP_WINDOWS) {
-        if (lost_windows % ESB_HOP_SWEEP_DWELL_WINDOWS == 0) {
-            hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
-            apply_hop_channel();
-        }
-    } else {
-        hop_policy_camp_step(&camp_anchor, &camp_dwell, ESB_HOP_ANCHOR_COUNT,
-                             ESB_HOP_ANCHOR_DWELL_WINDOWS);
-        uint8_t anchor_index = hop_anchor_index_at(camp_anchor);
-        if (hop_index != anchor_index) {
-            hop_index = anchor_index;
-            apply_hop_channel();
-        }
+    } else if (sweep_windows == 0) {
+        hop_index = hop_policy_index_next(hop_index, HOP_COUNT);
+        apply_hop_channel();
     }
 }
 
