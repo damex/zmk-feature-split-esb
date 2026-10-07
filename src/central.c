@@ -17,8 +17,10 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
 
+#include <zmk/endpoints.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_esb_peripheral_changed.h>
+#include <zmk/hid_indicators.h>
 #include <zmk/sensors.h>
 #include <zmk/split/central.h>
 #include <zmk/split/transport/central.h>
@@ -26,6 +28,7 @@
 
 #include "central.h"
 #include "central_input.h"
+#include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
@@ -407,7 +410,22 @@ static void central_event_work_fn(struct k_work *work) {
 
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
+/* Selected endpoint, so ZMK reports them as the current host's indicators. */
+static void apply_host_indicators(const uint8_t *data) {
+    if (!IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)) {
+        return;
+    }
+    struct zmk_hid_led_report_body report = {
+        .leds = data[offsetof(struct esb_host_indicators, indicators)],
+    };
+    zmk_hid_indicators_process_report(&report, zmk_endpoint_get_selected());
+}
+
 void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
+    if (esb_is_host_indicators(data, length)) {
+        apply_host_indicators(data);
+        return;
+    }
     if (esb_keepalive_matches(data, (uint8_t)length)) {
         central_input_reconcile(&esb_central, pipe, data);
         struct central_inbound inbound = {

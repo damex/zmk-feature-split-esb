@@ -305,6 +305,10 @@ ACK, a burst lands in one poll. Idle polls carry the current state, so a lost
 change heals, and the dongle forwards only reports that differ. USB polls at
 1 ms on a relay dongle. Relay pipes get no ZMK commands.
 
+Host lock indicators (caps, num, scroll, compose, kana) go back up to the central,
+so its widgets and the halves' beacon see them.
+Set `CONFIG_ZMK_HID_INDICATORS=y` on the dongle and the central for that.
+
 ## Channel hopping
 
 List two or more channels in `hop-channels` and the link hops between them, stepping

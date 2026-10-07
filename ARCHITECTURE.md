@@ -438,8 +438,8 @@ Time flows down, one column per device.
 
 ## Packets
 
-First byte routes a packet. Control tags sit at 0xFD..0xFF. Event type tags
-are a handful of small integers, build-asserted below the keepalive tag.
+First byte routes a packet. Control tags sit at 0xFC..0xFF. Event type tags
+are a handful of small integers, build-asserted below the host indicators tag.
 
 ```
 event packet     peripheral to central, events back to back in one payload
@@ -457,6 +457,10 @@ keepalive        peripheral to central, every tick
   [12]    held input key count, up to ZMK_INPUT_SPLIT_MAX_TRACKED_KEYS
   [13..]  held input keys, reg u8 + code u16 le each
   then    per-sensor running total, i64 le microdegrees each
+
+host indicators  relay dongle to central, on each host LED change
+  [0]    0xFC
+  [1]    host lock indicators, ZMK HID indicator bits
 
 beacon           central to peripheral, rides an ACK
   [0]    0xFE
