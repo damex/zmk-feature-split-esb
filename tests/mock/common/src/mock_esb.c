@@ -28,6 +28,7 @@ static size_t rx_fifo_count;
 static uint32_t rf_channel;
 static size_t rf_channel_sets;
 static size_t tx_flushes;
+static size_t rx_starts;
 
 static void note_call(void) {
     if (!initialized) {
@@ -59,6 +60,7 @@ int esb_read_rx_payload(struct esb_payload *payload) {
 
 int esb_start_rx(void) {
     note_call();
+    rx_starts++;
     return 0;
 }
 
@@ -166,4 +168,12 @@ size_t mock_esb_flush_count(void) {
 
 size_t mock_esb_calls_before_init(void) {
     return calls_before_init;
+}
+
+bool mock_esb_initialized(void) {
+    return initialized;
+}
+
+size_t mock_esb_rx_start_count(void) {
+    return rx_starts;
 }

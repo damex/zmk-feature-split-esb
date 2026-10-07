@@ -26,6 +26,7 @@ MOCK_CASES += \
 	peripheral_idle_keepalive \
 	peripheral_keepalive \
 	peripheral_rendezvous \
+	peripheral_startup_order \
 	wire_central_hid_state \
 	wire_central_simplex \
 	wire_peer_held_input \

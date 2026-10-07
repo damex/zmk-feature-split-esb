@@ -3,8 +3,8 @@
 
 /*
  * Fake ESB driver under a real esb_link.c on a central booting through ZMK's transport enable.
- * Exits 0 once boot made no ESB call ahead of esb_init and left RX started.
- * Exits 1 on a radio call before esb_init.
+ * Exits 0 once boot made no ESB call ahead of esb_init and left the PRX receiving.
+ * Exits 1 on a radio call before esb_init, or RX never started.
  */
 #include <stdlib.h>
 
@@ -32,7 +32,9 @@ static void verdict_fn(struct k_work *work) {
         printk("FAIL: %u ESB calls reached the radio before esb_init\n", (unsigned int)early_calls);
         exit(1);
     }
-    printk("PASS: no ESB call before esb_init through boot\n");
+    mock_check(mock_esb_initialized(), "boot runs esb_init");
+    mock_check(mock_esb_rx_start_count() > 0, "central starts RX after boot");
+    printk("PASS: no ESB call before esb_init through boot, RX started\n");
     exit(0);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_work, verdict_fn);
