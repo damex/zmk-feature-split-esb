@@ -24,6 +24,7 @@ MOCK_CASES += \
 	input_batch \
 	peripheral_ack_probe \
 	peripheral_adaptive_retransmits \
+	peripheral_burst_keepalive \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
 	peripheral_idle_clock \
