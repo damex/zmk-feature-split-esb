@@ -9,6 +9,7 @@ ZMK_APP ?= $(error ZMK_APP is not set)
 MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central_reconcile \
+	central_rendezvous \
 	central_return_path \
 	central_sleep \
 	central_startup_order \
