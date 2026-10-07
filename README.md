@@ -271,7 +271,7 @@ replays what was lost.
 A stuck key heals with the next keepalive.
 Every tick sends one, `hop-window-ms` apart while data flows and
 `idle-keepalive-ms` apart at idle.
-First tick of a burst still lands on the idle schedule.
+First send of a burst pulls the next tick in to `hop-window-ms`.
 The live stream is healed too: an orphan release
 (lost press) drops before ZMK sees it, a repeated press synthesizes its lost
 release first. A changed battery level reconciles the same way. Keepalives run on

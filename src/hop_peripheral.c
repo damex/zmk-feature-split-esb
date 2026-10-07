@@ -308,6 +308,10 @@ void hop_note_tx_failed(void) {
 
 void hop_note_data_sent(void) {
     atomic_set(&data_sent_since_tick, 1);
+    k_ticks_t remaining = k_work_delayable_remaining_get(&keepalive_work);
+    if (remaining > (k_ticks_t)k_ms_to_ticks_ceil64(hop_window_ms)) {
+        k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
+    }
 }
 
 int hop_set_retransmit_ceiling(uint32_t ceiling) {
