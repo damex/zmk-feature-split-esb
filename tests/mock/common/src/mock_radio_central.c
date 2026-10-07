@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * ESB link core stand-in under a real esb_link_central.c.
+ * Fake ESB link core under a real esb_link_central.c.
  * Mock case links mock_esb.c for the radio below.
  */
 #define DT_DRV_COMPAT zmk_split_esb

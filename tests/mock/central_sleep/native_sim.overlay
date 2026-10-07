@@ -1,0 +1,14 @@
+/ {
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+        hop-channels = [4A];
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+};

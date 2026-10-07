@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * ESB link core stand-in under a real esb_link_peripheral.c.
+ * Fake ESB link core under a real esb_link_peripheral.c.
  * Mock case links mock_esb.c and mock_hfclk.c for the radio and clock below.
  */
 #pragma once

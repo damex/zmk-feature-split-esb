@@ -1,7 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* Channel survey stand-in for esb_survey.c, every channel reads quiet. */
+/* Fake esb_survey.c, every channel reads quiet. */
 
 #include <stddef.h>
 #include <stdint.h>

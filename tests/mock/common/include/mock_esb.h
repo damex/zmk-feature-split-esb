@@ -29,3 +29,4 @@ size_t mock_esb_flush_count(void);
 size_t mock_esb_calls_before_init(void);
 bool mock_esb_initialized(void);
 size_t mock_esb_rx_start_count(void);
+size_t mock_esb_rx_stop_count(void);

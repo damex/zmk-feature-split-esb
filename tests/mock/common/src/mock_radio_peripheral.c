@@ -1,7 +1,7 @@
 // Copyright 2026 Roman Kuzmitskii (@damex)
 // SPDX-License-Identifier: MIT
 
-/* ESB link core stand-in under a real esb_link_peripheral.c. */
+/* Fake ESB link core under a real esb_link_peripheral.c. */
 
 #include "mock_radio_peripheral.h"
 

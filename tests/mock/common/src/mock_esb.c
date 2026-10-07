@@ -29,6 +29,7 @@ static uint32_t rf_channel;
 static size_t rf_channel_sets;
 static size_t tx_flushes;
 static size_t rx_starts;
+static size_t rx_stops;
 
 static void note_call(void) {
     if (!initialized) {
@@ -66,6 +67,7 @@ int esb_start_rx(void) {
 
 int esb_stop_rx(void) {
     note_call();
+    rx_stops++;
     return 0;
 }
 
@@ -176,4 +178,8 @@ bool mock_esb_initialized(void) {
 
 size_t mock_esb_rx_start_count(void) {
     return rx_starts;
+}
+
+size_t mock_esb_rx_stop_count(void) {
+    return rx_stops;
 }

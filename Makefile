@@ -10,6 +10,7 @@ MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central_reconcile \
 	central_return_path \
+	central_sleep \
 	central_startup_order \
 	esb_link_rx_ring \
 	esb_link_tx_failed \
@@ -27,6 +28,7 @@ MOCK_CASES += \
 	peripheral_idle_keepalive \
 	peripheral_keepalive \
 	peripheral_rendezvous \
+	peripheral_sleep \
 	peripheral_startup_order \
 	wire_central_hid_state \
 	wire_central_simplex \
