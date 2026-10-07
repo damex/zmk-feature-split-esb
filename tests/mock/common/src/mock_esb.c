@@ -30,6 +30,7 @@ static size_t rf_channel_sets;
 static size_t tx_flushes;
 static size_t rx_starts;
 static size_t rx_stops;
+static bool tx_busy;
 
 static void note_call(void) {
     if (!initialized) {
@@ -45,7 +46,7 @@ int esb_init(const struct esb_config *config) {
 
 bool esb_is_idle(void) {
     note_call();
-    return true;
+    return !tx_busy;
 }
 
 int esb_read_rx_payload(struct esb_payload *payload) {
@@ -148,11 +149,17 @@ void mock_esb_rx_raise(void) {
     raise_event((struct esb_evt){.evt_id = ESB_EVENT_RX_RECEIVED});
 }
 
+void mock_esb_tx_begin(void) {
+    tx_busy = true;
+}
+
 void mock_esb_tx_success(uint32_t attempts) {
+    tx_busy = false;
     raise_event((struct esb_evt){.evt_id = ESB_EVENT_TX_SUCCESS, .tx_attempts = attempts});
 }
 
 void mock_esb_tx_failed(void) {
+    tx_busy = false;
     raise_event((struct esb_evt){.evt_id = ESB_EVENT_TX_FAILED});
 }
 

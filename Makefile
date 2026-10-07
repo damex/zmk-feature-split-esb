@@ -25,6 +25,7 @@ MOCK_CASES += \
 	peripheral_ack_probe \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
+	peripheral_idle_clock \
 	peripheral_idle_keepalive \
 	peripheral_keepalive \
 	peripheral_rendezvous \

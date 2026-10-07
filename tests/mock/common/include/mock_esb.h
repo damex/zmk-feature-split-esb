@@ -16,6 +16,9 @@
 /* Queues a payload for the next RX event, exits 1 when the fake FIFO is full. */
 void mock_esb_rx_push(const struct esb_payload *payload);
 
+/* Radio reads busy from here until the next TX event. */
+void mock_esb_tx_begin(void);
+
 /* Events run in the calling thread in place of the radio ISR, exit 1 before esb_init. */
 void mock_esb_rx_raise(void);
 void mock_esb_tx_success(uint32_t attempts);
