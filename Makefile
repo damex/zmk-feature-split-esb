@@ -23,6 +23,7 @@ MOCK_CASES += \
 	hid_state_sync \
 	input_batch \
 	peripheral_ack_probe \
+	peripheral_adaptive_retransmits \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
 	peripheral_idle_clock \

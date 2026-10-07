@@ -27,6 +27,9 @@ void mock_esb_tx_failed(void);
 /* Last channel passed to esb_set_rf_channel, 0 before the first. */
 uint32_t mock_esb_channel(void);
 
+/* Last count passed to esb_set_retransmit_count, 0 before the first. */
+uint16_t mock_esb_retransmit_count(void);
+
 size_t mock_esb_channel_set_count(void);
 size_t mock_esb_flush_count(void);
 size_t mock_esb_calls_before_init(void);

@@ -27,6 +27,7 @@ static size_t rx_fifo_head;
 static size_t rx_fifo_count;
 static uint32_t rf_channel;
 static size_t rf_channel_sets;
+static uint16_t retransmit_count;
 static size_t tx_flushes;
 static size_t rx_starts;
 static size_t rx_stops;
@@ -123,8 +124,8 @@ int esb_set_retransmit_delay(uint16_t delay) {
 }
 
 int esb_set_retransmit_count(uint16_t count) {
-    ARG_UNUSED(count);
     note_call();
+    retransmit_count = count;
     return 0;
 }
 
@@ -169,6 +170,10 @@ uint32_t mock_esb_channel(void) {
 
 size_t mock_esb_channel_set_count(void) {
     return rf_channel_sets;
+}
+
+uint16_t mock_esb_retransmit_count(void) {
+    return retransmit_count;
 }
 
 size_t mock_esb_flush_count(void) {
