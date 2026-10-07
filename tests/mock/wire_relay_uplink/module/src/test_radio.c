@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a wire relay half.
+ * Fake NCS ESB on a wire relay half.
  * Exits 0 once own events leave on own pipe and wire peer frames on the peer pipe, each in order.
  * Exits 1 on a wrong packet or at deadline.
  */

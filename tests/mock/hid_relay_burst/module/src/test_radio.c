@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a central relaying HID to a dongle.
+ * Fake NCS ESB on a central relaying HID to a dongle.
  * A report written during poll N rides the ACK of poll N + 1.
  * Exits 0 once every burst change is written at the first poll after its key event.
  * Exits 1 on a late change, a re-send ahead of a waiting change or at deadline.

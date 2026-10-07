@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test link standing in for esb_link_send under input batching.
+ * Fake esb_link_send under input batching.
  * Exits 0 once every check passes, 1 at the first failing one.
  */
 #include <errno.h>

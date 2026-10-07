@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on the central, with a polling peripheral.
+ * Fake NCS ESB on the central, with a polling peripheral.
  * Exits 0 once beacon modifiers change in the expected order, 1 on a wrong change or deadline.
  */
 #define DT_DRV_COMPAT zmk_split_esb

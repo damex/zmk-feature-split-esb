@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a peripheral with a split input device.
+ * Fake NCS ESB on a peripheral with a split input device.
  * Exits 0 once keepalives list a held button while it is down and drop it after release.
  * Exits 1 on a wrong held list or at deadline.
  */

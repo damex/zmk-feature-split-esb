@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a central with a simplex wire peer.
+ * Fake NCS ESB on a central with a simplex wire peer.
  * Exits 0 once modifier changes and beacon refreshes pass with nothing on the wire.
  * Exits 1 on a wire transmit or without key activity.
  */

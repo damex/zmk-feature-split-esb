@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a wire relay half.
+ * Fake NCS ESB on a wire relay half.
  * Exits 0 once a wire peer beacon reaches the wire and applies locally, own beacon staying off.
  * Exits 1 on a leaked own beacon or at deadline.
  */

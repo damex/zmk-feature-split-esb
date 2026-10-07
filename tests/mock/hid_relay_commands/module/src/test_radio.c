@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a central relaying HID to a dongle.
+ * Fake NCS ESB on a central relaying HID to a dongle.
  * Exits 0 once a behavior sent to the relay source never reaches its replies.
  * Exits 1 on a reply that is not whole HID reports.
  */

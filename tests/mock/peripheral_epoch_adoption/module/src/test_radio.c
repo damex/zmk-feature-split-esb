@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a peripheral whose transmits land after retries.
+ * Fake NCS ESB on a peripheral whose transmits land after retries.
  * Exits 0 once a mask update and a new-epoch beacon retune it to the masked epoch channel,
  * with the link cost back at the first-try baseline.
  * Exits 1 on a wrong retune, epoch or link cost, or at deadline.

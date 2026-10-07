@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a peripheral whose every transmit fails.
+ * Fake NCS ESB on a peripheral whose every transmit fails.
  * Exits 0 once retunes sweep the pool per dwell, then camp each anchor in turn, still searching.
  * Exits 1 on a wrong, early or late retune, a link reported found, or at deadline.
  */

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for the ESB link on a simplex wire relay half.
+ * Fake ESB link on a simplex wire relay half.
  * Exits 0 once uplink relays and own commands run while nothing leaves on the wire.
  * Exits 1 on a wire transmit, a wire peer command run locally or a missed uplink.
  */

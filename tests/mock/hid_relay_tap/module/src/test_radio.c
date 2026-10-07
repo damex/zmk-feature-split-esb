@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on the central.
+ * Fake NCS ESB on the central.
  * Exits 0 once the relay delivers the expected report changes in order.
  * Exits 1 on the first wrong change or at deadline.
  */

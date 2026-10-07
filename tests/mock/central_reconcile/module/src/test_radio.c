@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a central, scripting one peripheral.
+ * Fake NCS ESB on a central, scripting one peripheral.
  * Exits 0 once lost, stray and silent-peripheral traffic reconciles into the expected events.
  * Exits 1 on a wrong or extra event or at deadline.
  */

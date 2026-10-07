@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for NCS ESB on a peripheral with a key, a split button and an encoder.
+ * Fake NCS ESB on a peripheral with a key, a split button and an encoder.
  * Exits 0 once the keepalive after the last event carries every field and the next reports idle.
  * Exits 1 on a wrong field or at deadline.
  */

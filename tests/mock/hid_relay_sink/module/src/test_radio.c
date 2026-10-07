@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Test radio standing in for the ESB link on a HID relay dongle.
+ * Fake ESB link on a HID relay dongle.
  * Exits 0 once the sink sees every report change once, in order, re-sends dropped,
  * a rejected report retried by its re-send.
  * Exits 1 on a duplicate, a wrong or a missing report.
