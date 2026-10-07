@@ -450,7 +450,7 @@ event packet     peripheral to central, events back to back in one payload
 
 keepalive        peripheral to central, every tick
   [0]     0xFF
-  [1]     state, 0 idle / 1 active
+  [1]     state, 1 while searching with data to send, else 0
   [2..9]  pressed-position bitmap, 64 keys
   [10]    battery percent, 0xFF unknown
   [11]    uplink link cost, attempts EWMA x10

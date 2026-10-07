@@ -262,7 +262,7 @@ Tunables (Kconfig, defaults shown):
 ## Lost-event reconcile
 
 Split events are deltas, the keepalive is the state: each peripheral keepalive
-carries a snapshot of its live state (activity, pressed-position bitmap, held
+carries a snapshot of its live state (search state, pressed-position bitmap, held
 input-split buttons, battery level, cumulative sensor totals). Events are ACK'd,
 but the radio gives up after `retransmit-count` tries, so a delta can still die
 in a bad-RF moment. The central reconciles its view against every snapshot and
