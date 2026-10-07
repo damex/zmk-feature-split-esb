@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /*
- * Peripheral hop engine: adopt the central's epoch and mask, sweep to re-find it on a bad uplink.
+ * Peripheral hop engine: adopt the central's epoch and mask, sweep until the central answers.
  */
 #define DT_DRV_COMPAT zmk_split_esb
 

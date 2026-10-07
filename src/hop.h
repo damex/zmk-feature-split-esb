@@ -6,7 +6,7 @@
  * Hop logic is a no-op when hop-channels lists a single channel.
  * Peripheral keepalive tick still runs, central reconciles against its state snapshot.
  * Central: owns the epoch, votes to hop off a degrading channel.
- * Peripheral: adopts the epoch from beacons, sweeps to re-find it on loss.
+ * Peripheral: adopts the epoch from beacons, on loss sweeps until the central answers.
  */
 #pragma once
 
