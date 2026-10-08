@@ -35,6 +35,7 @@ MOCK_CASES += \
 	peripheral_idle_clock \
 	peripheral_idle_keepalive \
 	peripheral_keepalive \
+	peripheral_lost_tap \
 	peripheral_pointer \
 	peripheral_rendezvous \
 	peripheral_sleep \

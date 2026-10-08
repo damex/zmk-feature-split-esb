@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-lost-tap
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..
