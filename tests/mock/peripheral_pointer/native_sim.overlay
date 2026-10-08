@@ -1,0 +1,78 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    chosen {
+        zmk,esb-self = &left;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+        lossy-codes = <INPUT_EV_REL INPUT_REL_X>, <INPUT_EV_REL INPUT_REL_Y>;
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+
+    pointer_input: pointer_input {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <100>;
+        event-period = <20>;
+        events = <
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_REL INPUT_REL_WHEEL 1 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_KEY INPUT_BTN_0 1 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_KEY INPUT_BTN_0 0 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 2 0
+            INPUT_EV_REL INPUT_REL_Y 2 1
+            INPUT_EV_REL INPUT_REL_X 1 0
+            INPUT_EV_REL INPUT_REL_X 1 0
+            INPUT_EV_REL INPUT_REL_X 1 0
+            INPUT_EV_REL INPUT_REL_X 1 0
+            INPUT_EV_REL INPUT_REL_X 1 1
+        >;
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_pointer: split_pointer@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+            device = <&pointer_input>;
+        };
+    };
+};
