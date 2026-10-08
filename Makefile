@@ -8,6 +8,11 @@ ZMK_APP ?= $(error ZMK_APP is not set)
 
 MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
+	central_hid_relay_burst \
+	central_hid_relay_commands \
+	central_hid_relay_indicators \
+	central_hid_relay_pointer \
+	central_hid_relay_tap \
 	central_reconcile \
 	central_rendezvous \
 	central_return_path \
@@ -17,12 +22,6 @@ MOCK_CASES += \
 	esb_link_tx_failed \
 	esb_link_tx_stall \
 	event_codec \
-	hid_relay_burst \
-	hid_relay_commands \
-	hid_relay_host_leds \
-	hid_relay_indicators \
-	hid_relay_sink \
-	hid_relay_tap \
 	hid_state_sync \
 	input_batch \
 	peripheral_adaptive_retransmits \
@@ -36,6 +35,9 @@ MOCK_CASES += \
 	peripheral_rendezvous \
 	peripheral_sleep \
 	peripheral_startup_order \
+	relay_host_leds \
+	relay_pointer \
+	relay_reports \
 	wire_central_hid_state \
 	wire_central_simplex \
 	wire_peer_held_input \
