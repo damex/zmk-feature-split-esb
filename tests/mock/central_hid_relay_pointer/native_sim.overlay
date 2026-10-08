@@ -1,0 +1,50 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    esb_relay_pointer: esb_relay_pointer {
+        compatible = "zmk,input-processor-esb-relay-pointer";
+        #input-processor-cells = <0>;
+    };
+
+    pointer_input: pointer_input {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <50>;
+        event-period = <1>;
+        events = <
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_REL INPUT_REL_WHEEL 1 1
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_REL INPUT_REL_HWHEEL (-1) 1
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+            INPUT_EV_KEY INPUT_BTN_0 1 1
+            INPUT_EV_REL INPUT_REL_X 3 0
+            INPUT_EV_REL INPUT_REL_Y (-2) 1
+        >;
+    };
+
+    pointer_listener {
+        compatible = "zmk,input-listener";
+        device = <&pointer_input>;
+        input-processors = <&esb_relay_pointer>;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            relay: peripheral_relay {
+                pipe = <0>;
+                prefix = <0x4B>;
+                role = "relay";
+            };
+        };
+    };
+};
