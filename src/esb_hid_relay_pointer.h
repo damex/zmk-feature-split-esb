@@ -22,6 +22,9 @@ size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room);
 
 /* Radio ISR. The report from take reached the ACK FIFO, its deltas leave the sums. */
 void esb_hid_relay_pointer_sent(const uint8_t *report);
+
+/* Clears pending motion and sets buttons to ZMK's held ones, or none while paused. */
+void esb_hid_relay_pointer_reset(void);
 #else
 static inline size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
     ARG_UNUSED(out);
@@ -31,5 +34,8 @@ static inline size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
 
 static inline void esb_hid_relay_pointer_sent(const uint8_t *report) {
     ARG_UNUSED(report);
+}
+
+static inline void esb_hid_relay_pointer_reset(void) {
 }
 #endif

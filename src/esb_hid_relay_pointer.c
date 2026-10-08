@@ -21,6 +21,8 @@
 #include <zmk/hid.h>
 #include <zmk/pointing.h>
 
+#include "esb_hid_relay_central.h"
+
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) == 1,
              "one relay pointer processor serves every input listener");
 BUILD_ASSERT(sizeof(struct zmk_hid_mouse_report) == ESB_HID_RELAY_POINTER_LENGTH,
@@ -93,6 +95,9 @@ static int relay_pointer_handle_event(const struct device *dev, struct input_eve
     ARG_UNUSED(param1);
     ARG_UNUSED(param2);
     ARG_UNUSED(state);
+    if (!esb_hid_relay_active()) {
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
     if (event->type == INPUT_EV_REL) {
         add_motion(event->code, event->value);
     } else if (event->type == INPUT_EV_KEY) {
@@ -117,17 +122,17 @@ size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
     if (room < ESB_HID_RELAY_POINTER_LENGTH) {
         return 0;
     }
-    struct zmk_hid_mouse_report report = {
-        .report_id = ZMK_HID_REPORT_ID_MOUSE,
-        .body =
-            {
-                .buttons = (zmk_mouse_button_flags_t)atomic_get(&buttons),
-                .d_x = take_delta(&sum_d_x),
-                .d_y = take_delta(&sum_d_y),
-                .d_scroll_y = take_delta(&sum_d_scroll_y),
-                .d_scroll_x = take_delta(&sum_d_scroll_x),
-            },
-    };
+    struct zmk_hid_mouse_report report = {.report_id = ZMK_HID_REPORT_ID_MOUSE};
+    /* Paused, the only report left is the release of buttons the dongle still holds. */
+    if (esb_hid_relay_active()) {
+        report.body = (struct zmk_hid_mouse_report_body){
+            .buttons = (zmk_mouse_button_flags_t)atomic_get(&buttons),
+            .d_x = take_delta(&sum_d_x),
+            .d_y = take_delta(&sum_d_y),
+            .d_scroll_y = take_delta(&sum_d_scroll_y),
+            .d_scroll_x = take_delta(&sum_d_scroll_x),
+        };
+    }
     if (!report_due(&report)) {
         return 0;
     }
@@ -143,6 +148,18 @@ void esb_hid_relay_pointer_sent(const uint8_t *bytes) {
     (void)atomic_sub(&sum_d_scroll_y, report.body.d_scroll_y);
     (void)atomic_sub(&sum_d_scroll_x, report.body.d_scroll_x);
     sent_buttons = report.body.buttons;
+}
+
+void esb_hid_relay_pointer_reset(void) {
+    (void)atomic_clear(&sum_d_x);
+    (void)atomic_clear(&sum_d_y);
+    (void)atomic_clear(&sum_d_scroll_y);
+    (void)atomic_clear(&sum_d_scroll_x);
+    zmk_mouse_button_flags_t held = 0;
+    if (esb_hid_relay_active()) {
+        held = zmk_hid_get_mouse_report()->body.buttons;
+    }
+    (void)atomic_set(&buttons, held);
 }
 
 static const struct zmk_input_processor_driver_api relay_pointer_api = {

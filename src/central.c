@@ -17,7 +17,7 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/__assert.h>
 
-#include <zmk/endpoints.h>
+#include <zmk/endpoints_types.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/split_esb_peripheral_changed.h>
 #include <zmk/hid_indicators.h>
@@ -410,7 +410,7 @@ static void central_event_work_fn(struct k_work *work) {
 
 static K_WORK_DEFINE(central_event_work, central_event_work_fn);
 
-/* Selected endpoint, so ZMK reports them as the current host's indicators. */
+/* Saved as ZMK's state for no host, so the central's own USB host keeps its lock indicators. */
 static void apply_host_indicators(const uint8_t *data) {
     if (!IS_ENABLED(CONFIG_ZMK_HID_INDICATORS)) {
         return;
@@ -418,7 +418,8 @@ static void apply_host_indicators(const uint8_t *data) {
     struct zmk_hid_led_report_body report = {
         .leds = data[offsetof(struct esb_host_indicators, indicators)],
     };
-    zmk_hid_indicators_process_report(&report, zmk_endpoint_get_selected());
+    const struct zmk_endpoint_instance no_host = {.transport = ZMK_TRANSPORT_NONE};
+    zmk_hid_indicators_process_report(&report, no_host);
 }
 
 void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {

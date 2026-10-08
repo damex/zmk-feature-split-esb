@@ -179,6 +179,7 @@ initialized.
 |   wire peer pipe: command and beacon go to wire_central_send instead         |
 |   relay pipe: each HID report change queues, idle reply latches the latest   |
 |   input thread: relay pointer processor sums motion and buttons, atomics     |
+|   central with its own host: relay latches released reports, pointer quiet   |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | RADIO ISR                                                                    |
 |                                                                              |

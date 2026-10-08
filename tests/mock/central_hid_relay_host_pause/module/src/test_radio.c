@@ -4,10 +4,11 @@
 /*
  * Fake ESB link core on a central with a relay dongle, keys and a pointer.
  * Central gets its own USB host while a key and a button are held, then loses it.
- * Exits 0 once the relay forwards before and after,
- * and while paused sends only released keys, one button release and no motion,
- * ignoring the dongle's host LEDs.
- * Exits 1 on a held key or motion while paused, applied LEDs, or a missing phase at verdict.
+ * Exits 0 once the relay forwards before and after, the held button again after,
+ * while paused sends only released keys, one button release and no motion,
+ * and saves the dongle's host LEDs as ZMK's state for no host, for after the pause.
+ * Exits 1 on a held key while paused, motion from the pause on,
+ * or a check missing at verdict.
  */
 #include <stdbool.h>
 #include <stddef.h>
@@ -24,10 +25,9 @@
 #include <dt-bindings/zmk/hid_indicators.h>
 #include <dt-bindings/zmk/keys.h>
 #include <zmk/endpoints_types.h>
-#include <zmk/event_manager.h>
 #include <zmk/events/endpoint_changed.h>
-#include <zmk/events/hid_indicators_changed.h>
 #include <zmk/hid.h>
+#include <zmk/hid_indicators.h>
 
 #include <esb.h>
 
@@ -62,7 +62,9 @@ struct observations {
     int32_t active_pointer_x;
     bool paused_release;
     bool paused_button_release;
+    bool paused_leds_kept;
     bool resumed_key_c;
+    bool resumed_button;
 };
 
 static enum phase phase = PHASE_ACTIVE;
@@ -125,19 +127,21 @@ static bool pointer_moves(const struct zmk_hid_mouse_report *report) {
 static void observe_pointer(const uint8_t *bytes) {
     struct zmk_hid_mouse_report report = {0};
     memcpy(&report, bytes, sizeof(report));
+    bool button = (report.body.buttons & PRIMARY_BUTTON) != 0;
     if (phase == PHASE_ACTIVE) {
         seen.active_pointer_x += report.body.d_x;
-        seen.active_button |= (report.body.buttons & PRIMARY_BUTTON) != 0;
-        return;
-    }
-    if (phase != PHASE_PAUSED) {
+        seen.active_button |= button;
         return;
     }
     if (pointer_moves(&report)) {
-        printk("FAIL: paused relay sent pointer motion\n");
+        printk("FAIL: relay sent pointer motion from the pause on\n");
         exit(1);
     }
-    seen.paused_button_release |= report.body.buttons == 0;
+    if (phase == PHASE_PAUSED) {
+        seen.paused_button_release |= report.body.buttons == 0;
+    } else {
+        seen.resumed_button |= button;
+    }
 }
 
 static size_t observe_report(const uint8_t *bytes, size_t room) {
@@ -193,18 +197,6 @@ bool hop_pipe_heard(uint8_t pipe) {
     return false;
 }
 
-static int indicators_listener(const zmk_event_t *event) {
-    const struct zmk_hid_indicators_changed *changed = as_zmk_hid_indicators_changed(event);
-    if (changed != NULL && changed->indicators == HID_INDICATOR_CAPS_LOCK) {
-        printk("FAIL: dongle host LEDs applied while the central has its own host\n");
-        exit(1);
-    }
-    return ZMK_EV_EVENT_BUBBLE;
-}
-
-ZMK_LISTENER(central_hid_relay_host_pause_test, indicators_listener);
-ZMK_SUBSCRIPTION(central_hid_relay_host_pause_test, zmk_hid_indicators_changed);
-
 static void raise_host(enum zmk_transport transport) {
     raise_zmk_endpoint_changed(
         (struct zmk_endpoint_changed){.endpoint = {.transport = transport}});
@@ -224,6 +216,8 @@ static void leds_fn(struct k_work *work) {
         .indicators = HID_INDICATOR_CAPS_LOCK,
     };
     rx_callback(RELAY_PIPE, (const uint8_t *)&packet, sizeof(packet));
+    const struct zmk_endpoint_instance no_host = {.transport = ZMK_TRANSPORT_NONE};
+    seen.paused_leds_kept = zmk_hid_indicators_get_profile(no_host) == HID_INDICATOR_CAPS_LOCK;
 }
 static K_WORK_DELAYABLE_DEFINE(leds_work, leds_fn);
 
@@ -257,7 +251,9 @@ static void verdict_fn(struct k_work *work) {
     check_seen(seen.active_pointer_x == ACTIVE_POINTER_X, "pointer motion relayed before the pause");
     check_seen(seen.paused_release, "released keys sent while paused");
     check_seen(seen.paused_button_release, "button release sent while paused");
+    check_seen(seen.paused_leds_kept, "dongle host LEDs saved as ZMK's state for no host");
     check_seen(seen.resumed_key_c, "key C relayed after the pause");
+    check_seen(seen.resumed_button, "held button relayed again after the pause");
     printk("PASS: relay paused for the central's own host and resumed after it\n");
     exit(0);
 }
