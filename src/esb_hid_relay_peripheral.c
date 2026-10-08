@@ -3,6 +3,7 @@
 
 /* HID relay, peripheral half: received reports to the registered sink. */
 
+#include <stdbool.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
@@ -13,6 +14,7 @@
 #include <zmk_split_esb_hid_relay.h>
 
 #include "esb_hid_relay_peripheral.h"
+#include "esb_hid_relay_pointer.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
@@ -26,23 +28,56 @@ static struct zmk_hid_keyboard_report delivered_keyboard = {
 static struct zmk_hid_consumer_report delivered_consumer = {
     .report_id = ZMK_HID_REPORT_ID_CONSUMER,
 };
+static uint8_t delivered_pointer[ESB_HID_RELAY_POINTER_LENGTH];
 
 struct relay_report {
     uint8_t report_id;
     size_t length;
     uint8_t *delivered;
+    bool (*is_news)(const struct relay_report *report, const uint8_t *bytes);
 };
+
+static bool state_is_news(const struct relay_report *report, const uint8_t *bytes) {
+    return memcmp(report->delivered, bytes, report->length) != 0;
+}
+
+static bool pointer_moves(const uint8_t *bytes) {
+    for (size_t offset = ESB_HID_RELAY_POINTER_MOTION_OFFSET; offset < ESB_HID_RELAY_POINTER_LENGTH;
+         offset++) {
+        if (bytes[offset] != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Motion is a delta, so a repeat with motion moves again. */
+static bool pointer_is_news(const struct relay_report *report, const uint8_t *bytes) {
+    if (pointer_moves(bytes)) {
+        return true;
+    }
+    return bytes[ESB_HID_RELAY_POINTER_BUTTONS_OFFSET] !=
+           report->delivered[ESB_HID_RELAY_POINTER_BUTTONS_OFFSET];
+}
 
 static const struct relay_report relay_reports[] = {
     {
         .report_id = ZMK_HID_REPORT_ID_KEYBOARD,
         .length = sizeof(delivered_keyboard),
         .delivered = (uint8_t *)&delivered_keyboard,
+        .is_news = state_is_news,
     },
     {
         .report_id = ZMK_HID_REPORT_ID_CONSUMER,
         .length = sizeof(delivered_consumer),
         .delivered = (uint8_t *)&delivered_consumer,
+        .is_news = state_is_news,
+    },
+    {
+        .report_id = ZMK_HID_REPORT_ID_MOUSE,
+        .length = sizeof(delivered_pointer),
+        .delivered = delivered_pointer,
+        .is_news = pointer_is_news,
     },
 };
 
@@ -62,7 +97,7 @@ int zmk_split_esb_hid_relay_register(zmk_split_esb_hid_relay_callback_t callback
 
 static void deliver_report(zmk_split_esb_hid_relay_callback_t callback,
                            const struct relay_report *report, const uint8_t *bytes) {
-    if (memcmp(report->delivered, bytes, report->length) == 0) {
+    if (!report->is_news(report, bytes)) {
         return;
     }
     if (callback(bytes, report->length) != 0) {

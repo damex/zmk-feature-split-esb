@@ -17,6 +17,7 @@
 
 #include <esb.h>
 
+#include "esb_hid_relay_pointer.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
 #include "spsc_latch.h"
@@ -188,6 +189,22 @@ static bool write_pending_control(uint8_t pipe) {
     return false;
 }
 
+static size_t append_pointer(uint8_t pipe, struct esb_payload *payload) {
+    if (!esb_link_pipe_is_relay(pipe)) {
+        return 0;
+    }
+    size_t room = CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD - payload->length;
+    size_t length = esb_hid_relay_pointer_take(&payload->data[payload->length], room);
+    payload->length = (uint8_t)(payload->length + length);
+    return length;
+}
+
+static void commit_pointer(const struct esb_payload *payload, size_t offset, size_t length) {
+    if (length != 0) {
+        esb_hid_relay_pointer_sent(&payload->data[offset]);
+    }
+}
+
 static bool write_queued_replies(uint8_t pipe) {
     struct esb_payload payload = {0};
     payload.pipe = pipe;
@@ -208,30 +225,43 @@ static bool write_queued_replies(uint8_t pipe) {
     if (taken == 0) {
         return false;
     }
+    size_t pointer_offset = payload.length;
+    size_t pointer_length = append_pointer(pipe, &payload);
     if (esb_write_payload(&payload) == 0) {
         for (uint32_t index = 0; index < taken; index++) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
         }
+        commit_pointer(&payload, pointer_offset, pointer_length);
     }
     return true;
 }
 
-static void write_idle_reply(uint8_t pipe) {
+static struct idle_reply *fresh_idle_reply(uint8_t pipe) {
     struct idle_reply *slot = spsc_latch_peek(&idle_reply_latch[pipe]);
-    if (slot == NULL) {
-        return;
-    }
-    if (slot->replies_staged != atomic_get(&replies_staged[pipe])) {
+    if (slot != NULL && slot->replies_staged != atomic_get(&replies_staged[pipe])) {
         (void)spsc_latch_release(&idle_reply_latch[pipe], slot);
-        return;
+        return NULL;
     }
+    return slot;
+}
+
+static void write_idle_reply(uint8_t pipe) {
     struct esb_payload payload = {0};
     payload.pipe = pipe;
-    payload.length = slot->length;
-    memcpy(payload.data, slot->data, slot->length);
-    if (esb_write_payload(&payload) == 0) {
+    struct idle_reply *slot = fresh_idle_reply(pipe);
+    if (slot != NULL) {
+        payload.length = slot->length;
+        memcpy(payload.data, slot->data, slot->length);
+    }
+    size_t pointer_offset = payload.length;
+    size_t pointer_length = append_pointer(pipe, &payload);
+    if (payload.length == 0 || esb_write_payload(&payload) != 0) {
+        return;
+    }
+    if (slot != NULL) {
         (void)spsc_latch_release(&idle_reply_latch[pipe], slot);
     }
+    commit_pointer(&payload, pointer_offset, pointer_length);
 }
 
 /* ISR-only, so esb_write_payload has a single caller context, no lock.

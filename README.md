@@ -309,6 +309,29 @@ Host lock indicators (caps, num, scroll, compose, kana) go back up to the centra
 so its widgets and the halves' beacon see them.
 Set `CONFIG_ZMK_HID_INDICATORS=y` on the dongle and the central for that.
 
+Pointer input (trackball, trackpad, mouse keys) relays too.
+Put the relay pointer processor last in every input listener on the central,
+ZMK's mouse key, move and scroll listeners included.
+Motion and scroll add up between relay polls, so a fast sensor loses no counts.
+Set `CONFIG_ZMK_POINTING=y` on the dongle and the central.
+
+```dts
+/ {
+    relay_pointer: relay_pointer {
+        compatible = "zmk,input-processor-esb-relay-pointer";
+        #input-processor-cells = <0>;
+    };
+};
+
+&trackball_listener {
+    input-processors = <&zip_xy_scaler 2 1>, <&relay_pointer>;
+};
+
+&mkp_input_listener {
+    input-processors = <&relay_pointer>;
+};
+```
+
 ## Channel hopping
 
 List two or more channels in `hop-channels` and the link hops between them, stepping
