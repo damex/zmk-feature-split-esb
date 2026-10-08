@@ -10,6 +10,7 @@ MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central_hid_relay_burst \
 	central_hid_relay_commands \
+	central_hid_relay_host_pause \
 	central_hid_relay_indicators \
 	central_hid_relay_pointer \
 	central_hid_relay_pointer_retry \
