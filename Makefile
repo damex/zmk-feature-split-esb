@@ -14,6 +14,7 @@ MOCK_CASES += \
 	central_hid_relay_pointer \
 	central_hid_relay_pointer_retry \
 	central_hid_relay_tap \
+	central_pointer \
 	central_reconcile \
 	central_rendezvous \
 	central_return_path \
