@@ -46,8 +46,8 @@ static int keycode_listener(const zmk_event_t *event) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(hid_relay_burst_test, keycode_listener);
-ZMK_SUBSCRIPTION(hid_relay_burst_test, zmk_keycode_state_changed);
+ZMK_LISTENER(central_hid_relay_burst_test, keycode_listener);
+ZMK_SUBSCRIPTION(central_hid_relay_burst_test, zmk_keycode_state_changed);
 
 static void *last_report_for(uint8_t report_id, size_t *length) {
     if (report_id == ZMK_HID_REPORT_ID_KEYBOARD) {

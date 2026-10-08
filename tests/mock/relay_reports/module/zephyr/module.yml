@@ -1,5 +1,5 @@
 ---
-name: zmk-feature-split-esb-test-hid-relay-sink
+name: zmk-feature-split-esb-test-relay-reports
 build:
   cmake: .
   kconfig: ../../../../Kconfig

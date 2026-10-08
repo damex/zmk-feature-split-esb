@@ -1,5 +1,5 @@
 ---
-name: zmk-feature-split-esb-test-hid-relay-burst
+name: zmk-feature-split-esb-test-central-hid-relay-burst
 build:
   cmake: .
   kconfig: ../../../../Kconfig

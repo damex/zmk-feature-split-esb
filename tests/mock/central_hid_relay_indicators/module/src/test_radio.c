@@ -85,8 +85,8 @@ static int indicators_listener(const zmk_event_t *event) {
     return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_LISTENER(hid_relay_indicators_test, indicators_listener);
-ZMK_SUBSCRIPTION(hid_relay_indicators_test, zmk_hid_indicators_changed);
+ZMK_LISTENER(central_hid_relay_indicators_test, indicators_listener);
+ZMK_SUBSCRIPTION(central_hid_relay_indicators_test, zmk_hid_indicators_changed);
 
 static void deliver_fn(struct k_work *work) {
     ARG_UNUSED(work);
