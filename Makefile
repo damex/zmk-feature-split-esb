@@ -9,6 +9,7 @@ ZMK_APP ?= $(error ZMK_APP is not set)
 MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central_hid_relay_burst \
+	central_hid_relay_button_heal \
 	central_hid_relay_commands \
 	central_hid_relay_host_pause \
 	central_hid_relay_indicators \
