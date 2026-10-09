@@ -282,3 +282,13 @@ void esb_link_role_rx_done(uint8_t pipes_seen) {
         write_idle_reply(pipe);
     }
 }
+
+void esb_link_role_tx_succeeded(void) {
+}
+
+bool esb_link_role_retry_failed_tx(void) {
+    return false;
+}
+
+void esb_link_role_stop(void) {
+}

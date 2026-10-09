@@ -38,6 +38,7 @@ MOCK_CASES += \
 	peripheral_lost_tap \
 	peripheral_pointer \
 	peripheral_rendezvous \
+	peripheral_restart_retune \
 	peripheral_sleep \
 	peripheral_startup_order \
 	relay_host_leds \

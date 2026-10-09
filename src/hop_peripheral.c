@@ -326,6 +326,10 @@ uint8_t hop_link_cost_x10(void) {
     return (uint8_t)MIN(attempts_ewma_x10, UINT8_MAX);
 }
 
+bool hop_link_acked(void) {
+    return atomic_get(&link_acked) != 0;
+}
+
 void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     __ASSERT_NO_MSG(status != NULL);
     status->channel = hop_current_channel();

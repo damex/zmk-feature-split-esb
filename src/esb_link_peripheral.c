@@ -203,6 +203,21 @@ static int submit_payload(const struct esb_payload *payload) {
     return error;
 }
 
+static atomic_t tx_restarts;
+
+static void tx_restart_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    hfclk_gate_hold();
+    /* Same lock as submit_payload, else a racing write starts the head twice. */
+    unsigned int key = irq_lock();
+    int error = esb_start_tx();
+    irq_unlock(key);
+    if (error) {
+        LOG_DBG("esb_start_tx after TX_FAILED returned %d", error);
+    }
+}
+static K_WORK_DEFINE(tx_restart_work, tx_restart_work_fn);
+
 static int send_on_pipe(uint8_t pipe, const uint8_t *data, size_t length, bool ack) {
     if (length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
         return -EMSGSIZE;
@@ -260,4 +275,24 @@ int esb_link_role_start(void) {
 
 void esb_link_role_rx_done(uint8_t pipes_seen) {
     ARG_UNUSED(pipes_seen);
+}
+
+void esb_link_role_tx_succeeded(void) {
+    atomic_set(&tx_restarts, 0);
+}
+
+bool esb_link_role_retry_failed_tx(void) {
+    apply_hop_channel();
+    atomic_val_t restarts = atomic_inc(&tx_restarts);
+    if (!hop_link_acked() || restarts >= ESB_LINK_TX_RESTARTS_MAX) {
+        atomic_set(&tx_restarts, 0);
+        return false;
+    }
+    k_work_submit(&tx_restart_work);
+    return true;
+}
+
+void esb_link_role_stop(void) {
+    (void)k_work_cancel(&tx_restart_work);
+    atomic_set(&tx_restarts, 0);
 }

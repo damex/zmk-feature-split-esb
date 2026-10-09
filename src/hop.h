@@ -45,6 +45,11 @@ void hop_note_data_sent(void);
 /* Channel the radio should currently tune to. */
 uint8_t hop_current_channel(void);
 
+/* Tunes the radio to the current hop channel, a no-op when already there.
+ * Busy radio refuses the retune.
+ * Next call retries it. */
+void apply_hop_channel(void);
+
 #if defined(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 int hop_stage_beacon(uint8_t pipe, uint8_t hid_modifiers, uint8_t hid_indicators);
 
@@ -65,6 +70,9 @@ void hop_boot_mask(void);
 void hop_restore(void);
 
 uint8_t hop_link_cost_x10(void);
+
+/* False while searching. */
+bool hop_link_acked(void);
 
 /* Returns -EINVAL above the DT retransmit-count. */
 int hop_set_retransmit_ceiling(uint32_t ceiling);

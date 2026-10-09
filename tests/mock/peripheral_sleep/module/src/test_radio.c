@@ -3,9 +3,10 @@
 
 /*
  * Fake ESB driver under a real esb_link.c and esb_sleep.c on a peripheral.
- * Exits 0 once sleep flushes TX, releases HFXO and stops keepalives,
+ * TX failure right before sleep queues a TX restart.
+ * Exits 0 once sleep flushes TX, releases HFXO, stops keepalives and drops the queued restart,
  * and waking after a failed poweroff brings keepalives back.
- * Exits 1 on a keepalive while asleep, a link that stays down, or at deadline.
+ * Exits 1 on a keepalive or TX restart while asleep, a link that stays down, or at deadline.
  */
 #include <stddef.h>
 #include <stdlib.h>
@@ -62,6 +63,8 @@ static K_WORK_DELAYABLE_DEFINE(awake_work, awake_fn);
 static void asleep_fn(struct k_work *work) {
     ARG_UNUSED(work);
     mock_check(keepalives == keepalives_at_sleep, "no keepalive while asleep");
+    mock_check(mock_esb_tx_start_count() == 0, "sleep drops the TX restart queued before it");
+    mock_check(!mock_hfclk_held(), "HFXO stays released while asleep");
     raise_activity(ZMK_ACTIVITY_ACTIVE);
     k_work_reschedule(&awake_work, K_MSEC(SETTLE_MS));
 }
@@ -71,6 +74,7 @@ static void sleep_fn(struct k_work *work) {
     ARG_UNUSED(work);
     mock_check(keepalives > 0, "keepalives flow before sleep");
     size_t flushes_before = mock_esb_flush_count();
+    mock_esb_tx_failed();
     raise_activity(ZMK_ACTIVITY_SLEEP);
     mock_check(mock_esb_flush_count() == flushes_before + 1, "sleep flushes TX");
     mock_check(!mock_hfclk_held(), "sleep releases HFXO");

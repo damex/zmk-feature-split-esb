@@ -122,6 +122,8 @@ initialized.
 |   [ESB TX FIFO] --> [ESB PTX radio]                                          |
 |   [TX events] --> [link_acked, max_tx_attempts]                              |
 |                   feed the keepalive tick                                    |
+|   [TX_FAILED] --> link up: restart the head up to twice, PID kept            |
+|                   searching or out of restarts: flush                        |
 +---------------|--------------------------------------------------------------+
                 | 2.4 GHz
 +-- dongle -----|--------------------------------------------------------------+

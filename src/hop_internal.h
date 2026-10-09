@@ -69,8 +69,6 @@ extern uint8_t hop_index;
 #define ESB_HOP_SWEEP_DWELL_WINDOWS                                                                  \
     (DIV_ROUND_UP(DT_INST_PROP(0, idle_keepalive_ms), DT_INST_PROP(0, hop_window_ms)) + 2)
 
-void apply_hop_channel(void);
-
 uint8_t hop_channel_at(uint8_t index);
 
 bool hop_is_anchor_index(uint8_t index);

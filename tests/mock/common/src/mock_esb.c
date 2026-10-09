@@ -31,6 +31,8 @@ static uint16_t retransmit_count;
 static size_t tx_flushes;
 static size_t rx_starts;
 static size_t rx_stops;
+static size_t tx_starts;
+static int (*start_tx_handler)(void);
 static bool tx_busy;
 
 static void note_call(void) {
@@ -59,6 +61,15 @@ int esb_read_rx_payload(struct esb_payload *payload) {
     rx_fifo_head = (rx_fifo_head + 1) % RX_FIFO_DEPTH;
     rx_fifo_count--;
     return 0;
+}
+
+int esb_start_tx(void) {
+    note_call();
+    tx_starts++;
+    if (start_tx_handler == NULL) {
+        return 0;
+    }
+    return start_tx_handler();
 }
 
 int esb_start_rx(void) {
@@ -106,6 +117,9 @@ int esb_set_prefixes(const uint8_t *prefixes, uint8_t num_pipes) {
 
 int esb_set_rf_channel(uint32_t channel) {
     note_call();
+    if (tx_busy) {
+        return -EBUSY;
+    }
     rf_channel = channel;
     rf_channel_sets++;
     return 0;
@@ -194,4 +208,12 @@ size_t mock_esb_rx_start_count(void) {
 
 size_t mock_esb_rx_stop_count(void) {
     return rx_stops;
+}
+
+void mock_esb_set_start_tx_handler(int (*handler)(void)) {
+    start_tx_handler = handler;
+}
+
+size_t mock_esb_tx_start_count(void) {
+    return tx_starts;
 }

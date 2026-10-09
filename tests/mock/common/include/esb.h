@@ -91,6 +91,7 @@ int esb_init(const struct esb_config *config);
 bool esb_is_idle(void);
 int esb_write_payload(const struct esb_payload *payload);
 int esb_read_rx_payload(struct esb_payload *payload);
+int esb_start_tx(void);
 int esb_start_rx(void);
 int esb_stop_rx(void);
 int esb_flush_tx(void);

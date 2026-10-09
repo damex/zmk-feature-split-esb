@@ -150,16 +150,21 @@ static void on_esb_event(const struct esb_evt *event) {
     case ESB_EVENT_TX_SUCCESS:
         esb_link_mark_tx_event();
         hop_note_tx_success((uint8_t)event->tx_attempts);
+        esb_link_role_tx_succeeded();
         break;
     case ESB_EVENT_TX_FAILED: {
         esb_link_mark_tx_event();
-        /* Retransmits exhausted: drop the packet, flush so the TX FIFO can advance. */
+        hop_note_tx_failed();
+        if (esb_link_role_retry_failed_tx()) {
+            break;
+        }
+        /* Only a flush moves the TX FIFO past a failed head.
+         * esb_pop_tx moves the write end instead. */
         LOG_WRN("TX retransmits exhausted, flushing TX FIFO");
         int flush_error = esb_flush_tx();
         if (flush_error) {
             LOG_DBG("esb_flush_tx after TX_FAILED returned %d", flush_error);
         }
-        hop_note_tx_failed();
         break;
     }
     default:
@@ -246,6 +251,7 @@ int esb_link_set_enabled(bool enabled) {
     }
     if (!enabled) {
         hop_stop();
+        esb_link_role_stop();
         int stop_error = esb_stop_rx();
         if (stop_error) {
             LOG_DBG("esb_stop_rx returned %d", stop_error);

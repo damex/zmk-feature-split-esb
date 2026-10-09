@@ -263,10 +263,14 @@ Tunables (Kconfig, defaults shown):
 
 Split events are deltas, the keepalive is the state: each peripheral keepalive
 carries a snapshot of its live state (search state, pressed-position bitmap, held
-input-split buttons, battery level, cumulative sensor totals). Events are ACK'd,
-but the radio gives up after `retransmit-count` tries, so a delta can still die
-in a bad-RF moment. The central reconciles its view against every snapshot and
-replays what was lost.
+input-split buttons, battery level, cumulative sensor totals).
+Events are ACK'd.
+While the link is up, a packet out of `retransmit-count` tries goes out again from
+the TX FIFO up to twice with its packet ID kept, so the central's radio drops a copy
+it already got.
+While searching it is dropped at once, keeping radio time low.
+A delta can still die in a bad-RF moment.
+The central reconciles its view against every snapshot and replays what was lost.
 
 A stuck key heals with the next keepalive.
 Every tick sends one, `hop-window-ms` apart while data flows and
