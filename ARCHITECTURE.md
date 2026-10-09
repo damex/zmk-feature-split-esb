@@ -180,7 +180,7 @@ initialized.
 |                                                                              |
 |   wire peer pipe: command and beacon go to wire_central_send instead         |
 |   relay pipe: each HID report change queues, idle reply latches the latest   |
-|   input thread: relay pointer processor sums motion and buttons, atomics     |
+|   input thread: relay pointer processor sums motion, queues button changes   |
 |   central with its own host: relay latches released reports, pointer quiet   |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | RADIO ISR                                                                    |
@@ -188,7 +188,7 @@ initialized.
 |   [RX from pipe N] --> [fill ACK FIFO]                                       |
 |   control latch first, else queued replies, else the idle reply              |
 |   relay pipe packs every queued HID report that fits into one ACK            |
-|   relay pipe appends one pointer report, the sums leave once it is written   |
+|   relay pipe appends buttons and summed motion once its queue drains         |
 |                     |                                                        |
 +---------------------|--------------------------------------------------------+
                       | ACK rides peripheral's next transmit

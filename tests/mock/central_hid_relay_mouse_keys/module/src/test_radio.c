@@ -7,7 +7,7 @@
  * Keymap clicks two buttons across relay polls, taps one inside a single poll,
  * then moves and scrolls.
  * Exits 0 once the relay ACKs carry every button change in order and every move and scroll count.
- * Exits 1 on an unknown report, two pointer reports in one ACK, a lost button change
+ * Exits 1 on an unknown report, two pointer reports with motion in one ACK, a lost button change
  * or a count that differs from what the mouse keys reported.
  */
 #include <stdbool.h>
@@ -132,19 +132,22 @@ static void note_buttons(uint8_t buttons) {
     relayed_button_count++;
 }
 
-static void add_pointer_report(const uint8_t *bytes) {
-    struct zmk_hid_mouse_report report = {0};
-    memcpy(&report, bytes, sizeof(report));
-    relayed.d_x += report.body.d_x;
-    relayed.d_y += report.body.d_y;
-    relayed.d_scroll_y += report.body.d_scroll_y;
-    relayed.d_scroll_x += report.body.d_scroll_x;
-    note_buttons(report.body.buttons);
+static bool report_moves(const struct zmk_hid_mouse_report *report) {
+    const struct zmk_hid_mouse_report_body *body = &report->body;
+    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+}
+
+static void add_pointer_report(const struct zmk_hid_mouse_report *report) {
+    relayed.d_x += report->body.d_x;
+    relayed.d_y += report->body.d_y;
+    relayed.d_scroll_y += report->body.d_scroll_y;
+    relayed.d_scroll_x += report->body.d_scroll_x;
+    note_buttons(report->body.buttons);
 }
 
 int esb_write_payload(const struct esb_payload *payload) {
     size_t offset = 0;
-    size_t pointer_reports = 0;
+    size_t moving_reports = 0;
     while (offset < payload->length) {
         uint8_t report_id = payload->data[offset + REPORT_ID_OFFSET];
         size_t length = report_length(report_id);
@@ -154,13 +157,16 @@ int esb_write_payload(const struct esb_payload *payload) {
             exit(1);
         }
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
-            pointer_reports++;
-            add_pointer_report(&payload->data[offset]);
+            struct zmk_hid_mouse_report report = {0};
+            memcpy(&report, &payload->data[offset], sizeof(report));
+            add_pointer_report(&report);
+            moving_reports += report_moves(&report) ? 1 : 0;
         }
         offset += length;
     }
-    if (pointer_reports > 1) {
-        printk("FAIL: one relay ACK carries %u pointer reports\n", (unsigned int)pointer_reports);
+    if (moving_reports > 1) {
+        printk("FAIL: one relay ACK carries %u pointer reports with motion\n",
+               (unsigned int)moving_reports);
         exit(1);
     }
     return 0;

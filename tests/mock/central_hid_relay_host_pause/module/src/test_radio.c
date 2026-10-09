@@ -5,7 +5,7 @@
  * Fake ESB link core on a central with a relay dongle, keys and a pointer.
  * Central gets its own USB host while a key and a button are held, then loses it.
  * Exits 0 once the relay forwards before and after, the held button again after,
- * while paused sends only released keys, one button release and no motion,
+ * while paused sends only released keys and buttons and no motion,
  * and saves the dongle's host LEDs as ZMK's state for no host, for after the pause.
  * Exits 1 on a held key while paused, motion from the pause on,
  * or a check missing at verdict.

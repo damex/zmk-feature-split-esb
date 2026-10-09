@@ -3,11 +3,11 @@
 
 /*
  * Fake ESB link core on a central with a relay dongle and a pointer input listener.
- * First ACK write carrying a pointer report fails, as on a full ACK FIFO.
+ * First ACK write carrying pointer motion fails, as on a full ACK FIFO.
  * Exits 0 once later ACKs carry the summed motion, scroll and final buttons,
  * nothing lost and nothing counted twice.
- * Exits 1 on an unknown report, two pointer reports in one ACK, no refused write,
- * or wrong totals at verdict.
+ * Exits 1 on an unknown report, two pointer reports with motion in one ACK,
+ * no refused write, or wrong totals at verdict.
  */
 #include <errno.h>
 #include <stdbool.h>
@@ -118,10 +118,17 @@ static void add_pointer_report(const uint8_t *bytes) {
     relayed.buttons = report.body.buttons;
 }
 
+static bool report_moves(const uint8_t *bytes) {
+    struct zmk_hid_mouse_report report = {0};
+    memcpy(&report, bytes, sizeof(report));
+    const struct zmk_hid_mouse_report_body *body = &report.body;
+    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+}
+
 static size_t walk_reports(const struct esb_payload *payload,
                            void (*on_pointer)(const uint8_t *bytes)) {
     size_t offset = 0;
-    size_t pointer_reports = 0;
+    size_t moving_reports = 0;
     while (offset < payload->length) {
         uint8_t report_id = payload->data[offset + REPORT_ID_OFFSET];
         size_t length = report_length(report_id);
@@ -131,23 +138,24 @@ static size_t walk_reports(const struct esb_payload *payload,
             exit(1);
         }
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
-            pointer_reports++;
+            moving_reports += report_moves(&payload->data[offset]) ? 1 : 0;
             if (on_pointer != NULL) {
                 on_pointer(&payload->data[offset]);
             }
         }
         offset += length;
     }
-    return pointer_reports;
+    return moving_reports;
 }
 
 int esb_write_payload(const struct esb_payload *payload) {
-    size_t pointer_reports = walk_reports(payload, NULL);
-    if (pointer_reports > 1) {
-        printk("FAIL: one relay ACK carries %u pointer reports\n", (unsigned int)pointer_reports);
+    size_t moving_reports = walk_reports(payload, NULL);
+    if (moving_reports > 1) {
+        printk("FAIL: one relay ACK carries %u pointer reports with motion\n",
+               (unsigned int)moving_reports);
         exit(1);
     }
-    if (pointer_reports == 1 && !write_refused) {
+    if (moving_reports == 1 && !write_refused) {
         write_refused = true;
         return -ENOMEM;
     }
@@ -204,7 +212,7 @@ static bool totals_match(const struct pointer_totals *expected) {
 static void verdict_fn(struct k_work *work) {
     ARG_UNUSED(work);
     if (!write_refused) {
-        printk("FAIL: no relay ACK with a pointer report to refuse\n");
+        printk("FAIL: no relay ACK with pointer motion to refuse\n");
         exit(1);
     }
     struct pointer_totals expected = expected_totals();

@@ -322,6 +322,7 @@ Pointer input (trackball, trackpad, mouse keys) relays too.
 Put the relay pointer processor last in every input listener on the central,
 ZMK's mouse key, move and scroll listeners included.
 Motion and scroll add up between relay polls, so a fast sensor loses no counts.
+Button changes queue like key changes, so a click shorter than one poll still reaches the host.
 Set `CONFIG_ZMK_POINTING=y` on the dongle and the central.
 
 ```dts

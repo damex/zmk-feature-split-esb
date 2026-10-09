@@ -226,7 +226,9 @@ static bool write_queued_replies(uint8_t pipe) {
         return false;
     }
     size_t pointer_offset = payload.length;
-    size_t pointer_length = append_pointer(pipe, &payload);
+    /* Current buttons must not overtake a button change still queued. */
+    bool drained = k_msgq_peek_at(reply_queue[pipe], &packet, taken) != 0;
+    size_t pointer_length = drained ? append_pointer(pipe, &payload) : 0;
     if (esb_write_payload(&payload) == 0) {
         for (uint32_t index = 0; index < taken; index++) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);

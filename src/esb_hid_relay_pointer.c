@@ -42,7 +42,7 @@ static atomic_t sum_d_y;
 static atomic_t sum_d_scroll_y;
 static atomic_t sum_d_scroll_x;
 static atomic_t buttons;
-static zmk_mouse_button_flags_t sent_buttons;
+static atomic_t buttons_changed;
 
 static void add_motion(uint16_t code, int32_t value) {
     switch (code) {
@@ -76,16 +76,31 @@ static bool button_bit(uint16_t code, zmk_mouse_button_flags_t *bit) {
     return true;
 }
 
+static atomic_val_t set_button(zmk_mouse_button_flags_t bit, bool pressed) {
+    if (pressed) {
+        return atomic_or(&buttons, bit);
+    }
+    return atomic_and(&buttons, ~(atomic_val_t)bit);
+}
+
 static void add_button(uint16_t code, int32_t value) {
     zmk_mouse_button_flags_t bit = 0;
     if (!button_bit(code, &bit)) {
         return;
     }
-    if (value != 0) {
-        (void)atomic_or(&buttons, bit);
-    } else {
-        (void)atomic_and(&buttons, ~(atomic_val_t)bit);
+    bool pressed = value != 0;
+    bool was_pressed = (set_button(bit, pressed) & bit) != 0;
+    if (was_pressed != pressed) {
+        atomic_set(&buttons_changed, 1);
     }
+}
+
+static void stage_buttons(void) {
+    struct zmk_hid_mouse_report report = {
+        .report_id = ZMK_HID_REPORT_ID_MOUSE,
+        .body = {.buttons = (zmk_mouse_button_flags_t)atomic_get(&buttons)},
+    };
+    esb_hid_relay_stage(&report, sizeof(report));
 }
 
 static int relay_pointer_handle_event(const struct device *dev, struct input_event *event,
@@ -103,6 +118,10 @@ static int relay_pointer_handle_event(const struct device *dev, struct input_eve
     } else if (event->type == INPUT_EV_KEY) {
         add_button(event->code, event->value);
     }
+    /* One button report per sync, as ZMK's own listener sends. */
+    if (event->sync && atomic_cas(&buttons_changed, 1, 0)) {
+        stage_buttons();
+    }
     return ZMK_INPUT_PROC_CONTINUE;
 }
 
@@ -110,20 +129,12 @@ static int16_t take_delta(atomic_t *sum) {
     return (int16_t)CLAMP(atomic_get(sum), INT16_MIN, INT16_MAX);
 }
 
-static bool report_due(const struct zmk_hid_mouse_report *report) {
-    const struct zmk_hid_mouse_report_body *body = &report->body;
-    if (body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0) {
-        return true;
-    }
-    return body->buttons != sent_buttons;
-}
-
 size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
     if (room < ESB_HID_RELAY_POINTER_LENGTH) {
         return 0;
     }
     struct zmk_hid_mouse_report report = {.report_id = ZMK_HID_REPORT_ID_MOUSE};
-    /* Paused, the only report left is the release of buttons the dongle still holds. */
+    /* Paused, every report releases the buttons the dongle still holds. */
     if (esb_hid_relay_active()) {
         report.body = (struct zmk_hid_mouse_report_body){
             .buttons = (zmk_mouse_button_flags_t)atomic_get(&buttons),
@@ -132,9 +143,6 @@ size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
             .d_scroll_y = take_delta(&sum_d_scroll_y),
             .d_scroll_x = take_delta(&sum_d_scroll_x),
         };
-    }
-    if (!report_due(&report)) {
-        return 0;
     }
     memcpy(out, &report, sizeof(report));
     return sizeof(report);
@@ -147,7 +155,6 @@ void esb_hid_relay_pointer_sent(const uint8_t *bytes) {
     (void)atomic_sub(&sum_d_y, report.body.d_y);
     (void)atomic_sub(&sum_d_scroll_y, report.body.d_scroll_y);
     (void)atomic_sub(&sum_d_scroll_x, report.body.d_scroll_x);
-    sent_buttons = report.body.buttons;
 }
 
 void esb_hid_relay_pointer_reset(void) {

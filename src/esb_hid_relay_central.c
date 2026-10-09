@@ -46,14 +46,13 @@ static void stage_report(uint8_t pipe, const void *report, size_t length) {
     }
 }
 
-static void stage_keyboard_report(uint8_t pipe) {
-    struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
-    stage_report(pipe, report, sizeof(*report));
-}
-
-static void stage_consumer_report(uint8_t pipe) {
-    struct zmk_hid_consumer_report *report = zmk_hid_get_consumer_report();
-    stage_report(pipe, report, sizeof(*report));
+void esb_hid_relay_stage(const void *report, size_t length) {
+    for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
+        if (!esb_link_pipe_is_relay(pipe)) {
+            continue;
+        }
+        stage_report(pipe, report, length);
+    }
 }
 
 BUILD_ASSERT(sizeof(struct zmk_hid_keyboard_report) + sizeof(struct zmk_hid_consumer_report) <=
@@ -100,15 +99,12 @@ static void stage_keycode(const struct zmk_keycode_state_changed *keycode) {
     if (!esb_hid_relay_active()) {
         return;
     }
-    for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
-        if (!esb_link_pipe_is_relay(pipe)) {
-            continue;
-        }
-        if (keycode->usage_page == HID_USAGE_CONSUMER) {
-            stage_consumer_report(pipe);
-        } else {
-            stage_keyboard_report(pipe);
-        }
+    if (keycode->usage_page == HID_USAGE_CONSUMER) {
+        struct zmk_hid_consumer_report *report = zmk_hid_get_consumer_report();
+        esb_hid_relay_stage(report, sizeof(*report));
+    } else {
+        struct zmk_hid_keyboard_report *report = zmk_hid_get_keyboard_report();
+        esb_hid_relay_stage(report, sizeof(*report));
     }
 }
 
