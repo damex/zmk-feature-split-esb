@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-relay-lost-sweep
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..

@@ -52,6 +52,7 @@ MOCK_CASES += \
 	peripheral_startup_order \
 	relay_busy_channel \
 	relay_host_leds \
+	relay_lost_sweep \
 	relay_pointer \
 	relay_poll \
 	relay_reports \
