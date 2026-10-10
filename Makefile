@@ -47,6 +47,7 @@ MOCK_CASES += \
 	peripheral_restart_retune \
 	peripheral_sleep \
 	peripheral_startup_order \
+	relay_busy_channel \
 	relay_host_leds \
 	relay_pointer \
 	relay_poll \

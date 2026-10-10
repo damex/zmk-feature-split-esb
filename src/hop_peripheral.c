@@ -219,8 +219,7 @@ static void settle_link_state(void) {
     }
 }
 
-static void keepalive_work_fn(struct k_work *work) {
-    ARG_UNUSED(work);
+static void run_hop_window(void) {
     settle_link_state();
     if (HOP_COUNT > 1) {
         ensure_mask();
@@ -238,11 +237,17 @@ static void keepalive_work_fn(struct k_work *work) {
     }
     esb_link_set_retransmit_count(retransmit_budget());
     esb_link_apply_pending();
+}
+
+static void keepalive_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    /* A window grades by its worst packet, so a relay steps one per poll. */
+    if (!SELF_IS_RELAY) {
+        run_hop_window();
+    }
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
-    /* Relay polls never stop, so its link keeps the active pace. */
-    bool fast = SELF_IS_RELAY || active || searching;
-    uint16_t period_ms = fast ? hop_window_ms : idle_keepalive_ms;
+    uint16_t period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
     esb_link_send_keepalive(esb_keepalive_peripheral_state(active, searching));
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
@@ -252,6 +257,7 @@ static K_WORK_DELAYABLE_DEFINE(relay_poll_work, relay_poll_work_fn);
 
 static void relay_poll_work_fn(struct k_work *work) {
     ARG_UNUSED(work);
+    run_hop_window();
     esb_link_send_relay_poll();
     k_work_reschedule(&relay_poll_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS));
 }

@@ -344,15 +344,16 @@ All four run on the system workqueue.
 |                                                                              |
 |  [relay_poll_work_fn] --> [send relay poll]  hop_peripheral.c                |
 |  one byte, its ACK carries the central's HID reports                         |
+|  runs the hop window first, one window per poll                              |
 +------------------------------------------------------------------------------+
 
 +-- peripheral keepalive tick ---- hop-window-ms active, ----------------------+
-|                                  idle-keepalive-ms idle, relay never idle    |
+|                                  idle-keepalive-ms idle                      |
 |                                                                              |
 |  [link_acked, max_tx_attempts]               hop_peripheral.c                |
 |                |                                                             |
 |                v                                                             |
-|  [keepalive_work_fn]                                                         |
+|  [keepalive_work_fn]                         relay: window on the poll tick  |
 |   |beacon epoch changed    |acked               |silent                      |
 |   v                        v                    v                            |
 |  [adopt_epoch]        [connected_window]   [lost_window]                     |

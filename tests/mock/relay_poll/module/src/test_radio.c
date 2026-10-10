@@ -4,7 +4,7 @@
 /*
  * Fake NCS ESB on a relay dongle, every transmit acked at once.
  * Exits 0 once the dongle polled with one-byte polls at the relay poll rate,
- * sent its keepalive only at the hop window rate and went silent after hop_stop.
+ * kept its keepalive off the poll rate and went silent after hop_stop.
  * Exits 1 on any other transmit, too few polls, keepalives at the poll rate,
  * or a transmit after hop_stop.
  */
