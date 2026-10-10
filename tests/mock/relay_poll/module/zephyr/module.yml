@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-relay-poll
+build:
+  cmake: .
+  kconfig: ../../../../Kconfig
+  settings:
+    dts_root: ../../../..

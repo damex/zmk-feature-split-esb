@@ -304,7 +304,9 @@ Indicators need `CONFIG_ZMK_HID_INDICATORS` on the central.
 A `role = "relay"` peripheral is a USB dongle for the split. Set
 `CONFIG_ZMK_SPLIT_ESB_HID_RELAY=y` on it and on the central. Every HID report
 change rides the ACK of the dongle's next poll, so
-`ZMK_SPLIT_ESB_HID_RELAY_POLL_MS` sets the latency. Queued changes pack into one
+`ZMK_SPLIT_ESB_HID_RELAY_POLL_MS` sets the latency. A poll is one byte. The
+central answers it in its radio interrupt. The dongle's keepalive runs every
+`hop-window-ms`, separate from the polls. Queued changes pack into one
 ACK, a burst lands in one poll. Every `ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS` one
 idle poll carries the current state, so a lost change heals. Other idle polls
 carry nothing. The dongle forwards only reports that differ. USB polls at

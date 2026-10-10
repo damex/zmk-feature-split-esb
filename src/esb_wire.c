@@ -41,7 +41,7 @@ static const uint8_t payload_size[] = {
     [ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT] = sizeof(struct input_wire),
     [ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_BATTERY_EVENT] = WIRE_PAYLOAD(battery_event),
 };
-BUILD_ASSERT(ARRAY_SIZE(payload_size) <= ESB_HOST_INDICATORS_TAG,
+BUILD_ASSERT(ARRAY_SIZE(payload_size) <= ESB_RELAY_POLL_TAG,
              "event type tags collide with the uplink control tags");
 
 static bool is_input(uint8_t type) {

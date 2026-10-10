@@ -36,6 +36,9 @@ int esb_link_send(const uint8_t *data, size_t length, bool ack);
  * Send the acked keepalive, this device's state snapshot. */
 void esb_link_send_keepalive(uint8_t state);
 
+/* Peripheral only. */
+void esb_link_send_relay_poll(void);
+
 /* Peripheral only.
  * Return -EINVAL for a value the radio rejects.
  * Busy radio defers the write to esb_link_apply_pending. */

@@ -73,6 +73,7 @@ initialized.
 |      |--> [esb_link_role_start] no-op on PTX                                 |
 |      v                                                                       |
 |  [hop_start] --> [keepalive_work due in hop-window-ms]                       |
+|                   relay dongle: relay_poll_work due in its poll period       |
 |      |                                                                       |
 |      v                                                                       |
 |  [esb_config_init]                           esb_config.c                    |
@@ -112,7 +113,7 @@ initialized.
 |       v                                                                      |
 |   [esb_link_send]                       esb_link_peripheral.c                |
 |   noack for lossy-codes input,                                               |
-|   keepalives enter here from the tick                                        |
+|   keepalives and relay polls enter here from their ticks                     |
 |       |                                                                      |
 |       v                                                                      |
 |   [ESB TX FIFO]                                                              |
@@ -134,6 +135,7 @@ initialized.
 |       v                                                                      |
 |   [hop_consume_rx]                                hop_central.c              |
 |   stamp heard + rssi, motion/active bits                                     |
+|   relay poll stops here, not queued                                          |
 |       |                                                                      |
 |       v                                                                      |
 |   [SPSC ring]                                                                |
@@ -335,11 +337,17 @@ initialized.
 
 ## Ticks
 
-All three run on the system workqueue.
+All four run on the system workqueue.
 
 ```
++-- relay poll tick ------------- ZMK_SPLIT_ESB_HID_RELAY_POLL_MS -------------+
+|                                                                              |
+|  [relay_poll_work_fn] --> [send relay poll]  hop_peripheral.c                |
+|  one byte, its ACK carries the central's HID reports                         |
++------------------------------------------------------------------------------+
+
 +-- peripheral keepalive tick ---- hop-window-ms active, ----------------------+
-|                                  idle-keepalive-ms idle                      |
+|                                  idle-keepalive-ms idle, relay never idle    |
 |                                                                              |
 |  [link_acked, max_tx_attempts]               hop_peripheral.c                |
 |                |                                                             |
@@ -443,8 +451,8 @@ Time flows down, one column per device.
 
 ## Packets
 
-First byte routes a packet. Control tags sit at 0xFC..0xFF. Event type tags
-are a handful of small integers, build-asserted below the host indicators tag.
+First byte routes a packet. Control tags sit at 0xFB..0xFF. Event type tags
+are a handful of small integers, build-asserted below the relay poll tag.
 
 ```
 event packet     peripheral to central, events back to back in one payload
@@ -466,6 +474,9 @@ keepalive        peripheral to central, every tick
 host indicators  relay dongle to central, on each host LED change
   [0]    0xFC
   [1]    host lock indicators, ZMK HID indicator bits
+
+relay poll       relay dongle to central, every ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
+  [0]    0xFB
 
 beacon           central to peripheral, rides an ACK
   [0]    0xFE

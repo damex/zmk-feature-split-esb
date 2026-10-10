@@ -128,7 +128,7 @@ static void on_esb_event(const struct esb_evt *event) {
         while (esb_read_rx_payload(&payload) == 0) {
             pipes_seen |= (uint8_t)BIT(payload.pipe);
             if (hop_consume_rx(payload.pipe, payload.data, payload.length, payload.rssi)) {
-                continue; /* control packet (keepalive or beacon), not queued */
+                continue;
             }
             struct esb_link_packet *slot = spsc_acquire(&rx_spsc);
             if (slot == NULL) {

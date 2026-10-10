@@ -35,6 +35,7 @@ BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
 static const uint8_t self_pipe = DT_PROP(DT_CHOSEN(zmk_esb_self), pipe);
 BUILD_ASSERT(DT_PROP(DT_CHOSEN(zmk_esb_self), pipe) < ESB_BEACON_PEER_COUNT,
              "self pipe outside beacon peer table");
+#define SELF_IS_RELAY DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay)
 
 #define ADAPTIVE_RETRANSMITS_MIN 2
 #define RETRANSMIT_CEILING_MAX DT_INST_PROP(0, retransmit_count)
@@ -239,23 +240,32 @@ static void keepalive_work_fn(struct k_work *work) {
     esb_link_apply_pending();
     bool active = atomic_set(&data_sent_since_tick, 0) != 0;
     bool searching = atomic_get(&link_acked) == 0;
-    bool force_fast = DT_ENUM_HAS_VALUE(DT_CHOSEN(zmk_esb_self), role, relay);
-    uint16_t period_ms;
-    if (force_fast) {
-        period_ms = CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS;
-    } else {
-        period_ms = (active || searching) ? hop_window_ms : idle_keepalive_ms;
-    }
+    /* Relay polls never stop, so its link keeps the active pace. */
+    bool fast = SELF_IS_RELAY || active || searching;
+    uint16_t period_ms = fast ? hop_window_ms : idle_keepalive_ms;
     esb_link_send_keepalive(esb_keepalive_peripheral_state(active, searching));
     k_work_reschedule(&keepalive_work, K_MSEC(period_ms));
 }
 
+static void relay_poll_work_fn(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(relay_poll_work, relay_poll_work_fn);
+
+static void relay_poll_work_fn(struct k_work *work) {
+    ARG_UNUSED(work);
+    esb_link_send_relay_poll();
+    k_work_reschedule(&relay_poll_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS));
+}
+
 void hop_start(void) {
     k_work_reschedule(&keepalive_work, K_MSEC(hop_window_ms));
+    if (SELF_IS_RELAY) {
+        k_work_reschedule(&relay_poll_work, K_MSEC(CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS));
+    }
 }
 
 void hop_stop(void) {
     k_work_cancel_delayable(&keepalive_work);
+    k_work_cancel_delayable(&relay_poll_work);
 }
 
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi) {

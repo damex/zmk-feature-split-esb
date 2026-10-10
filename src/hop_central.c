@@ -17,6 +17,7 @@
 
 #include <zmk_split_esb.h>
 
+#include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_survey.h"
@@ -479,7 +480,8 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         return false;
     }
     bool keepalive = esb_keepalive_matches(data, length);
-    if (!keepalive) {
+    bool poll = esb_is_relay_poll(data, length);
+    if (!keepalive && !poll) {
         /* Store before the motion bit: the decision tick reads pipe_rssi_dbm only when
          * that bit is set, so publish the value first. */
         atomic_set(&pipe_rssi_dbm[pipe], hop_policy_rssi_to_dbm(rssi));
@@ -488,6 +490,9 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
     atomic_or(&pipe_heard_mask, BIT(pipe));
     atomic_set(&pipe_last_heard_ms[pipe], (atomic_val_t)k_uptime_get_32());
     atomic_set_bit(pipe_ever_heard, pipe);
+    if (poll) {
+        return true;
+    }
     if (HOP_COUNT <= 1) {
         return false;
     }

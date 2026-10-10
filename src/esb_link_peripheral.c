@@ -16,6 +16,7 @@
 
 #include <esb.h>
 
+#include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
@@ -250,6 +251,15 @@ void esb_link_send_keepalive(uint8_t state) {
         return;
     }
     (void)submit_payload(&keepalive);
+}
+
+void esb_link_send_relay_poll(void) {
+    const struct esb_relay_poll poll = {.tag = ESB_RELAY_POLL_TAG};
+    struct esb_payload payload = {0};
+    payload.pipe = self_pipe;
+    payload.length = sizeof(poll);
+    memcpy(payload.data, &poll, sizeof(poll));
+    (void)submit_payload(&payload);
 }
 
 #if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)

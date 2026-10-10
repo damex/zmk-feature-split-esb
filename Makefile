@@ -22,6 +22,7 @@ MOCK_CASES += \
 	central_idle_ack \
 	central_pointer \
 	central_reconcile \
+	central_relay_poll \
 	central_rendezvous \
 	central_return_path \
 	central_sleep \
@@ -48,6 +49,7 @@ MOCK_CASES += \
 	peripheral_startup_order \
 	relay_host_leds \
 	relay_pointer \
+	relay_poll \
 	relay_reports \
 	wire_central_hid_state \
 	wire_central_simplex \

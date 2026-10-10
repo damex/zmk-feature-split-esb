@@ -17,7 +17,7 @@
 /* Schedule per-role hop work.
  * Safe before esb_link_init runs, work is statically initialized.
  * Central: hop-decision window.
- * Peripheral: keepalive tick. */
+ * Peripheral: keepalive tick, and the poll on a relay dongle. */
 void hop_start(void);
 
 void hop_stop(void);
@@ -25,7 +25,7 @@ void hop_stop(void);
 /* Called per received payload in the radio ISR.
  * rssi is the ESB sample magnitude (dBm is its negative).
  * Returns true for control packets the caller must not queue.
- * Central: always false, keepalives queue up for position reconcile.
+ * Central: relay poll only, keepalives queue for position reconcile.
  * Peripheral: beacon and mask update, except a beacon on a wire relay's peer pipe. */
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi);
 
