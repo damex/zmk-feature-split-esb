@@ -112,7 +112,7 @@ initialized.
 |       |                                                                      |
 |       v                                                                      |
 |   [esb_link_send]                       esb_link_peripheral.c                |
-|   noack for lossy-codes input,                                               |
+|   noack for lossy-codes input, as running totals,                            |
 |   keepalives and relay polls enter here from their ticks                     |
 |       |                                                                      |
 |       v                                                                      |
@@ -150,6 +150,9 @@ initialized.
 |   safe from any context.                                                     |
 |   held input keys reconcile                                                  |
 |   here, repeated press drops                                                 |
+|   lossy totals turn back                                                     |
+|   into deltas here, keepalive                                                |
+|   totals heal after quiet                                                    |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |
@@ -460,6 +463,7 @@ event packet     peripheral to central, events back to back in one payload
   [0]    event type
   [1..]  payload, input packed to 9 bytes:
          reg u8, sync u8, type u8, code u16 le, value i32 le
+         sync bit 0 is ZMK's sync, bit 1 marks a lossy axis running total
          other types copy their ZMK struct verbatim
 
 keepalive        peripheral to central, every tick
@@ -470,6 +474,8 @@ keepalive        peripheral to central, every tick
   [11]    uplink link cost, attempts EWMA x10
   [12]    held input key count, up to ZMK_INPUT_SPLIT_MAX_TRACKED_KEYS
   [13..]  held input keys, reg u8 + code u16 le each
+  then    lossy motion total count
+  then    lossy motion totals, reg u8 + code u8 + running total low 16 bits i16 le each
   then    per-sensor running total, i64 le microdegrees each
 
 host indicators  relay dongle to central, on each host LED change

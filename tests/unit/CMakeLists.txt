@@ -20,6 +20,7 @@ target_include_directories(testbinary PRIVATE
 target_sources(testbinary PRIVATE
   src/test_esb_keepalive.c
   src/test_esb_hid_state.c
+  src/test_esb_motion_total.c
   src/test_esb_sensor_sync.c
   src/test_hop_policy.c
   src/test_cobs.c

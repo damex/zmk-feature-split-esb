@@ -162,8 +162,9 @@ void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators) {
     atomic_set(&synced_hid_state, esb_hid_state_pack(modifiers, indicators));
 }
 
-uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state,
-                                  uint8_t link_cost) {
+uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost,
+                                  const struct esb_keepalive_motion_total *motion_totals,
+                                  uint8_t motion_count) {
     struct esb_keepalive_held_key held_keys[PERIPHERAL_INPUT_HELD_KEYS_MAX];
     const struct esb_keepalive_snapshot snapshot = {
         .state = state,
@@ -172,6 +173,8 @@ uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state,
         .position_bitmap = peripheral_pressed_bitmap(),
         .held_keys = held_keys,
         .held_count = peripheral_input_held_keys(held_keys),
+        .motion_totals = motion_totals,
+        .motion_count = motion_count,
         .sensor_totals_udeg = peripheral_sensor_totals(),
         .sensor_count = peripheral_sensor_count(),
     };

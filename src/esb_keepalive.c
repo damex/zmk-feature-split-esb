@@ -12,9 +12,21 @@
 
 #define HELD_REG_OFFSET 0
 #define HELD_CODE_OFFSET 1
+#define MOTION_REG_OFFSET 0
+#define MOTION_CODE_OFFSET 1
+#define MOTION_TOTAL_OFFSET 2
 
-static size_t sensor_offset(uint8_t held_count) {
-    return ESB_KEEPALIVE_HELD_OFFSET + (size_t)held_count * ESB_KEEPALIVE_HELD_BYTES;
+static size_t motion_entry_offset(uint8_t held_count, uint8_t index) {
+    return ESB_KEEPALIVE_MOTION_OFFSET(held_count) + (size_t)index * ESB_KEEPALIVE_MOTION_BYTES;
+}
+
+static size_t motion_count_offset(const uint8_t *data) {
+    return ESB_KEEPALIVE_MOTION_COUNT_OFFSET(esb_keepalive_held_count(data));
+}
+
+static size_t sensor_offset(const uint8_t *data) {
+    return ESB_KEEPALIVE_SENSOR_OFFSET(esb_keepalive_held_count(data),
+                                       esb_keepalive_motion_count(data));
 }
 
 static void encode_held_keys(uint8_t *out, const struct esb_keepalive_held_key *held_keys,
@@ -27,14 +39,28 @@ static void encode_held_keys(uint8_t *out, const struct esb_keepalive_held_key *
     }
 }
 
+static void encode_motion_totals(uint8_t *out, uint8_t held_count,
+                                 const struct esb_keepalive_motion_total *motion_totals,
+                                 uint8_t motion_count) {
+    out[ESB_KEEPALIVE_MOTION_COUNT_OFFSET(held_count)] = motion_count;
+    for (uint8_t index = 0; index < motion_count; index++) {
+        uint8_t *entry = &out[motion_entry_offset(held_count, index)];
+        entry[MOTION_REG_OFFSET] = motion_totals[index].reg;
+        entry[MOTION_CODE_OFFSET] = motion_totals[index].code;
+        sys_put_le16((uint16_t)motion_totals[index].short_total, &entry[MOTION_TOTAL_OFFSET]);
+    }
+}
+
 size_t esb_keepalive_encode(uint8_t *out, size_t out_size,
                             const struct esb_keepalive_snapshot *snapshot) {
     __ASSERT_NO_MSG(out != NULL);
     __ASSERT_NO_MSG(snapshot != NULL);
     __ASSERT_NO_MSG(snapshot->position_bitmap != NULL);
     __ASSERT_NO_MSG(snapshot->held_count == 0 || snapshot->held_keys != NULL);
+    __ASSERT_NO_MSG(snapshot->motion_count == 0 || snapshot->motion_totals != NULL);
     __ASSERT_NO_MSG(snapshot->sensor_count == 0 || snapshot->sensor_totals_udeg != NULL);
-    size_t length = (size_t)ESB_KEEPALIVE_LENGTH(snapshot->held_count, snapshot->sensor_count);
+    size_t length = (size_t)ESB_KEEPALIVE_LENGTH(snapshot->held_count, snapshot->motion_count,
+                                                 snapshot->sensor_count);
     if (out_size < length) {
         return 0;
     }
@@ -44,7 +70,9 @@ size_t esb_keepalive_encode(uint8_t *out, size_t out_size,
     out[ESB_KEEPALIVE_BATTERY_OFFSET] = snapshot->battery_level;
     out[ESB_KEEPALIVE_LINK_COST_OFFSET] = snapshot->link_cost_x10;
     encode_held_keys(out, snapshot->held_keys, snapshot->held_count);
-    size_t totals_offset = sensor_offset(snapshot->held_count);
+    encode_motion_totals(out, snapshot->held_count, snapshot->motion_totals,
+                         snapshot->motion_count);
+    size_t totals_offset = ESB_KEEPALIVE_SENSOR_OFFSET(snapshot->held_count, snapshot->motion_count);
     for (uint8_t sensor_index = 0; sensor_index < snapshot->sensor_count; sensor_index++) {
         sys_put_le64((uint64_t)snapshot->sensor_totals_udeg[sensor_index],
                      &out[totals_offset + (size_t)sensor_index * ESB_KEEPALIVE_SENSOR_BYTES]);
@@ -60,7 +88,10 @@ bool esb_keepalive_matches(const uint8_t *data, uint8_t length) {
     if (data[ESB_KEEPALIVE_TAG_OFFSET] != ESB_KEEPALIVE_TAG) {
         return false;
     }
-    size_t totals_offset = sensor_offset(esb_keepalive_held_count(data));
+    if (length <= motion_count_offset(data)) {
+        return false;
+    }
+    size_t totals_offset = sensor_offset(data);
     if (length < totals_offset) {
         return false;
     }
@@ -81,9 +112,28 @@ struct esb_keepalive_held_key esb_keepalive_held_key_at(const uint8_t *data, uin
     };
 }
 
+uint8_t esb_keepalive_motion_count(const uint8_t *data) {
+    __ASSERT_NO_MSG(data != NULL);
+    return data[motion_count_offset(data)];
+}
+
+struct esb_keepalive_motion_total esb_keepalive_motion_total_at(const uint8_t *data,
+                                                                uint8_t index) {
+    __ASSERT_NO_MSG(data != NULL);
+    const uint8_t *entry = &data[motion_entry_offset(esb_keepalive_held_count(data), index)];
+    return (struct esb_keepalive_motion_total){
+        .reg = entry[MOTION_REG_OFFSET],
+        .code = entry[MOTION_CODE_OFFSET],
+        .short_total = (int16_t)sys_get_le16(&entry[MOTION_TOTAL_OFFSET]),
+    };
+}
+
 uint8_t esb_keepalive_sensor_count(const uint8_t *data, uint8_t length) {
     __ASSERT_NO_MSG(data != NULL);
-    size_t totals_offset = sensor_offset(esb_keepalive_held_count(data));
+    if (length <= motion_count_offset(data)) {
+        return 0;
+    }
+    size_t totals_offset = sensor_offset(data);
     if (length < totals_offset) {
         return 0;
     }
@@ -92,7 +142,7 @@ uint8_t esb_keepalive_sensor_count(const uint8_t *data, uint8_t length) {
 
 int64_t esb_keepalive_sensor_total_udeg(const uint8_t *data, uint8_t sensor_index) {
     __ASSERT_NO_MSG(data != NULL);
-    size_t totals_offset = sensor_offset(esb_keepalive_held_count(data));
+    size_t totals_offset = sensor_offset(data);
     return (int64_t)sys_get_le64(
         &data[totals_offset + (size_t)sensor_index * ESB_KEEPALIVE_SENSOR_BYTES]);
 }

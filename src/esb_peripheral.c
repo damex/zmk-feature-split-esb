@@ -9,9 +9,11 @@
 #include <errno.h>
 
 #include <zephyr/devicetree.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk/split/transport/peripheral.h>
@@ -19,7 +21,9 @@
 
 #include "esb_batch.h"
 #include "esb_hid_relay_peripheral.h"
+#include "esb_keepalive.h"
 #include "esb_link.h"
+#include "esb_motion_total.h"
 #include "esb_wire.h"
 #include "hop.h"
 #include "peripheral_input.h"
@@ -37,11 +41,11 @@ static const uint32_t lossy_dt_cells[] = {
     DT_INST_FOREACH_PROP_ELEM_SEP(0, lossy_codes, LOSSY_DT_CELL, (,))
 };
 
-BUILD_ASSERT((ARRAY_SIZE(lossy_dt_cells) % 2) == 0,
+BUILD_ASSERT((ARRAY_SIZE(lossy_dt_cells) % PERIPHERAL_LOSSY_PAIR_CELLS) == 0,
              "zmk,split-esb lossy-codes must be (type, code) pairs");
 
 static bool input_is_lossy(uint8_t input_type, uint16_t input_code) {
-    for (size_t pair = 0; pair < ARRAY_SIZE(lossy_dt_cells); pair += 2) {
+    for (size_t pair = 0; pair < ARRAY_SIZE(lossy_dt_cells); pair += PERIPHERAL_LOSSY_PAIR_CELLS) {
         if ((uint8_t)lossy_dt_cells[pair] == input_type
             && (uint16_t)lossy_dt_cells[pair + 1] == input_code) {
             return true;
@@ -60,6 +64,67 @@ static bool input_is_lossy(uint8_t input_type, uint16_t input_code) {
 
 #endif /* DT_INST_NODE_HAS_PROP(0, lossy_codes) */
 
+#define MOTION_SLOT_COUNT MAX(PERIPHERAL_MOTION_TOTALS_MAX, 1)
+
+/* Input thread claims and adds, the keepalive tick reads. */
+struct motion_slot {
+    atomic_t claimed;
+    uint8_t reg;
+    uint8_t code;
+    atomic_t total;
+};
+
+static struct motion_slot motion_slots[MOTION_SLOT_COUNT];
+
+static struct motion_slot *motion_slot_for(uint8_t reg, uint8_t code) {
+    for (size_t index = 0; index < ARRAY_SIZE(motion_slots); index++) {
+        struct motion_slot *slot = &motion_slots[index];
+        if (atomic_get(&slot->claimed) == 0) {
+            slot->reg = reg;
+            slot->code = code;
+            atomic_set(&slot->claimed, 1);
+            return slot;
+        }
+        if (slot->reg == reg && slot->code == code) {
+            return slot;
+        }
+    }
+    return NULL;
+}
+
+static void motion_to_total(struct zmk_split_transport_peripheral_event *event) {
+    if (event->data.input_event.type != INPUT_EV_REL || event->data.input_event.code > UINT8_MAX) {
+        return;
+    }
+    struct motion_slot *slot =
+        motion_slot_for(event->data.input_event.reg, (uint8_t)event->data.input_event.code);
+    if (slot == NULL) {
+        return;
+    }
+    int32_t total =
+        esb_motion_total_add((int32_t)atomic_get(&slot->total), event->data.input_event.value);
+    atomic_set(&slot->total, total);
+    event->data.input_event.value = total;
+    event->data.input_event.sync = (uint8_t)(event->data.input_event.sync | ESB_WIRE_INPUT_TOTAL);
+}
+
+static uint8_t motion_totals_snapshot(struct esb_keepalive_motion_total *out) {
+    uint8_t count = 0;
+    for (size_t index = 0; index < ARRAY_SIZE(motion_slots); index++) {
+        const struct motion_slot *slot = &motion_slots[index];
+        if (atomic_get(&slot->claimed) == 0) {
+            continue;
+        }
+        out[count] = (struct esb_keepalive_motion_total){
+            .reg = slot->reg,
+            .code = slot->code,
+            .short_total = (int16_t)(uint16_t)atomic_get(&slot->total),
+        };
+        count++;
+    }
+    return count;
+}
+
 static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *event) {
     if (event->type != ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
         return true;
@@ -70,13 +135,21 @@ static bool event_wants_ack(const struct zmk_split_transport_peripheral_event *e
 static struct esb_batch batch;
 
 uint8_t esb_link_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state) {
-    return peripheral_keepalive_fill(out, out_size, state, hop_link_cost_x10());
+    struct esb_keepalive_motion_total motion_totals[MOTION_SLOT_COUNT];
+    uint8_t motion_count = motion_totals_snapshot(motion_totals);
+    return peripheral_keepalive_fill(out, out_size, state, hop_link_cost_x10(), motion_totals,
+                                     motion_count);
 }
 
 static int esb_peripheral_report_event(const struct zmk_split_transport_peripheral_event *event) {
     if (event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT) {
         peripheral_input_note_event(event);
-        return esb_batch_report_event(&batch, event, event_wants_ack(event));
+        bool wants_ack = event_wants_ack(event);
+        struct zmk_split_transport_peripheral_event sent = *event;
+        if (!wants_ack) {
+            motion_to_total(&sent);
+        }
+        return esb_batch_report_event(&batch, &sent, wants_ack);
     }
     uint8_t wire[ESB_WIRE_MAX_EVENT_SIZE];
     int encoded = peripheral_encode_event(event, wire, sizeof(wire));

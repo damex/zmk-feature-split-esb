@@ -40,7 +40,7 @@ int esb_batch_flush(struct esb_batch *batch) {
 
 static bool batch_flush_due(const struct esb_batch *batch,
                             const struct zmk_split_transport_peripheral_event *event) {
-    if (event->data.input_event.sync) {
+    if ((event->data.input_event.sync & ESB_WIRE_INPUT_SYNC) != 0) {
         return true;
     }
     /* Keepalive lists held keys at once, a key event waiting here would trail it. */

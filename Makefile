@@ -20,6 +20,7 @@ MOCK_CASES += \
 	central_hid_relay_pointer_retry \
 	central_hid_relay_tap \
 	central_idle_ack \
+	central_lossy_totals \
 	central_pointer \
 	central_reconcile \
 	central_relay_poll \
@@ -44,6 +45,7 @@ MOCK_CASES += \
 	peripheral_idle_clock \
 	peripheral_idle_keepalive \
 	peripheral_keepalive \
+	peripheral_lossy_drop \
 	peripheral_lost_tap \
 	peripheral_pointer \
 	peripheral_rendezvous \

@@ -5,7 +5,8 @@
  * Fake ESB driver under a real esb_link.c on a pointer peripheral fed by an input mock.
  * TX FIFO refuses every write for FIFO_FULL_MS from each button event on, or until flushed.
  * Exits 0 once every input event was offered to the radio once and in order, lossy-codes motion
- * without ACK, and the first keepalive after each full FIFO lists the refused button state.
+ * without ACK as running totals, and the first keepalive after each full FIFO lists the refused
+ * button state.
  * Exits 1 on a wrong packet, a resent event, a wrong heal, no heal within HEAL_BOUND_MS
  * of the FIFO draining, or at deadline.
  */
@@ -53,6 +54,36 @@ BUILD_ASSERT(ARRAY_SIZE(mock_events) % MOCK_EVENT_CELLS == 0, "input-mock events
 #define MOCK_EVENT_COUNT (ARRAY_SIZE(mock_events) / MOCK_EVENT_CELLS)
 
 static const uint32_t lossy_codes[] = DT_INST_PROP(0, lossy_codes);
+#define LOSSY_PAIR_CELLS 2
+#define LOSSY_PAIR_COUNT (ARRAY_SIZE(lossy_codes) / LOSSY_PAIR_CELLS)
+
+static int32_t expected_values[MOCK_EVENT_COUNT];
+static uint8_t expected_total_flags[MOCK_EVENT_COUNT];
+
+static size_t lossy_pair_of(uint32_t type, uint32_t code) {
+    for (size_t pair = 0; pair < LOSSY_PAIR_COUNT; pair++) {
+        const uint32_t *cells = &lossy_codes[pair * LOSSY_PAIR_CELLS];
+        if (cells[MOCK_EVENT_TYPE] == type && cells[MOCK_EVENT_CODE] == code) {
+            return pair;
+        }
+    }
+    return LOSSY_PAIR_COUNT;
+}
+
+static void expect_lossy_totals(void) {
+    int32_t totals[LOSSY_PAIR_COUNT] = {0};
+    for (size_t index = 0; index < MOCK_EVENT_COUNT; index++) {
+        const uint32_t *cells = &mock_events[index * MOCK_EVENT_CELLS];
+        expected_values[index] = (int32_t)cells[MOCK_EVENT_VALUE];
+        size_t pair = lossy_pair_of(cells[MOCK_EVENT_TYPE], cells[MOCK_EVENT_CODE]);
+        if (cells[MOCK_EVENT_TYPE] != INPUT_EV_REL || pair == LOSSY_PAIR_COUNT) {
+            continue;
+        }
+        totals[pair] += expected_values[index];
+        expected_values[index] = totals[pair];
+        expected_total_flags[index] = ESB_WIRE_INPUT_TOTAL;
+    }
+}
 
 struct packet_summary {
     bool holds_button;
@@ -103,18 +134,20 @@ static bool event_is_button(const struct zmk_split_transport_peripheral_event *e
 static bool event_is_mock_event_at(const struct zmk_split_transport_peripheral_event *event,
                                    size_t index) {
     const uint32_t *cells = &mock_events[index * MOCK_EVENT_CELLS];
+    uint8_t sync = event->data.input_event.sync;
     return event->type == ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT &&
            event->data.input_event.reg == POINTER_REG &&
            event->data.input_event.type == cells[MOCK_EVENT_TYPE] &&
            event->data.input_event.code == cells[MOCK_EVENT_CODE] &&
-           event->data.input_event.value == (int32_t)cells[MOCK_EVENT_VALUE] &&
-           (event->data.input_event.sync != 0) == (cells[MOCK_EVENT_SYNC] != 0);
+           event->data.input_event.value == expected_values[index] &&
+           ((sync & ESB_WIRE_INPUT_SYNC) != 0) == (cells[MOCK_EVENT_SYNC] != 0) &&
+           (sync & ESB_WIRE_INPUT_TOTAL) == expected_total_flags[index];
 }
 
 static bool event_ends_batch(const struct zmk_split_transport_peripheral_event *event,
                              size_t batched) {
-    return event->data.input_event.sync != 0 || event->data.input_event.type == INPUT_EV_KEY ||
-           batched == ESB_BATCH_MAX;
+    return (event->data.input_event.sync & ESB_WIRE_INPUT_SYNC) != 0 ||
+           event->data.input_event.type == INPUT_EV_KEY || batched == ESB_BATCH_MAX;
 }
 
 static struct packet_summary check_event_packet(const struct esb_payload *payload) {
@@ -134,7 +167,7 @@ static struct packet_summary check_event_packet(const struct esb_payload *payloa
         next_event++;
         batched++;
         batch_ended = event_ends_batch(&event, batched);
-        last_sync = event.data.input_event.sync != 0;
+        last_sync = (event.data.input_event.sync & ESB_WIRE_INPUT_SYNC) != 0;
         if (event_is_button(&event)) {
             summary.holds_button = true;
             summary.button_pressed = event.data.input_event.value != 0;
@@ -253,6 +286,7 @@ static void verdict_deadline_fn(struct k_work *work) {
 static K_WORK_DELAYABLE_DEFINE(verdict_deadline_work, verdict_deadline_fn);
 
 static int test_radio_init(void) {
+    expect_lossy_totals();
     k_work_reschedule(&verdict_deadline_work, K_MSEC(VERDICT_DEADLINE_MS));
     return 0;
 }

@@ -104,7 +104,7 @@ enum central_inbound_kind {
     CENTRAL_INBOUND_KEEPALIVE = 1,
 };
 
-#define KEEPALIVE_COPY_LENGTH ESB_KEEPALIVE_LENGTH(CENTRAL_INPUT_HELD_KEYS_MAX, ZMK_KEYMAP_SENSORS_LEN)
+#define KEEPALIVE_COPY_LENGTH CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD
 
 struct central_inbound {
     uint8_t source;
@@ -433,8 +433,6 @@ void central_ingest_packet(uint8_t pipe, const uint8_t *data, size_t length) {
             .source = pipe,
             .kind = CENTRAL_INBOUND_KEEPALIVE,
         };
-        /* Held keys or totals beyond local capacity truncate with the copy.
-         * Sensor count derives from the copied length. */
         inbound.data.keepalive.length = (uint8_t)MIN(length, KEEPALIVE_COPY_LENGTH);
         memcpy(inbound.data.keepalive.data, data, inbound.data.keepalive.length);
         if (k_msgq_put(&central_event_msgq, &inbound, K_NO_WAIT) < 0) {

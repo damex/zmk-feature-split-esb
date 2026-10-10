@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zephyr/devicetree.h>
+
 #include <zmk/sensors.h>
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
@@ -15,7 +17,9 @@
 #include "esb_keepalive.h"
 #include "peripheral_input.h"
 
-#define PERIPHERAL_KEEPALIVE_MAX_LENGTH ESB_KEEPALIVE_LENGTH(PERIPHERAL_INPUT_HELD_KEYS_MAX, ZMK_KEYMAP_SENSORS_LEN)
+#define PERIPHERAL_LOSSY_PAIR_CELLS 2
+#define PERIPHERAL_MOTION_TOTALS_MAX (DT_PROP_LEN_OR(DT_INST(0, zmk_split_esb), lossy_codes, 0) / PERIPHERAL_LOSSY_PAIR_CELLS)
+#define PERIPHERAL_KEEPALIVE_MAX_LENGTH ESB_KEEPALIVE_LENGTH(PERIPHERAL_INPUT_HELD_KEYS_MAX, PERIPHERAL_MOTION_TOTALS_MAX, ZMK_KEYMAP_SENSORS_LEN)
 
 void peripheral_set_transport(const struct zmk_split_transport_peripheral *instance);
 
@@ -33,4 +37,6 @@ uint8_t peripheral_sensor_count(void);
 void peripheral_deliver_command(const uint8_t *bytes, size_t length);
 void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators);
 
-uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost);
+uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost,
+                                  const struct esb_keepalive_motion_total *motion_totals,
+                                  uint8_t motion_count);

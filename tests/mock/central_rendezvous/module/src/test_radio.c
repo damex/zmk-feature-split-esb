@@ -58,7 +58,7 @@ struct ack_queue {
 
 static enum phase phase = PHASE_POLLING;
 static struct ack_queue ack_queues[PIPE_COUNT];
-static uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0)];
+static uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0, 0)];
 static size_t keepalive_length;
 static uint8_t epoch_at_silence;
 static uint32_t return_ms;

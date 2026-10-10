@@ -22,6 +22,7 @@
 #include <esb.h>
 
 #include "esb_keepalive.h"
+#include "esb_link.h"
 #include "esb_link_internal.h"
 #include "hop.h"
 #include "hop_internal.h"
@@ -83,7 +84,7 @@ static void peripheral_poll_fn(struct k_work *work) {
         .battery_level = ESB_KEEPALIVE_BATTERY_UNKNOWN,
         .position_bitmap = no_positions,
     };
-    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0)];
+    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(0, 0, 0)];
     esb_keepalive_encode(keepalive, sizeof(keepalive), &snapshot);
     for (uint8_t pipe = 0; pipe < esb_link_pipe_count; pipe++) {
         (void)hop_consume_rx(pipe, keepalive, sizeof(keepalive), 0);

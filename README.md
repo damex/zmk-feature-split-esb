@@ -235,6 +235,14 @@ converges within one keepalive period even when the last event of a burst is
 lost. A gap past 180 degrees (reboot, long outage) resyncs the baseline
 instead of replaying it.
 
+Lossy relative axes are cumulative on air the same way, so motion from a
+dropped packet arrives with the next one. The keepalive carries the low 16 bits
+of each axis total. The central applies them only after a hop window without
+motion from that peripheral, so a keepalive trailing resumed motion never steps
+the cursor back. A gap past 8192 counts resyncs the baseline, and so does
+silence past `peripheral-timeout-ms`. Each lossy pair keeps one total per
+peripheral: a second pointer device's lossy axes stay plain deltas.
+
 Example for a mouse:
 ```dts
 #include <zephyr/dt-bindings/input/input-event-codes.h>

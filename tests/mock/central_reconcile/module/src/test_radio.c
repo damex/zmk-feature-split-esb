@@ -313,7 +313,7 @@ static void send_keepalive(const struct script_step *step) {
         .sensor_totals_udeg = totals,
         .sensor_count = ZMK_KEYMAP_SENSORS_LEN,
     };
-    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), ZMK_KEYMAP_SENSORS_LEN)];
+    uint8_t keepalive[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), 0, ZMK_KEYMAP_SENSORS_LEN)];
     size_t length = esb_keepalive_encode(keepalive, sizeof(keepalive), &snapshot);
     if (length == 0) {
         printk("FAIL: script keepalive does not encode\n");

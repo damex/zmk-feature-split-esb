@@ -10,12 +10,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zephyr/sys/util.h>
+
 #include <zmk/split/transport/types.h>
 
 #define ESB_WIRE_MAX_EVENT_SIZE                                                                    \
     (1 + sizeof(((struct zmk_split_transport_peripheral_event *)0)->data))
 
 #define ESB_WIRE_INPUT_EVENT_SIZE 10
+
+#define ESB_WIRE_INPUT_SYNC BIT(0)
+#define ESB_WIRE_INPUT_TOTAL BIT(1)
 
 /* Append one encoded event to out (out_cap bytes free).
  * Returns bytes written (1 + payload), or 0 if the event does not fit. */

@@ -9,7 +9,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include <zephyr/devicetree.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/util.h>
@@ -18,10 +20,15 @@
 
 #include "esb_keepalive.h"
 #include "esb_link_internal.h"
+#include "esb_motion_total.h"
+#include "esb_wire.h"
 
 LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 #define CENTRAL_INPUT_REG_MAX 32
+#define MOTION_TRACKS_MAX 4
+
+static const uint32_t hop_window_ms = DT_PROP(DT_INST(0, zmk_split_esb), hop_window_ms);
 
 /* Written on the RX thread, read by the staleness tick: single writer per slot,
  * aligned loads, no lock needed. */
@@ -34,8 +41,18 @@ struct tracked_input_key {
 
 static struct tracked_input_key tracked_input_keys[ESB_LINK_PIPE_MAX][CENTRAL_INPUT_HELD_KEYS_MAX];
 
-/* Staleness tick only flags, so tracked input keys keep one writer. */
-static ATOMIC_DEFINE(input_keys_reset_pipes, ESB_LINK_PIPE_MAX);
+struct tracked_motion {
+    bool used;
+    uint8_t reg;
+    uint8_t code;
+    struct esb_motion_track track;
+};
+
+static struct tracked_motion tracked_motions[ESB_LINK_PIPE_MAX][MOTION_TRACKS_MAX];
+static uint32_t motion_heard_ms[ESB_LINK_PIPE_MAX];
+
+/* Staleness tick only flags, so tracked input state keeps one writer. */
+static ATOMIC_DEFINE(input_reset_pipes, ESB_LINK_PIPE_MAX);
 
 static void note_input_reg(uint8_t pipe, uint8_t reg) {
     if (reg < CENTRAL_INPUT_REG_MAX) {
@@ -77,13 +94,57 @@ static void untrack_input_key(uint8_t pipe, struct esb_keepalive_held_key key) {
     }
 }
 
-static void apply_input_keys_reset(uint8_t pipe) {
-    if (!atomic_test_and_clear_bit(input_keys_reset_pipes, pipe)) {
+static void apply_input_reset(uint8_t pipe) {
+    if (!atomic_test_and_clear_bit(input_reset_pipes, pipe)) {
         return;
     }
     for (size_t index = 0; index < ARRAY_SIZE(tracked_input_keys[pipe]); index++) {
         tracked_input_keys[pipe][index].held = false;
     }
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_motions[pipe]); index++) {
+        tracked_motions[pipe][index].used = false;
+    }
+}
+
+static struct esb_motion_track *find_motion_track(uint8_t pipe, uint8_t reg, uint8_t code) {
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_motions[pipe]); index++) {
+        struct tracked_motion *slot = &tracked_motions[pipe][index];
+        if (slot->used && slot->reg == reg && slot->code == code) {
+            return &slot->track;
+        }
+    }
+    return NULL;
+}
+
+static struct esb_motion_track *claim_motion_track(uint8_t pipe, uint8_t reg, uint8_t code) {
+    struct esb_motion_track *found = find_motion_track(pipe, reg, code);
+    if (found != NULL) {
+        return found;
+    }
+    for (size_t index = 0; index < ARRAY_SIZE(tracked_motions[pipe]); index++) {
+        struct tracked_motion *slot = &tracked_motions[pipe][index];
+        if (!slot->used) {
+            *slot = (struct tracked_motion){.used = true, .reg = reg, .code = code};
+            return &slot->track;
+        }
+    }
+    return NULL;
+}
+
+static void motion_total_to_delta(uint8_t pipe, struct zmk_split_transport_peripheral_event *event) {
+    uint8_t sync = event->data.input_event.sync & ESB_WIRE_INPUT_SYNC;
+    event->data.input_event.sync = sync;
+    motion_heard_ms[pipe] = k_uptime_get_32();
+    struct esb_motion_track *track =
+        claim_motion_track(pipe, event->data.input_event.reg, (uint8_t)event->data.input_event.code);
+    int32_t delta = 0;
+    if (track == NULL) {
+        LOG_DBG("Motion track table full, code %u from %u dropped",
+                (unsigned int)event->data.input_event.code, (unsigned int)pipe);
+    } else {
+        (void)esb_motion_track_delta(track, event->data.input_event.value, &delta);
+    }
+    event->data.input_event.value = delta;
 }
 
 void central_input_deliver_event(const struct zmk_split_transport_central *transport, uint8_t pipe,
@@ -92,7 +153,7 @@ void central_input_deliver_event(const struct zmk_split_transport_central *trans
         (void)zmk_split_transport_central_peripheral_event_handler(transport, pipe, *event);
         return;
     }
-    apply_input_keys_reset(pipe);
+    apply_input_reset(pipe);
     note_input_reg(pipe, event->data.input_event.reg);
     if (event->data.input_event.type == INPUT_EV_KEY) {
         struct esb_keepalive_held_key key = {
@@ -113,7 +174,11 @@ void central_input_deliver_event(const struct zmk_split_transport_central *trans
                     (unsigned int)pipe);
         }
     }
-    (void)zmk_split_transport_central_peripheral_event_handler(transport, pipe, *event);
+    struct zmk_split_transport_peripheral_event delivered = *event;
+    if ((event->data.input_event.sync & ESB_WIRE_INPUT_TOTAL) != 0) {
+        motion_total_to_delta(pipe, &delivered);
+    }
+    (void)zmk_split_transport_central_peripheral_event_handler(transport, pipe, delivered);
 }
 
 static void replay_input_key(const struct zmk_split_transport_central *transport, uint8_t pipe,
@@ -174,14 +239,66 @@ static void press_held_input_keys(const struct zmk_split_transport_central *tran
     }
 }
 
+static bool motion_heal_at(uint8_t pipe, const uint8_t *keepalive, uint8_t index,
+                           struct zmk_split_transport_peripheral_event *heal) {
+    struct esb_keepalive_motion_total motion = esb_keepalive_motion_total_at(keepalive, index);
+    struct esb_motion_track *track = find_motion_track(pipe, motion.reg, motion.code);
+    int32_t delta = 0;
+    if (track == NULL || !esb_motion_track_short_delta(track, motion.short_total, &delta)) {
+        return false;
+    }
+    *heal = (struct zmk_split_transport_peripheral_event){
+        .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
+        .data = {.input_event = {.reg = motion.reg,
+                                 .type = INPUT_EV_REL,
+                                 .code = motion.code,
+                                 .value = delta}},
+    };
+    return true;
+}
+
+static void deliver_heal(const struct zmk_split_transport_central *transport, uint8_t pipe,
+                         struct zmk_split_transport_peripheral_event heal, bool sync) {
+    heal.data.input_event.sync = (uint8_t)sync;
+    LOG_DBG("Reconcile lost: motion code %u by %d from %u",
+            (unsigned int)heal.data.input_event.code, (int)heal.data.input_event.value,
+            (unsigned int)pipe);
+    (void)zmk_split_transport_central_peripheral_event_handler(transport, pipe, heal);
+}
+
+static void heal_lost_motion(const struct zmk_split_transport_central *transport, uint8_t pipe,
+                             const uint8_t *keepalive) {
+    if (!esb_motion_quiet_enough(k_uptime_get_32() - motion_heard_ms[pipe], hop_window_ms)) {
+        return;
+    }
+    struct zmk_split_transport_peripheral_event pending = {0};
+    bool has_pending = false;
+    struct zmk_split_transport_peripheral_event heal = {0};
+    uint8_t motion_count = esb_keepalive_motion_count(keepalive);
+    for (uint8_t index = 0; index < motion_count; index++) {
+        if (!motion_heal_at(pipe, keepalive, index, &heal)) {
+            continue;
+        }
+        if (has_pending) {
+            deliver_heal(transport, pipe, pending, false);
+        }
+        pending = heal;
+        has_pending = true;
+    }
+    if (has_pending) {
+        deliver_heal(transport, pipe, pending, true);
+    }
+}
+
 void central_input_reconcile(const struct zmk_split_transport_central *transport, uint8_t pipe,
                              const uint8_t *keepalive) {
     if (pipe >= ESB_LINK_PIPE_MAX) {
         return;
     }
-    apply_input_keys_reset(pipe);
+    apply_input_reset(pipe);
     release_unheld_input_keys(transport, pipe, keepalive);
     press_held_input_keys(transport, pipe, keepalive);
+    heal_lost_motion(transport, pipe, keepalive);
 }
 
 void central_input_release_pipe(uint8_t pipe) {
@@ -193,5 +310,5 @@ void central_input_release_pipe(uint8_t pipe) {
             zmk_input_split_peripheral_disconnected(reg);
         }
     }
-    atomic_set_bit(input_keys_reset_pipes, pipe);
+    atomic_set_bit(input_reset_pipes, pipe);
 }

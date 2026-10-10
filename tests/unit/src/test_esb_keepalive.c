@@ -22,7 +22,7 @@ ZTEST(esb_keepalive, test_encode_layout) {
         .battery_level = 97,
         .link_cost_x10 = 23,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0, 0)];
     esb_keepalive_encode(wire, sizeof(wire), &snapshot);
     zassert_equal(wire[ESB_KEEPALIVE_TAG_OFFSET], ESB_KEEPALIVE_TAG, "tag byte");
     zassert_equal(esb_keepalive_state(wire), 0x01, "state byte");
@@ -39,9 +39,9 @@ ZTEST(esb_keepalive, test_encode_length) {
         .sensor_totals_udeg = totals,
         .sensor_count = 1,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 1)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0, 1)];
     size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
-    zassert_equal(length, ESB_KEEPALIVE_LENGTH(0, 1), "full buffer returns encoded length");
+    zassert_equal(length, ESB_KEEPALIVE_LENGTH(0, 0, 1), "full buffer returns encoded length");
 }
 
 ZTEST(esb_keepalive, test_encode_short_buffer) {
@@ -51,7 +51,7 @@ ZTEST(esb_keepalive, test_encode_short_buffer) {
         .sensor_totals_udeg = totals,
         .sensor_count = 1,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 1)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0, 1)];
     uint8_t untouched[sizeof(wire)];
     memset(wire, 0xAA, sizeof(wire));
     memcpy(untouched, wire, sizeof(untouched));
@@ -65,13 +65,15 @@ ZTEST(esb_keepalive, test_matches) {
         .position_bitmap = no_positions,
         .battery_level = ESB_KEEPALIVE_BATTERY_UNKNOWN,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0, 0)];
     esb_keepalive_encode(wire, sizeof(wire), &snapshot);
-    zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 0)),
+    zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 0, 0)),
                  "tagged base-length packet");
     zassert_false(esb_keepalive_matches(wire, 1), "beacon length is not a keepalive");
-    uint8_t event_like[ESB_KEEPALIVE_LENGTH(0, 0)] = {0x02};
-    zassert_false(esb_keepalive_matches(event_like, ESB_KEEPALIVE_LENGTH(0, 0)),
+    zassert_false(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 0, 0) - 1),
+                  "missing motion count is not a keepalive");
+    uint8_t event_like[ESB_KEEPALIVE_LENGTH(0, 0, 0)] = {0x02};
+    zassert_false(esb_keepalive_matches(event_like, ESB_KEEPALIVE_LENGTH(0, 0, 0)),
                   "event tag is not a keepalive");
 }
 
@@ -82,14 +84,14 @@ ZTEST(esb_keepalive, test_sensor_totals) {
         .sensor_totals_udeg = totals,
         .sensor_count = 2,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 2)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, 0, 2)];
     esb_keepalive_encode(wire, sizeof(wire), &snapshot);
-    zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 2)), "totals length matches");
-    zassert_false(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 2) - 1),
+    zassert_true(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 0, 2)), "totals length matches");
+    zassert_false(esb_keepalive_matches(wire, ESB_KEEPALIVE_LENGTH(0, 0, 2) - 1),
                   "partial total is not a keepalive");
-    zassert_equal(esb_keepalive_sensor_count(wire, ESB_KEEPALIVE_LENGTH(0, 2)), 2,
+    zassert_equal(esb_keepalive_sensor_count(wire, ESB_KEEPALIVE_LENGTH(0, 0, 2)), 2,
                   "count from length");
-    zassert_equal(esb_keepalive_sensor_count(wire, ESB_KEEPALIVE_LENGTH(0, 0)), 0,
+    zassert_equal(esb_keepalive_sensor_count(wire, ESB_KEEPALIVE_LENGTH(0, 0, 0)), 0,
                   "base length count");
     zassert_equal(esb_keepalive_sensor_total_udeg(wire, 0), 90000000LL, "first total");
     zassert_equal(esb_keepalive_sensor_total_udeg(wire, 1), -3500000LL, "negative total");
@@ -108,9 +110,9 @@ ZTEST(esb_keepalive, test_held_keys) {
         .sensor_totals_udeg = totals,
         .sensor_count = 1,
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(2, 1)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(2, 0, 1)];
     size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
-    zassert_equal(length, ESB_KEEPALIVE_LENGTH(2, 1), "held keys and totals length");
+    zassert_equal(length, ESB_KEEPALIVE_LENGTH(2, 0, 1), "held keys and totals length");
     zassert_true(esb_keepalive_matches(wire, length), "held keys packet matches");
     zassert_equal(esb_keepalive_held_count(wire), 2, "held count");
     struct esb_keepalive_held_key first = esb_keepalive_held_key_at(wire, 0);
@@ -130,7 +132,7 @@ ZTEST(esb_keepalive, test_held_keys_uncapped) {
         .held_keys = held,
         .held_count = ARRAY_SIZE(held),
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), 0)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), 0, 0)];
     size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
     zassert_equal(length, sizeof(wire), "any held count that fits encodes");
     zassert_true(esb_keepalive_matches(wire, length), "any held count that fits matches");
@@ -143,11 +145,61 @@ ZTEST(esb_keepalive, test_held_count_past_packet_rejected) {
         .held_keys = held,
         .held_count = ARRAY_SIZE(held),
     };
-    uint8_t wire[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), 0)];
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), 0, 0)];
     size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
     zassert_false(esb_keepalive_matches(wire, length - 1), "truncated held key is rejected");
     wire[ESB_KEEPALIVE_HELD_COUNT_OFFSET] = 2;
     zassert_false(esb_keepalive_matches(wire, length), "count past the packet is rejected");
+}
+
+ZTEST(esb_keepalive, test_motion_totals) {
+    const struct esb_keepalive_held_key held[] = {
+        {.reg = 1, .code = 0x110},
+    };
+    const struct esb_keepalive_motion_total motion[] = {
+        {.reg = 1, .code = 0x00, .short_total = -300},
+        {.reg = 1, .code = 0x01, .short_total = 1200},
+    };
+    int64_t totals[1] = {-1000000LL};
+    const struct esb_keepalive_snapshot snapshot = {
+        .position_bitmap = no_positions,
+        .held_keys = held,
+        .held_count = ARRAY_SIZE(held),
+        .motion_totals = motion,
+        .motion_count = ARRAY_SIZE(motion),
+        .sensor_totals_udeg = totals,
+        .sensor_count = 1,
+    };
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(ARRAY_SIZE(held), ARRAY_SIZE(motion), 1)];
+    size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
+    zassert_equal(length, sizeof(wire), "held keys, motion and sensor totals length");
+    zassert_true(esb_keepalive_matches(wire, length), "motion packet matches");
+    zassert_equal(esb_keepalive_held_count(wire), 1, "held count ahead of motion");
+    zassert_equal(esb_keepalive_motion_count(wire), 2, "motion count");
+    struct esb_keepalive_motion_total first = esb_keepalive_motion_total_at(wire, 0);
+    struct esb_keepalive_motion_total second = esb_keepalive_motion_total_at(wire, 1);
+    zassert_equal(first.reg, 1, "first motion reg");
+    zassert_equal(first.code, 0x00, "first motion code");
+    zassert_equal(first.short_total, -300, "negative short total");
+    zassert_equal(second.code, 0x01, "second motion code");
+    zassert_equal(second.short_total, 1200, "second short total");
+    zassert_equal(esb_keepalive_sensor_count(wire, length), 1, "sensor totals after motion");
+    zassert_equal(esb_keepalive_sensor_total_udeg(wire, 0), -1000000LL,
+                  "sensor total after motion");
+}
+
+ZTEST(esb_keepalive, test_motion_count_past_packet_rejected) {
+    const struct esb_keepalive_motion_total motion[1] = {0};
+    const struct esb_keepalive_snapshot snapshot = {
+        .position_bitmap = no_positions,
+        .motion_totals = motion,
+        .motion_count = ARRAY_SIZE(motion),
+    };
+    uint8_t wire[ESB_KEEPALIVE_LENGTH(0, ARRAY_SIZE(motion), 0)];
+    size_t length = esb_keepalive_encode(wire, sizeof(wire), &snapshot);
+    zassert_false(esb_keepalive_matches(wire, length - 1), "truncated motion total is rejected");
+    wire[ESB_KEEPALIVE_MOTION_COUNT_OFFSET(0)] = 2;
+    zassert_false(esb_keepalive_matches(wire, length), "motion count past the packet is rejected");
 }
 
 ZTEST(esb_keepalive, test_peripheral_state_active_only_while_searching) {

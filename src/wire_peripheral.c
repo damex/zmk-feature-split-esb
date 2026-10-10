@@ -114,7 +114,7 @@ static void wire_peripheral_keepalive_fire(struct k_work *work) {
         return;
     }
     uint8_t length = peripheral_keepalive_fill(wire_keepalive_buffer, sizeof(wire_keepalive_buffer),
-                                               ESB_KEEPALIVE_IDLE, 0);
+                                               ESB_KEEPALIVE_IDLE, 0, NULL, 0);
     if (length > 0) {
         int result = wire_link_send_keepalive(wire_keepalive_buffer, length);
         if (result == 0) {
