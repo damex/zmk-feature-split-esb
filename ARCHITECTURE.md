@@ -188,7 +188,7 @@ initialized.
 |   [RX from pipe N] --> [fill ACK FIFO]                                       |
 |   control latch first, else queued replies, else the idle reply              |
 |   relay pipe packs every queued HID report that fits into one ACK            |
-|   relay pipe appends buttons and summed motion once its queue drains         |
+|   relay pipe appends summed motion once its queue drains, buttons on refresh |
 |                     |                                                        |
 +---------------------|--------------------------------------------------------+
                       | ACK rides peripheral's next transmit

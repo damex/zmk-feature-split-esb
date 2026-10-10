@@ -82,6 +82,7 @@ static void latch_relay_reports(void) {
             latch_reports(pipe, &released_keyboard, &released_consumer);
         }
     }
+    esb_hid_relay_pointer_refresh();
 }
 
 static void hid_relay_keepalive_fire(struct k_work *work);

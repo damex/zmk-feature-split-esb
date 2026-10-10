@@ -13,11 +13,13 @@ MOCK_CASES += \
 	central_hid_relay_button_heal \
 	central_hid_relay_commands \
 	central_hid_relay_host_pause \
+	central_hid_relay_idle_ack \
 	central_hid_relay_indicators \
 	central_hid_relay_mouse_keys \
 	central_hid_relay_pointer \
 	central_hid_relay_pointer_retry \
 	central_hid_relay_tap \
+	central_idle_ack \
 	central_pointer \
 	central_reconcile \
 	central_rendezvous \

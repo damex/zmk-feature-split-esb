@@ -305,8 +305,9 @@ A `role = "relay"` peripheral is a USB dongle for the split. Set
 `CONFIG_ZMK_SPLIT_ESB_HID_RELAY=y` on it and on the central. Every HID report
 change rides the ACK of the dongle's next poll, so
 `ZMK_SPLIT_ESB_HID_RELAY_POLL_MS` sets the latency. Queued changes pack into one
-ACK, a burst lands in one poll. Idle polls carry the current state, so a lost
-change heals, and the dongle forwards only reports that differ. USB polls at
+ACK, a burst lands in one poll. Every `ZMK_SPLIT_ESB_HID_RELAY_KEEPALIVE_MS` one
+idle poll carries the current state, so a lost change heals. Other idle polls
+carry nothing. The dongle forwards only reports that differ. USB polls at
 1 ms on a relay dongle. Relay pipes get no ZMK commands.
 
 The relay goes quiet while the central has a USB host of its own.

@@ -43,6 +43,7 @@ static atomic_t sum_d_scroll_y;
 static atomic_t sum_d_scroll_x;
 static atomic_t buttons;
 static atomic_t buttons_changed;
+static atomic_t refresh_due;
 
 static void add_motion(uint16_t code, int32_t value) {
     switch (code) {
@@ -129,6 +130,14 @@ static int16_t take_delta(atomic_t *sum) {
     return (int16_t)CLAMP(atomic_get(sum), INT16_MIN, INT16_MAX);
 }
 
+static bool body_moves(const struct zmk_hid_mouse_report_body *body) {
+    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+}
+
+void esb_hid_relay_pointer_refresh(void) {
+    atomic_set(&refresh_due, 1);
+}
+
 size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
     if (room < ESB_HID_RELAY_POINTER_LENGTH) {
         return 0;
@@ -144,6 +153,9 @@ size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
             .d_scroll_x = take_delta(&sum_d_scroll_x),
         };
     }
+    if (!body_moves(&report.body) && atomic_get(&refresh_due) == 0) {
+        return 0;
+    }
     memcpy(out, &report, sizeof(report));
     return sizeof(report);
 }
@@ -155,6 +167,7 @@ void esb_hid_relay_pointer_sent(const uint8_t *bytes) {
     (void)atomic_sub(&sum_d_y, report.body.d_y);
     (void)atomic_sub(&sum_d_scroll_y, report.body.d_scroll_y);
     (void)atomic_sub(&sum_d_scroll_x, report.body.d_scroll_x);
+    (void)atomic_clear(&refresh_due);
 }
 
 void esb_hid_relay_pointer_reset(void) {

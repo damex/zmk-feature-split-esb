@@ -18,8 +18,11 @@
 #define ESB_HID_RELAY_POINTER_MOTION_OFFSET 2
 
 #if defined(CONFIG_DT_HAS_ZMK_INPUT_PROCESSOR_ESB_RELAY_POINTER_ENABLED)
+/* Next take writes current buttons even without motion. */
+void esb_hid_relay_pointer_refresh(void);
+
 /* Radio ISR. Writes current buttons and pending motion into out, returns its length.
- * Returns 0 without room. */
+ * Returns 0 without room, or without motion and no refresh due. */
 size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room);
 
 /* Radio ISR. The report from take reached the ACK FIFO, its deltas leave the sums. */
@@ -28,6 +31,9 @@ void esb_hid_relay_pointer_sent(const uint8_t *report);
 /* Clears pending motion and sets buttons to ZMK's held ones, or none while paused. */
 void esb_hid_relay_pointer_reset(void);
 #else
+static inline void esb_hid_relay_pointer_refresh(void) {
+}
+
 static inline size_t esb_hid_relay_pointer_take(uint8_t *out, size_t room) {
     ARG_UNUSED(out);
     ARG_UNUSED(room);
