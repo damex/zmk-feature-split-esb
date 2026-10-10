@@ -32,6 +32,9 @@ bool hop_policy_should_hop(uint8_t *bad_windows, uint8_t penalty, uint16_t thres
 #define HOP_POLICY_TX_ATTEMPTS_GRADE_STEP 4
 uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts);
 
+/* Window grade from its transmits: mean attempts rounded up, 0 without any. */
+uint8_t hop_policy_window_attempts(uint32_t attempts_sum, uint32_t packets);
+
 #define HOP_POLICY_ATTEMPTS_EWMA_SHIFT 2
 uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
 

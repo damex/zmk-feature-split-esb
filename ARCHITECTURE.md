@@ -121,7 +121,7 @@ initialized.
 | RADIO ISR                                                                    |
 |                                                                              |
 |   [ESB TX FIFO] --> [ESB PTX radio]                                          |
-|   [TX events] --> [link_acked, max_tx_attempts]                              |
+|   [TX events] --> [link_acked, window attempts]                              |
 |                   feed the keepalive tick                                    |
 |   [TX_FAILED] --> link up: restart the head up to twice, PID kept            |
 |                   searching or out of restarts: flush                        |
@@ -350,7 +350,7 @@ All four run on the system workqueue.
 +-- peripheral keepalive tick ---- hop-window-ms active, ----------------------+
 |                                  idle-keepalive-ms idle                      |
 |                                                                              |
-|  [link_acked, max_tx_attempts]               hop_peripheral.c                |
+|  [link_acked, window attempts]               hop_peripheral.c                |
 |                |                                                             |
 |                v                                                             |
 |  [keepalive_work_fn]                         relay: window on the poll tick  |
@@ -359,6 +359,7 @@ All four run on the system workqueue.
 |  [adopt_epoch]        [connected_window]   [lost_window]                     |
 |  retune to epoch      attempts EWMA ->     degrade undo ->                   |
 |  channel, mask swap   retransmit budget,   sweep the pool                    |
+|                       mean attempts ->                                       |
 |                       degrade step                                           |
 |   |                        |                    |                            |
 |   +------------+-----------+--------------------+                            |

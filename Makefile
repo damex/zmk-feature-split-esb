@@ -34,6 +34,7 @@ MOCK_CASES += \
 	hid_state_sync \
 	input_batch \
 	peripheral_adaptive_retransmits \
+	peripheral_bad_channel \
 	peripheral_burst_keepalive \
 	peripheral_burst_start_keepalive \
 	peripheral_busy_keys \

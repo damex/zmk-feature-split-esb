@@ -45,6 +45,8 @@ static uint16_t attempts_ewma_x10 = 10;
 static const uint16_t hop_window_ms = DT_INST_PROP(0, hop_window_ms);
 static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
+static atomic_t window_attempts_sum;
+static atomic_t window_packets;
 static atomic_t data_sent_since_tick;
 static atomic_t tx_succeeded_since_tick;
 static atomic_t tx_failed_since_tick;
@@ -151,6 +153,12 @@ static void adopt_staged_mask(void) {
     (void)spsc_latch_release(&staged_mask_latch, slot);
 }
 
+static void clear_window_attempts(void) {
+    atomic_set(&max_tx_attempts, 0);
+    atomic_set(&window_attempts_sum, 0);
+    atomic_set(&window_packets, 0);
+}
+
 /* Adopt the central's channel on a beacon epoch or mask change.
  * Otherwise sweep the pool until a window lands on the central.
  * The full pool is the rendezvous, so a stale mask still recovers.
@@ -166,17 +174,21 @@ static void adopt_epoch(uint8_t epoch) {
     sweep_windows = 0;
     degrade_undo_armed = false;
     attempts_ewma_x10 = 10;
-    atomic_set(&max_tx_attempts, 0);
+    clear_window_attempts();
 }
 
 static void connected_window(void) {
     sweep_windows = 0;
     degrade_undo_armed = false;
-    uint8_t attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
-    if (attempts > 0) {
-        attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, attempts);
+    uint8_t worst_attempts = (uint8_t)atomic_set(&max_tx_attempts, 0);
+    /* A transmit landing between these reads counts in the next window. */
+    uint32_t attempts_sum = (uint32_t)atomic_set(&window_attempts_sum, 0);
+    uint32_t packets = (uint32_t)atomic_set(&window_packets, 0);
+    if (worst_attempts > 0) {
+        attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, worst_attempts);
     }
-    uint8_t penalty = hop_policy_attempts_penalty(attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
+    uint8_t typical_attempts = hop_policy_window_attempts(attempts_sum, packets);
+    uint8_t penalty = hop_policy_attempts_penalty(typical_attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
     if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
         degrade_undo_index = hop_index;
         degrade_undo_armed = true;
@@ -186,7 +198,7 @@ static void connected_window(void) {
 }
 
 static void lost_window(void) {
-    atomic_set(&max_tx_attempts, 0);
+    clear_window_attempts();
     bad_windows = 0;
     sweep_windows = (uint16_t)((sweep_windows + 1) % ESB_HOP_SWEEP_DWELL_WINDOWS);
     if (degrade_undo_armed) {
@@ -312,6 +324,8 @@ void hop_note_tx_success(uint8_t attempts) {
     atomic_set(&tx_succeeded_since_tick, 1);
     if (HOP_COUNT > 1) {
         record_tx_attempts(attempts);
+        (void)atomic_add(&window_attempts_sum, attempts);
+        (void)atomic_inc(&window_packets);
     }
 }
 

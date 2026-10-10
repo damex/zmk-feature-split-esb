@@ -81,6 +81,16 @@ ZTEST(hop_policy, test_attempts_penalty) {
     zassert_equal(hop_policy_attempts_penalty(255, good), HOP_POLICY_MAX_LOSS_PENALTY, "lost: capped");
 }
 
+ZTEST(hop_policy, test_window_attempts) {
+    zassert_equal(hop_policy_window_attempts(0, 0), 0, "no packets: 0");
+    zassert_equal(hop_policy_window_attempts(3, 1), 3, "one packet: its attempts");
+    zassert_equal(hop_policy_window_attempts(8, 4), 2, "exact mean");
+    zassert_equal(hop_policy_window_attempts(6, 4), 2, "one retried of four rounds up to 2");
+    zassert_equal(hop_policy_window_attempts(9, 4), 3, "just over 2 rounds up to 3");
+    zassert_equal(hop_policy_window_attempts(UINT32_MAX, 1), UINT8_MAX, "saturates");
+    zassert_equal(hop_policy_window_attempts(UINT32_MAX, UINT32_MAX), 1, "no overflow at type max");
+}
+
 ZTEST(hop_policy, test_index_next_wraps) {
     zassert_equal(hop_policy_index_next(0, 3), 1, NULL);
     zassert_equal(hop_policy_index_next(1, 3), 2, NULL);

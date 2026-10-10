@@ -48,6 +48,17 @@ uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts) {
     return (uint8_t)penalty;
 }
 
+uint8_t hop_policy_window_attempts(uint32_t attempts_sum, uint32_t packets) {
+    if (packets == 0) {
+        return 0;
+    }
+    uint32_t mean = attempts_sum / packets;
+    if (attempts_sum % packets != 0) {
+        mean++;
+    }
+    return (uint8_t)MIN(mean, UINT8_MAX);
+}
+
 uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample) {
     int32_t sample_x10 = (int32_t)sample * 10;
     int32_t difference = sample_x10 - (int32_t)ewma_x10;
