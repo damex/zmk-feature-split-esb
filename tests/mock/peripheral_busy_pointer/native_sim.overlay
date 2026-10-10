@@ -1,0 +1,37 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    chosen {
+        zmk,esb-self = &mouse;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            mouse: peripheral_mouse {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+
+    pointer_input: pointer_input {
+        compatible = "zmk,input-mock";
+        event-startup-delay = <60000>;
+        event-period = <1000>;
+        events = <INPUT_EV_REL INPUT_REL_X 0 1>;
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_pointer: split_pointer@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+            device = <&pointer_input>;
+        };
+    };
+};

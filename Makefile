@@ -36,6 +36,8 @@ MOCK_CASES += \
 	peripheral_adaptive_retransmits \
 	peripheral_burst_keepalive \
 	peripheral_burst_start_keepalive \
+	peripheral_busy_keys \
+	peripheral_busy_pointer \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
 	peripheral_idle_clock \
