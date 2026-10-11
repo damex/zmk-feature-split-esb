@@ -1,5 +1,5 @@
 ---
-name: zmk-feature-split-esb-test-peripheral-pointer
+name: zmk-feature-split-esb-test-peripheral-bad-channel-lossless
 build:
   cmake: .
   kconfig: ../../../../Kconfig

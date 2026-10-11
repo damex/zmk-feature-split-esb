@@ -23,7 +23,7 @@ MOCK_CASES += \
 	central_hid_relay_totals \
 	central_idle_ack \
 	central_lossy_totals \
-	central_pointer \
+	central_pointer_lossless \
 	central_reconcile \
 	central_relay_poll \
 	central_rendezvous \
@@ -37,11 +37,11 @@ MOCK_CASES += \
 	hid_state_sync \
 	input_batch \
 	peripheral_adaptive_retransmits \
-	peripheral_bad_channel \
+	peripheral_bad_channel_lossless \
 	peripheral_burst_keepalive \
 	peripheral_burst_start_keepalive \
 	peripheral_busy_keys \
-	peripheral_busy_pointer \
+	peripheral_busy_pointer_lossless \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
 	peripheral_idle_clock \
@@ -49,7 +49,7 @@ MOCK_CASES += \
 	peripheral_keepalive \
 	peripheral_lossy_drop \
 	peripheral_lost_tap \
-	peripheral_pointer \
+	peripheral_pointer_lossy \
 	peripheral_rendezvous \
 	peripheral_restart_retune \
 	peripheral_sleep \
