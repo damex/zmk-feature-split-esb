@@ -60,6 +60,7 @@ MOCK_CASES += \
 	relay_pointer \
 	relay_poll \
 	relay_reports \
+	relay_usb_drain \
 	wire_central_hid_state \
 	wire_central_simplex \
 	wire_peer_held_input \
