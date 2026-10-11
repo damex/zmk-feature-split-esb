@@ -1,0 +1,23 @@
+/ {
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_input: split_input@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+};
