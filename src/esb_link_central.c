@@ -46,20 +46,26 @@ static int reply_queue_init(void) {
 }
 SYS_INIT(reply_queue_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
-#define RELAY_PIPE_BIT(node) \
-    +(DT_ENUM_HAS_VALUE(node, role, relay) ? (1u << DT_PROP(node, pipe)) : 0u)
-#define RELAY_PIPE_MASK (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, RELAY_PIPE_BIT))
-
-#define SELF_PIPE_BIT(node) \
-    +(DT_ENUM_HAS_VALUE(node, role, self) ? (1u << DT_PROP(node, pipe)) : 0u)
-#define SELF_PIPE_MASK (0u DT_FOREACH_CHILD_STATUS_OKAY(ESB_PERIPHERALS, SELF_PIPE_BIT))
+#define PIPE_HAS_ROLE(node, value) [DT_PROP(node, pipe)] = DT_ENUM_HAS_VALUE(node, role, value),
+static const bool relay_pipes[ESB_LINK_PIPE_MAX] = {
+    DT_FOREACH_CHILD_STATUS_OKAY_VARGS(ESB_PERIPHERALS, PIPE_HAS_ROLE, relay)
+};
+static const bool self_pipes[ESB_LINK_PIPE_MAX] = {
+    DT_FOREACH_CHILD_STATUS_OKAY_VARGS(ESB_PERIPHERALS, PIPE_HAS_ROLE, self)
+};
 
 bool esb_link_pipe_is_relay(uint8_t pipe) {
-    return (RELAY_PIPE_MASK & (1u << pipe)) != 0u;
+    if (pipe >= ARRAY_SIZE(relay_pipes)) {
+        return false;
+    }
+    return relay_pipes[pipe];
 }
 
 bool esb_link_pipe_is_self(uint8_t pipe) {
-    return (SELF_PIPE_MASK & (1u << pipe)) != 0u;
+    if (pipe >= ARRAY_SIZE(self_pipes)) {
+        return false;
+    }
+    return self_pipes[pipe];
 }
 
 uint8_t esb_link_source_ids(uint8_t *out_ids) {
