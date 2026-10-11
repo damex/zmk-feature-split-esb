@@ -38,10 +38,12 @@ MOCK_CASES += \
 	input_batch \
 	peripheral_adaptive_retransmits \
 	peripheral_bad_channel_lossless \
+	peripheral_bad_channel_lossy \
 	peripheral_burst_keepalive \
 	peripheral_burst_start_keepalive \
 	peripheral_busy_keys \
 	peripheral_busy_pointer_lossless \
+	peripheral_busy_pointer_lossy \
 	peripheral_epoch_adoption \
 	peripheral_held_input \
 	peripheral_idle_clock \
@@ -49,6 +51,7 @@ MOCK_CASES += \
 	peripheral_keepalive \
 	peripheral_lossy_drop \
 	peripheral_lost_tap \
+	peripheral_pointer_lossless \
 	peripheral_pointer_lossy \
 	peripheral_rendezvous \
 	peripheral_restart_retune \
