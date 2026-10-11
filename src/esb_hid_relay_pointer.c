@@ -164,9 +164,7 @@ static zmk_mouse_button_flags_t report_buttons(bool changes_queued) {
 }
 
 static bool body_is_written(const struct zmk_hid_mouse_report_body *body) {
-    return body->buttons == written_body.buttons && body->d_x == written_body.d_x &&
-           body->d_y == written_body.d_y && body->d_scroll_y == written_body.d_scroll_y &&
-           body->d_scroll_x == written_body.d_scroll_x;
+    return memcmp(body, &written_body, sizeof(*body)) == 0;
 }
 
 void esb_hid_relay_pointer_refresh(void) {

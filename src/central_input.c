@@ -62,7 +62,10 @@ static void note_input_reg(uint8_t pipe, uint8_t reg) {
 
 static bool input_keys_equal(struct esb_keepalive_held_key left,
                              struct esb_keepalive_held_key right) {
-    return left.reg == right.reg && left.code == right.code;
+    if (left.reg != right.reg) {
+        return false;
+    }
+    return left.code == right.code;
 }
 
 static struct tracked_input_key *find_tracked_input_key(uint8_t pipe,
