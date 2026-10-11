@@ -93,7 +93,10 @@ static int relay_to_usb(const uint8_t *bytes, size_t length, bool skippable) {
     if (hid_dev == NULL) {
         return -ENODEV;
     }
-    k_timeout_t wait = skippable ? K_NO_WAIT : K_MSEC(ENDPOINT_WAIT_MS);
+    k_timeout_t wait = K_MSEC(ENDPOINT_WAIT_MS);
+    if (skippable) {
+        wait = K_NO_WAIT;
+    }
     if (k_sem_take(&hid_tx_sem, wait) != 0) {
         return -EBUSY;
     }

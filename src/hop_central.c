@@ -350,7 +350,10 @@ static void stage_mask_update(void) {
     } else if (!refresh) {
         return;
     }
-    const uint8_t *mask = pending_valid ? pending_mask : active_mask;
+    const uint8_t *mask = active_mask;
+    if (pending_valid) {
+        mask = pending_mask;
+    }
     struct esb_mask_update update = {.tag = ESB_MASK_UPDATE_TAG};
     memcpy(update.mask, mask, ESB_HOP_MASK_BYTES);
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {

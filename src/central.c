@@ -227,8 +227,15 @@ static void replay_position_diff(uint8_t source, const uint8_t *target, const ch
          position < ESB_KEEPALIVE_POSITION_COUNT;
          position = esb_keepalive_bitmap_diff_next(tracked, target, position + 1)) {
         bool pressed = esb_keepalive_bitmap_get(target, position);
-        LOG_WRN("%s: position %u %s from %u", reason, (unsigned int)position,
-                pressed ? "press" : "release", (unsigned int)source);
+        const char *transition = "release";
+        if (pressed) {
+            transition = "press";
+        }
+        LOG_WRN("%s: position %u %s from %u",
+                reason,
+                (unsigned int)position,
+                transition,
+                (unsigned int)source);
         esb_keepalive_bitmap_set(tracked, position, pressed);
         forward_key_position(source, position, pressed);
     }

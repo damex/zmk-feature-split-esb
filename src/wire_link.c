@@ -12,6 +12,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/sys/util.h>
 
 #include "wire_frame.h"
 
@@ -98,7 +99,11 @@ static struct ring_buf *wire_tx_pick_ring(void) {
 
 static void wire_tx_track_frame(struct ring_buf *ring, const uint8_t *chunk, int sent) {
     for (int index = 0; index < sent; index++) {
-        wire_tx_frame_ring = (chunk[index] == WIRE_FRAME_DELIMITER) ? NULL : ring;
+        struct ring_buf *frame_ring = ring;
+        if (chunk[index] == WIRE_FRAME_DELIMITER) {
+            frame_ring = NULL;
+        }
+        wire_tx_frame_ring = frame_ring;
     }
 }
 
@@ -133,7 +138,8 @@ static void wire_uart_isr(const struct device *uart_device, void *user_data) {
         }
         const int sent = uart_fifo_fill(uart_device, chunk, (int)claim);
         wire_tx_track_frame(active, chunk, sent);
-        ring_buf_get_finish(active, (uint32_t)(sent < 0 ? 0 : sent));
+        const uint32_t consumed = (uint32_t)MAX(sent, 0);
+        ring_buf_get_finish(active, consumed);
         if (sent < (int)claim) {
             break;
         }

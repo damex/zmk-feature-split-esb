@@ -183,8 +183,14 @@ void central_input_deliver_event(const struct zmk_split_transport_central *trans
 
 static void replay_input_key(const struct zmk_split_transport_central *transport, uint8_t pipe,
                              struct esb_keepalive_held_key key, bool pressed) {
-    LOG_WRN("Reconcile lost: input code %u %s from %u", (unsigned int)key.code,
-            pressed ? "press" : "release", (unsigned int)pipe);
+    const char *transition = "release";
+    if (pressed) {
+        transition = "press";
+    }
+    LOG_WRN("Reconcile lost: input code %u %s from %u",
+            (unsigned int)key.code,
+            transition,
+            (unsigned int)pipe);
     struct zmk_split_transport_peripheral_event event = {
         .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
         .data = {.input_event = {

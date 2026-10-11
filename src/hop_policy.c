@@ -72,8 +72,11 @@ uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample) {
     int32_t sample_x10 = (int32_t)sample * 10;
     int32_t difference = sample_x10 - (int32_t)ewma_x10;
     int32_t delta = difference / (1 << HOP_POLICY_ATTEMPTS_EWMA_SHIFT);
-    if (delta == 0 && difference != 0) {
-        delta = (difference > 0) ? 1 : -1;
+    if (delta == 0 && difference > 0) {
+        delta = 1;
+    }
+    if (delta == 0 && difference < 0) {
+        delta = -1;
     }
     return (uint16_t)((int32_t)ewma_x10 + delta);
 }
@@ -227,7 +230,7 @@ const uint8_t *hop_policy_mask_store_mask(const uint8_t *stored, size_t pool_cou
 void hop_policy_score_update(uint8_t *score, uint8_t penalty, uint8_t decay) {
     __ASSERT_NO_MSG(score != NULL);
     if (penalty == 0) {
-        *score = (*score > decay) ? (uint8_t)(*score - decay) : 0;
+        *score = (uint8_t)(*score - MIN(*score, decay));
         return;
     }
     *score = hop_policy_saturating_add(*score, penalty);
