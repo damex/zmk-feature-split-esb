@@ -35,6 +35,12 @@ uint8_t hop_policy_attempts_penalty(uint8_t attempts, uint8_t good_attempts);
 /* Window grade from its transmits: mean attempts rounded up, 0 without any. */
 uint8_t hop_policy_window_attempts(uint32_t attempts_sum, uint32_t packets);
 
+/* Window grade from its acked transmits, each send without ACK counted as one attempt.
+ * 0 when no acked transmit is left. */
+uint8_t hop_policy_acked_window_attempts(uint32_t attempts_sum,
+                                         uint32_t packets,
+                                         uint32_t noack_packets);
+
 #define HOP_POLICY_ATTEMPTS_EWMA_SHIFT 2
 uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample);
 

@@ -135,6 +135,9 @@ uint8_t hop_link_cost_x10(void) {
 void hop_note_data_sent(void) {
 }
 
+void hop_note_noack_sent(void) {
+}
+
 static void wire_inject_fn(struct k_work *work) {
     ARG_UNUSED(work);
     for (size_t index = 0; index < ARRAY_SIZE(peer_events); index++) {

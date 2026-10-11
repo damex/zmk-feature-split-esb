@@ -47,6 +47,7 @@ static const uint16_t idle_keepalive_ms = DT_INST_PROP(0, idle_keepalive_ms);
 static atomic_t max_tx_attempts;
 static atomic_t window_attempts_sum;
 static atomic_t window_packets;
+static atomic_t window_noack_packets;
 static atomic_t data_sent_since_tick;
 static atomic_t tx_succeeded_since_tick;
 static atomic_t tx_failed_since_tick;
@@ -157,6 +158,7 @@ static void clear_window_attempts(void) {
     atomic_set(&max_tx_attempts, 0);
     atomic_set(&window_attempts_sum, 0);
     atomic_set(&window_packets, 0);
+    atomic_set(&window_noack_packets, 0);
 }
 
 /* Adopt the central's channel on a beacon epoch or mask change.
@@ -184,10 +186,13 @@ static void connected_window(void) {
     /* A transmit landing between these reads counts in the next window. */
     uint32_t attempts_sum = (uint32_t)atomic_set(&window_attempts_sum, 0);
     uint32_t packets = (uint32_t)atomic_set(&window_packets, 0);
+    uint32_t noack_packets = (uint32_t)atomic_set(&window_noack_packets, 0);
     if (worst_attempts > 0) {
         attempts_ewma_x10 = hop_policy_ewma_update(attempts_ewma_x10, worst_attempts);
     }
-    uint8_t typical_attempts = hop_policy_window_attempts(attempts_sum, packets);
+    uint8_t typical_attempts = hop_policy_acked_window_attempts(attempts_sum,
+                                                                packets,
+                                                                noack_packets);
     uint8_t penalty = hop_policy_attempts_penalty(typical_attempts, HOP_POLICY_GOOD_TX_ATTEMPTS);
     if (hop_policy_should_hop(&bad_windows, penalty, hop_threshold)) {
         degrade_undo_index = hop_index;
@@ -325,6 +330,12 @@ void hop_note_tx_failed(void) {
     atomic_set(&tx_failed_since_tick, 1);
     if (HOP_COUNT > 1) {
         record_tx_attempts(0xFF); /* a lost packet is the worst this window */
+    }
+}
+
+void hop_note_noack_sent(void) {
+    if (HOP_COUNT > 1) {
+        (void)atomic_inc(&window_noack_packets);
     }
 }
 

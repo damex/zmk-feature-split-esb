@@ -31,7 +31,7 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
 
 /* Central: no-op.
  * Peripheral: transmit succeeded after this many attempts (1 = first try).
- * Fire-and-forget success repeats the last acked count. */
+ * Fire-and-forget success reports one attempt. */
 void hop_note_tx_success(uint8_t attempts);
 
 /* Central: no-op.
@@ -41,6 +41,10 @@ void hop_note_tx_failed(void);
 /* Central: no-op.
  * Peripheral: real data went out, next keepalive uses the fast rate. */
 void hop_note_data_sent(void);
+
+/* Central: no-op.
+ * Peripheral: a packet left without ACK, its success stays out of the window grade. */
+void hop_note_noack_sent(void);
 
 /* Channel the radio should currently tune to. */
 uint8_t hop_current_channel(void);

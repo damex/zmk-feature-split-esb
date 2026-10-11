@@ -59,6 +59,15 @@ uint8_t hop_policy_window_attempts(uint32_t attempts_sum, uint32_t packets) {
     return (uint8_t)MIN(mean, UINT8_MAX);
 }
 
+uint8_t hop_policy_acked_window_attempts(uint32_t attempts_sum,
+                                         uint32_t packets,
+                                         uint32_t noack_packets) {
+    if (noack_packets >= packets) {
+        return 0;
+    }
+    return hop_policy_window_attempts(attempts_sum - noack_packets, packets - noack_packets);
+}
+
 uint16_t hop_policy_ewma_update(uint16_t ewma_x10, uint8_t sample) {
     int32_t sample_x10 = (int32_t)sample * 10;
     int32_t difference = sample_x10 - (int32_t)ewma_x10;

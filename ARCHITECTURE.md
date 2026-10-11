@@ -363,7 +363,7 @@ All four run on the system workqueue.
 |  [adopt_epoch]        [connected_window]   [lost_window]                     |
 |  retune to epoch      attempts EWMA ->     degrade undo ->                   |
 |  channel, mask swap   retransmit budget,   sweep the pool                    |
-|                       mean attempts ->                                       |
+|                       acked mean attempts ->                                 |
 |                       degrade step                                           |
 |   |                        |                    |                            |
 |   +------------+-----------+--------------------+                            |

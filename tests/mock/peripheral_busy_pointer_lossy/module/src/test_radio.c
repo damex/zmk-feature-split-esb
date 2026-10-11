@@ -71,8 +71,10 @@ static void check_channel(void) {
     }
     printk("FAIL: mouse left channel %u for %u after %u packets, %u of them busy, "
            "%u without ACK\n",
-           (unsigned int)channel, (unsigned int)mock_esb_channel(),
-           (unsigned int)atomic_get(&packets), (unsigned int)atomic_get(&busy_packets),
+           (unsigned int)channel,
+           (unsigned int)mock_esb_channel(),
+           (unsigned int)atomic_get(&packets),
+           (unsigned int)atomic_get(&busy_packets),
            (unsigned int)atomic_get(&noack_packets));
     exit(1);
 }
@@ -132,8 +134,10 @@ static void verdict_fn(struct k_work *work) {
     check_channel();
     printk("PASS: mouse stayed on channel %u through %u packets, %u of them busy, "
            "%u without ACK\n",
-           (unsigned int)atomic_get(&settled_channel), (unsigned int)atomic_get(&packets),
-           (unsigned int)atomic_get(&busy_packets), (unsigned int)atomic_get(&noack_packets));
+           (unsigned int)atomic_get(&settled_channel),
+           (unsigned int)atomic_get(&packets),
+           (unsigned int)atomic_get(&busy_packets),
+           (unsigned int)atomic_get(&noack_packets));
     exit(0);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_work, verdict_fn);

@@ -385,8 +385,10 @@ Stale entries heal through the retest ladder.
 A peripheral resumes its last-acked channel from retained RAM after a reboot or
 wake, so the first keystroke does not pay for a sweep. On a degrading uplink it
 steps to the next unmasked channel, steps back once if the new one stays silent,
-and only then enters the full sweep. A window counts as degrading when its packets
-average more than two attempts, so one slow packet in a busy window does not.
+and only then enters the full sweep. A window counts as degrading when its acked
+packets average more than two attempts, so one slow packet in a busy window does
+not. Lossy-codes packets go without ACK and report one attempt whatever the
+channel, so the average leaves them out.
 
 The peripheral also adapts its retransmit budget to delivery cost: an attempts EWMA
 scales the count between 2 and `retransmit-count`, so a clean link keeps low tail

@@ -52,7 +52,8 @@ enum mock_event_cell {
 };
 
 static const uint32_t mock_events[] = DT_PROP(DT_NODELABEL(pointer_input), events);
-BUILD_ASSERT(ARRAY_SIZE(mock_events) % MOCK_EVENT_CELLS == 0, "input-mock events are tuples of four cells");
+BUILD_ASSERT(ARRAY_SIZE(mock_events) % MOCK_EVENT_CELLS == 0,
+             "input-mock events are tuples of four cells");
 #define MOCK_EVENT_COUNT (ARRAY_SIZE(mock_events) / MOCK_EVENT_CELLS)
 
 struct packet_summary {
@@ -117,8 +118,9 @@ static struct packet_summary check_event_packet(const struct esb_payload *payloa
     bool last_sync = false;
     while (offset < payload->length) {
         struct zmk_split_transport_peripheral_event event = {0};
-        size_t consumed =
-            esb_wire_decode_event(&payload->data[offset], payload->length - offset, &event);
+        size_t consumed = esb_wire_decode_event(&payload->data[offset],
+                                                payload->length - offset,
+                                                &event);
         mock_check(consumed != 0, "event packet decodes whole");
         mock_check(!batch_ended, "packet ends at a sync, a button or a full batch");
         mock_check(next_event < MOCK_EVENT_COUNT && event_is_mock_event_at(&event, next_event),
@@ -188,7 +190,8 @@ static void check_verdict(void) {
     mock_check(full_batches != 0, "a full batch is offered without a sync");
     printk("PASS: %u input events offered to the radio in order as deltas with ACK, "
            "%u motion packets refused, keepalives healed the refused press and release\n",
-           (unsigned int)MOCK_EVENT_COUNT, (unsigned int)refused_motion_packets);
+           (unsigned int)MOCK_EVENT_COUNT,
+           (unsigned int)refused_motion_packets);
     exit(0);
 }
 
@@ -237,7 +240,8 @@ int esb_write_payload(const struct esb_payload *payload) {
 static void verdict_deadline_fn(struct k_work *work) {
     ARG_UNUSED(work);
     printk("FAIL: %u of %u input events offered to the radio by deadline\n",
-           (unsigned int)next_event, (unsigned int)MOCK_EVENT_COUNT);
+           (unsigned int)next_event,
+           (unsigned int)MOCK_EVENT_COUNT);
     exit(1);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_deadline_work, verdict_deadline_fn);

@@ -517,6 +517,9 @@ void hop_note_tx_failed(void) {
 void hop_note_data_sent(void) {
 }
 
+void hop_note_noack_sent(void) {
+}
+
 static int8_t worst_pipe_rssi_dbm(void) {
     int8_t worst = 0;
     for (uint8_t pipe = 0; pipe < PERIPHERAL_COUNT; pipe++) {

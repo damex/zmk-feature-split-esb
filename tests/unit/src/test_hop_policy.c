@@ -91,6 +91,22 @@ ZTEST(hop_policy, test_window_attempts) {
     zassert_equal(hop_policy_window_attempts(UINT32_MAX, UINT32_MAX), 1, "no overflow at type max");
 }
 
+ZTEST(hop_policy, test_acked_window_attempts) {
+    zassert_equal(hop_policy_acked_window_attempts(11, 9, 8), 3, "sends without ACK drop out");
+    zassert_equal(hop_policy_acked_window_attempts(6, 4, 0), 2, "all acked: plain mean");
+    zassert_equal(hop_policy_acked_window_attempts(4, 4, 4), 0, "nothing acked: no grade");
+    zassert_equal(hop_policy_acked_window_attempts(3, 2, 5),
+                  0,
+                  "more without ACK than successes: no grade");
+    zassert_equal(hop_policy_acked_window_attempts(0, 0, 0), 0, "no packets: 0");
+    zassert_equal(hop_policy_acked_window_attempts(UINT32_MAX, UINT32_MAX, 0),
+                  1,
+                  "no overflow at type max");
+    zassert_equal(hop_policy_acked_window_attempts(UINT32_MAX, UINT32_MAX, UINT32_MAX),
+                  0,
+                  "all without ACK: no grade");
+}
+
 ZTEST(hop_policy, test_index_next_wraps) {
     zassert_equal(hop_policy_index_next(0, 3), 1, NULL);
     zassert_equal(hop_policy_index_next(1, 3), 2, NULL);

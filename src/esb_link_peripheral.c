@@ -232,6 +232,9 @@ static int send_on_pipe(uint8_t pipe, const uint8_t *data, size_t length, bool a
     if (error == 0) {
         hop_note_data_sent();
     }
+    if (error == 0 && !ack) {
+        hop_note_noack_sent();
+    }
     return error;
 }
 
