@@ -332,7 +332,13 @@ Set `CONFIG_ZMK_HID_INDICATORS=y` on the dongle and the central for that.
 Pointer input (trackball, trackpad, mouse keys) relays too.
 Put the relay pointer processor last in every input listener on the central,
 ZMK's mouse key, move and scroll listeners included.
-Motion and scroll add up between relay polls, so a fast sensor loses no counts.
+Motion and scroll cross to the dongle as running totals, and the dongle turns
+them back into deltas once its USB endpoint takes them. A relay ACK the dongle
+misses loses no counts, the next one carries them. While the pointer moves,
+every relay ACK keeps room for the mouse report, so motion never waits behind
+queued key changes. A gap past 8192 counts resyncs the dongle's baseline, and
+so do mouse reports silent past twice `idle-keepalive-ms`, as after a central
+restart.
 Button changes queue like key changes, so a click shorter than one poll still reaches the host.
 Set `CONFIG_ZMK_POINTING=y` on the dongle and the central.
 

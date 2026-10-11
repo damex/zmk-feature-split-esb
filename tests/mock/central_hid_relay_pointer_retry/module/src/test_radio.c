@@ -4,7 +4,7 @@
 /*
  * Fake ESB link core on a central with a relay dongle and a pointer input listener.
  * First ACK write carrying pointer motion fails, as on a full ACK FIFO.
- * Exits 0 once later ACKs carry the summed motion, scroll and final buttons,
+ * Exits 0 once later ACKs' running totals reach the summed motion, scroll and final buttons,
  * nothing lost and nothing counted twice.
  * Exits 1 on an unknown report, two pointer reports with motion in one ACK,
  * no refused write, or wrong totals at verdict.
@@ -111,24 +111,31 @@ static size_t report_length(uint8_t report_id) {
 static void add_pointer_report(const uint8_t *bytes) {
     struct zmk_hid_mouse_report report = {0};
     memcpy(&report, bytes, sizeof(report));
-    relayed.d_x += report.body.d_x;
-    relayed.d_y += report.body.d_y;
-    relayed.d_scroll_y += report.body.d_scroll_y;
-    relayed.d_scroll_x += report.body.d_scroll_x;
+    relayed.d_x = report.body.d_x;
+    relayed.d_y = report.body.d_y;
+    relayed.d_scroll_y = report.body.d_scroll_y;
+    relayed.d_scroll_x = report.body.d_scroll_x;
     relayed.buttons = report.body.buttons;
 }
 
-static bool report_moves(const uint8_t *bytes) {
+static bool totals_advance(const uint8_t *bytes, struct pointer_totals *seen) {
     struct zmk_hid_mouse_report report = {0};
     memcpy(&report, bytes, sizeof(report));
     const struct zmk_hid_mouse_report_body *body = &report.body;
-    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+    bool moves = body->d_x != seen->d_x || body->d_y != seen->d_y ||
+                 body->d_scroll_y != seen->d_scroll_y || body->d_scroll_x != seen->d_scroll_x;
+    seen->d_x = body->d_x;
+    seen->d_y = body->d_y;
+    seen->d_scroll_y = body->d_scroll_y;
+    seen->d_scroll_x = body->d_scroll_x;
+    return moves;
 }
 
 static size_t walk_reports(const struct esb_payload *payload,
                            void (*on_pointer)(const uint8_t *bytes)) {
     size_t offset = 0;
     size_t moving_reports = 0;
+    struct pointer_totals seen = relayed;
     while (offset < payload->length) {
         uint8_t report_id = payload->data[offset + REPORT_ID_OFFSET];
         size_t length = report_length(report_id);
@@ -138,7 +145,7 @@ static size_t walk_reports(const struct esb_payload *payload,
             exit(1);
         }
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
-            moving_reports += report_moves(&payload->data[offset]) ? 1 : 0;
+            moving_reports += totals_advance(&payload->data[offset], &seen) ? 1 : 0;
             if (on_pointer != NULL) {
                 on_pointer(&payload->data[offset]);
             }
@@ -224,7 +231,7 @@ static void verdict_fn(struct k_work *work) {
                (int)expected.d_scroll_y, (int)expected.d_scroll_x, expected.buttons);
         exit(1);
     }
-    printk("PASS: refused pointer ACK retried, every delta and the final buttons relayed once\n");
+    printk("PASS: refused pointer ACK retried, totals reached every delta and the final buttons\n");
     exit(0);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_work, verdict_fn);

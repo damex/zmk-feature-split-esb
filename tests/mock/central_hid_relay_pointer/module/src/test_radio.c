@@ -4,8 +4,8 @@
 /*
  * Fake ESB link core on a central with a relay dongle and a pointer input listener.
  * Pointer events arrive faster than the relay polls.
- * Exits 0 once the relay ACKs carry the summed motion, scroll and final buttons,
- * at most one pointer report with motion each.
+ * Exits 0 once the relay ACKs' running totals reach the summed motion and scroll,
+ * with the final buttons, at most one pointer report with new motion each.
  * Exits 1 on an unknown report, two pointer reports with motion in one ACK,
  * or wrong totals at verdict.
  */
@@ -108,14 +108,15 @@ static size_t report_length(uint8_t report_id) {
 
 static bool report_moves(const struct zmk_hid_mouse_report *report) {
     const struct zmk_hid_mouse_report_body *body = &report->body;
-    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+    return body->d_x != relayed.d_x || body->d_y != relayed.d_y ||
+           body->d_scroll_y != relayed.d_scroll_y || body->d_scroll_x != relayed.d_scroll_x;
 }
 
 static void add_pointer_report(const struct zmk_hid_mouse_report *report) {
-    relayed.d_x += report->body.d_x;
-    relayed.d_y += report->body.d_y;
-    relayed.d_scroll_y += report->body.d_scroll_y;
-    relayed.d_scroll_x += report->body.d_scroll_x;
+    relayed.d_x = report->body.d_x;
+    relayed.d_y = report->body.d_y;
+    relayed.d_scroll_y = report->body.d_scroll_y;
+    relayed.d_scroll_x = report->body.d_scroll_x;
     relayed.buttons = report->body.buttons;
 }
 
@@ -133,8 +134,8 @@ int esb_write_payload(const struct esb_payload *payload) {
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
             struct zmk_hid_mouse_report report = {0};
             memcpy(&report, &payload->data[offset], sizeof(report));
-            add_pointer_report(&report);
             moving_reports += report_moves(&report) ? 1 : 0;
+            add_pointer_report(&report);
         }
         offset += length;
     }
@@ -203,7 +204,7 @@ static void verdict_fn(struct k_work *work) {
                (int)expected.d_scroll_y, (int)expected.d_scroll_x, expected.buttons);
         exit(1);
     }
-    printk("PASS: relay ACKs carried every pointer delta and the final buttons\n");
+    printk("PASS: relay ACK totals reached every pointer delta and the final buttons\n");
     exit(0);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_work, verdict_fn);

@@ -6,7 +6,8 @@
  * Relay pointer processor sits on the mouse key press, move and scroll listeners.
  * Keymap clicks two buttons across relay polls, taps one inside a single poll,
  * then moves and scrolls.
- * Exits 0 once the relay ACKs carry every button change in order and every move and scroll count.
+ * Exits 0 once the relay ACKs carry every button change in order and running totals
+ * reaching every move and scroll count.
  * Exits 1 on an unknown report, two pointer reports with motion in one ACK, a lost button change
  * or a count that differs from what the mouse keys reported.
  */
@@ -134,14 +135,15 @@ static void note_buttons(uint8_t buttons) {
 
 static bool report_moves(const struct zmk_hid_mouse_report *report) {
     const struct zmk_hid_mouse_report_body *body = &report->body;
-    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+    return body->d_x != relayed.d_x || body->d_y != relayed.d_y ||
+           body->d_scroll_y != relayed.d_scroll_y || body->d_scroll_x != relayed.d_scroll_x;
 }
 
 static void add_pointer_report(const struct zmk_hid_mouse_report *report) {
-    relayed.d_x += report->body.d_x;
-    relayed.d_y += report->body.d_y;
-    relayed.d_scroll_y += report->body.d_scroll_y;
-    relayed.d_scroll_x += report->body.d_scroll_x;
+    relayed.d_x = report->body.d_x;
+    relayed.d_y = report->body.d_y;
+    relayed.d_scroll_y = report->body.d_scroll_y;
+    relayed.d_scroll_x = report->body.d_scroll_x;
     note_buttons(report->body.buttons);
 }
 
@@ -159,8 +161,8 @@ int esb_write_payload(const struct esb_payload *payload) {
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
             struct zmk_hid_mouse_report report = {0};
             memcpy(&report, &payload->data[offset], sizeof(report));
-            add_pointer_report(&report);
             moving_reports += report_moves(&report) ? 1 : 0;
+            add_pointer_report(&report);
         }
         offset += length;
     }
@@ -268,7 +270,7 @@ static void verdict_fn(struct k_work *work) {
     check_buttons();
     check_motion_relayed();
     printk("PASS: relay ACKs carried %u mouse key button changes in order, "
-           "every move and scroll count\n",
+           "totals reached every move and scroll count\n",
            (unsigned int)relayed_button_count);
     exit(0);
 }

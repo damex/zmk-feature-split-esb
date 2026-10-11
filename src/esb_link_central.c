@@ -189,51 +189,78 @@ static bool write_pending_control(uint8_t pipe) {
     return false;
 }
 
-static size_t append_pointer(uint8_t pipe, struct esb_payload *payload) {
+static size_t append_pointer(uint8_t pipe, struct esb_payload *payload, bool changes_queued) {
     if (!esb_link_pipe_is_relay(pipe)) {
         return 0;
     }
     size_t room = CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD - payload->length;
-    size_t length = esb_hid_relay_pointer_take(&payload->data[payload->length], room);
+    size_t length =
+        esb_hid_relay_pointer_take(&payload->data[payload->length], room, changes_queued);
     payload->length = (uint8_t)(payload->length + length);
     return length;
 }
 
-static void commit_pointer(const struct esb_payload *payload, size_t offset, size_t length) {
-    if (length != 0) {
+static void commit_pointer(const struct esb_payload *payload, size_t offset, bool has_pointer) {
+    if (has_pointer) {
         esb_hid_relay_pointer_sent(&payload->data[offset]);
     }
 }
 
-static bool write_queued_replies(uint8_t pipe) {
-    struct esb_payload payload = {0};
-    payload.pipe = pipe;
-    uint32_t taken = 0;
+struct packed_replies {
+    uint32_t taken;
+    size_t pointer_offset;
+    bool has_pointer;
+};
+
+static size_t queued_room(uint8_t pipe) {
+    if (!esb_link_pipe_is_relay(pipe) || !esb_hid_relay_pointer_motion_pending()) {
+        return CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD;
+    }
+    return CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD - ESB_HID_RELAY_POINTER_LENGTH;
+}
+
+static struct packed_replies pack_queued_replies(uint8_t pipe, struct esb_payload *payload) {
+    struct packed_replies packed = {0};
+    size_t room = queued_room(pipe);
     struct esb_link_packet packet;
-    while (k_msgq_peek_at(reply_queue[pipe], &packet, taken) == 0) {
-        if (payload.length + packet.length > CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD) {
+    while (k_msgq_peek_at(reply_queue[pipe], &packet, packed.taken) == 0) {
+        if (payload->length + packet.length > room) {
             break;
         }
-        memcpy(&payload.data[payload.length], packet.data, packet.length);
-        payload.length = (uint8_t)(payload.length + packet.length);
-        taken++;
+        uint8_t *reply = &payload->data[payload->length];
+        memcpy(reply, packet.data, packet.length);
+        if (esb_link_pipe_is_relay(pipe) && esb_hid_relay_pointer_stamp(reply, packet.length)) {
+            packed.pointer_offset = payload->length;
+            packed.has_pointer = true;
+        }
+        payload->length = (uint8_t)(payload->length + packet.length);
+        packed.taken++;
         /* Relay replies are whole HID reports the dongle splits again, commands are not. */
         if (!esb_link_pipe_is_relay(pipe)) {
             break;
         }
     }
-    if (taken == 0) {
+    return packed;
+}
+
+static bool write_queued_replies(uint8_t pipe) {
+    struct esb_payload payload = {0};
+    payload.pipe = pipe;
+    struct packed_replies packed = pack_queued_replies(pipe, &payload);
+    if (packed.taken == 0) {
         return false;
     }
-    size_t pointer_offset = payload.length;
-    /* Current buttons must not overtake a button change still queued. */
-    bool drained = k_msgq_peek_at(reply_queue[pipe], &packet, taken) != 0;
-    size_t pointer_length = drained ? append_pointer(pipe, &payload) : 0;
+    struct esb_link_packet packet;
+    if (!packed.has_pointer) {
+        bool changes_queued = k_msgq_peek_at(reply_queue[pipe], &packet, packed.taken) == 0;
+        packed.pointer_offset = payload.length;
+        packed.has_pointer = append_pointer(pipe, &payload, changes_queued) != 0;
+    }
     if (esb_write_payload(&payload) == 0) {
-        for (uint32_t index = 0; index < taken; index++) {
+        for (uint32_t index = 0; index < packed.taken; index++) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
         }
-        commit_pointer(&payload, pointer_offset, pointer_length);
+        commit_pointer(&payload, packed.pointer_offset, packed.has_pointer);
     }
     return true;
 }
@@ -256,14 +283,14 @@ static void write_idle_reply(uint8_t pipe) {
         memcpy(payload.data, slot->data, slot->length);
     }
     size_t pointer_offset = payload.length;
-    size_t pointer_length = append_pointer(pipe, &payload);
+    bool has_pointer = append_pointer(pipe, &payload, false) != 0;
     if (payload.length == 0 || esb_write_payload(&payload) != 0) {
         return;
     }
     if (slot != NULL) {
         (void)spsc_latch_release(&idle_reply_latch[pipe], slot);
     }
-    commit_pointer(&payload, pointer_offset, pointer_length);
+    commit_pointer(&payload, pointer_offset, has_pointer);
 }
 
 /* ISR-only, so esb_write_payload has a single caller context, no lock.

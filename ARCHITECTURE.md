@@ -185,7 +185,7 @@ initialized.
 |                                                                              |
 |   wire peer pipe: command and beacon go to wire_central_send instead         |
 |   relay pipe: each HID report change queues, idle reply latches the latest   |
-|   input thread: relay pointer processor sums motion, queues button changes   |
+|   input thread: relay pointer processor keeps running totals, queues buttons |
 |   central with its own host: relay latches released reports, pointer quiet   |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | RADIO ISR                                                                    |
@@ -193,7 +193,7 @@ initialized.
 |   [RX from pipe N] --> [fill ACK FIFO]                                       |
 |   control latch first, else queued replies, else the idle reply              |
 |   relay pipe packs every queued HID report that fits into one ACK            |
-|   relay pipe appends summed motion once its queue drains, buttons on refresh |
+|   relay pipe keeps room for the mouse report while its totals move          |
 |                     |                                                        |
 +---------------------|--------------------------------------------------------+
                       | ACK rides peripheral's next transmit
@@ -213,7 +213,8 @@ initialized.
 |                                                                              |
 |   [SPSC ring] --> [esb_peripheral_on_rx] --> [command msgq]                  |
 |                   wire peer's pipe on a relay half: Wire downlink            |
-|                   relay dongle: esb_hid_relay_deliver splits, drops repeats  |
+|                   relay dongle: esb_hid_relay_deliver splits, drops repeats, |
+|                   turns pointer totals into deltas once USB takes them       |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |

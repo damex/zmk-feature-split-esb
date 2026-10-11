@@ -4,10 +4,11 @@
 /*
  * Fake ESB link core on a central with a relay dongle, keys and a pointer.
  * Central gets its own USB host while a key and a button are held, then loses it.
+ * A button press queues as the pause starts.
  * Exits 0 once the relay forwards before and after, the held button again after,
  * while paused sends only released keys and buttons and no motion,
  * and saves the dongle's host LEDs as ZMK's state for no host, for after the pause.
- * Exits 1 on a held key while paused, motion from the pause on,
+ * Exits 1 on a held key or button while paused, motion from the pause on,
  * or a check missing at verdict.
  */
 #include <stdbool.h>
@@ -31,6 +32,7 @@
 
 #include <esb.h>
 
+#include "esb_hid_relay_central.h"
 #include "esb_hid_state.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
@@ -40,6 +42,7 @@
 #define REPORT_ID_OFFSET 0
 #define REPORT_BODY_OFFSET 1
 #define PRIMARY_BUTTON BIT(0)
+#define SECONDARY_BUTTON BIT(1)
 #define ACTIVE_POINTER_X 4
 #define POLL_START_MS 20
 #define PAUSE_MS 100
@@ -119,26 +122,36 @@ static void observe_consumer(const uint8_t *bytes) {
     }
 }
 
+static struct zmk_hid_mouse_report_body last_pointer;
+
 static bool pointer_moves(const struct zmk_hid_mouse_report *report) {
     const struct zmk_hid_mouse_report_body *body = &report->body;
-    return body->d_x != 0 || body->d_y != 0 || body->d_scroll_y != 0 || body->d_scroll_x != 0;
+    return body->d_x != last_pointer.d_x || body->d_y != last_pointer.d_y ||
+           body->d_scroll_y != last_pointer.d_scroll_y ||
+           body->d_scroll_x != last_pointer.d_scroll_x;
 }
 
 static void observe_pointer(const uint8_t *bytes) {
     struct zmk_hid_mouse_report report = {0};
     memcpy(&report, bytes, sizeof(report));
     bool button = (report.body.buttons & PRIMARY_BUTTON) != 0;
+    bool moves = pointer_moves(&report);
+    last_pointer = report.body;
     if (phase == PHASE_ACTIVE) {
-        seen.active_pointer_x += report.body.d_x;
+        seen.active_pointer_x = report.body.d_x;
         seen.active_button |= button;
         return;
     }
-    if (pointer_moves(&report)) {
+    if (moves) {
         printk("FAIL: relay sent pointer motion from the pause on\n");
         exit(1);
     }
     if (phase == PHASE_PAUSED) {
-        seen.paused_button_release |= report.body.buttons == 0;
+        if (report.body.buttons != 0) {
+            printk("FAIL: paused relay sent a held button\n");
+            exit(1);
+        }
+        seen.paused_button_release = true;
     } else {
         seen.resumed_button |= button;
     }
@@ -205,6 +218,11 @@ static void raise_host(enum zmk_transport transport) {
 static void pause_fn(struct k_work *work) {
     ARG_UNUSED(work);
     phase = PHASE_PAUSED;
+    const struct zmk_hid_mouse_report press = {
+        .report_id = ZMK_HID_REPORT_ID_MOUSE,
+        .body = {.buttons = (zmk_mouse_button_flags_t)(PRIMARY_BUTTON | SECONDARY_BUTTON)},
+    };
+    esb_hid_relay_stage(&press, sizeof(press));
     raise_host(ZMK_TRANSPORT_USB);
 }
 static K_WORK_DELAYABLE_DEFINE(pause_work, pause_fn);
