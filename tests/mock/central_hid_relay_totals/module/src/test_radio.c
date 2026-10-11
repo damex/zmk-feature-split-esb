@@ -143,7 +143,8 @@ static void check_press_order(uint8_t buttons) {
     sink_press_seen |= pressed;
 }
 
-static int usb_sink(const uint8_t *bytes, size_t length) {
+static int usb_sink(const uint8_t *bytes, size_t length, bool skippable) {
+    ARG_UNUSED(skippable);
     if (bytes[REPORT_ID_OFFSET] == ZMK_HID_REPORT_ID_KEYBOARD) {
         sink_key_changes++;
         return 0;

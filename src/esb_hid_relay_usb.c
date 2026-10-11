@@ -28,6 +28,7 @@ LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 #define HID_REPORT_TYPE_MASK 0xFF00
 #define HID_REPORT_ID_MASK 0x00FF
 #define HID_REPORT_TYPE_OUTPUT 0x0200
+#define ENDPOINT_WAIT_MS 10
 
 static const struct device *hid_dev;
 static K_SEM_DEFINE(hid_tx_sem, 1, 1);
@@ -88,11 +89,12 @@ static const struct hid_ops ops = {
     .int_in_ready = in_ready_cb,
 };
 
-static int relay_to_usb(const uint8_t *bytes, size_t length) {
+static int relay_to_usb(const uint8_t *bytes, size_t length, bool skippable) {
     if (hid_dev == NULL) {
         return -ENODEV;
     }
-    if (k_sem_take(&hid_tx_sem, K_MSEC(10)) != 0) {
+    k_timeout_t wait = skippable ? K_NO_WAIT : K_MSEC(ENDPOINT_WAIT_MS);
+    if (k_sem_take(&hid_tx_sem, wait) != 0) {
         return -EBUSY;
     }
     int err = hid_int_ep_write(hid_dev, bytes, length, NULL);

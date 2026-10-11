@@ -10,6 +10,7 @@ zephyr_library_sources(
   ${mock_common}/src/mock_hfclk.c
   ${esb_root}/src/esb_batch.c
   ${esb_root}/src/esb_hid_relay_peripheral.c
+  ${esb_root}/src/esb_hid_relay_usb.c
   ${esb_root}/src/esb_keepalive.c
   ${esb_root}/src/esb_link.c
   ${esb_root}/src/esb_link_peripheral.c

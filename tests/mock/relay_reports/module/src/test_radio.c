@@ -4,8 +4,8 @@
 /*
  * Fake ESB link on a HID relay dongle.
  * Exits 0 once the sink sees every report change once, in order, re-sends dropped,
- * a rejected report retried by its re-send.
- * Exits 1 on a duplicate, a wrong or a missing report.
+ * a rejected report retried by its re-send, none of them skippable.
+ * Exits 1 on a duplicate, a wrong, a missing or a skippable report.
  */
 #include <errno.h>
 #include <stdbool.h>
@@ -80,7 +80,12 @@ static struct zmk_hid_keyboard_report keyboard_report(uint32_t usage) {
     return report;
 }
 
-static int sink(const uint8_t *bytes, size_t length) {
+static int sink(const uint8_t *bytes, size_t length, bool skippable) {
+    if (skippable) {
+        printk("FAIL: key report reached the sink as skippable at step %u\n",
+               (unsigned int)(next_expected + 1));
+        exit(1);
+    }
     if (length == last_sink_length && memcmp(bytes, last_sink_report, length) == 0) {
         printk("FAIL: duplicate report reached the sink at step %u:",
                (unsigned int)(next_expected + 1));

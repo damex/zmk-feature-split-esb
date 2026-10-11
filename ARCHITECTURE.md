@@ -214,7 +214,8 @@ initialized.
 |   [SPSC ring] --> [esb_peripheral_on_rx] --> [command msgq]                  |
 |                   wire peer's pipe on a relay half: Wire downlink            |
 |                   relay dongle: esb_hid_relay_deliver splits, drops repeats, |
-|                   turns pointer totals into deltas once USB takes them       |
+|                   turns pointer totals into deltas once USB takes them,      |
+|                   motion alone skips a busy endpoint, keys and buttons wait  |
 | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
 | system workqueue                                                             |
 |                                                                              |

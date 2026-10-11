@@ -89,7 +89,7 @@ static void deliver_pointer(zmk_split_esb_hid_relay_callback_t callback, const u
     bool moves = pointer_totals_to_deltas(bytes, usb, tracks);
     uint8_t buttons = usb[ESB_HID_RELAY_POINTER_BUTTONS_OFFSET];
     if (moves || buttons != delivered_buttons) {
-        if (callback(usb, sizeof(usb)) != 0) {
+        if (callback(usb, sizeof(usb), buttons == delivered_buttons) != 0) {
             return;
         }
         delivered_buttons = buttons;
@@ -141,7 +141,7 @@ static void deliver_report(zmk_split_esb_hid_relay_callback_t callback,
     if (!report->is_news(report, bytes)) {
         return;
     }
-    if (callback(bytes, report->length) != 0) {
+    if (callback(bytes, report->length, false) != 0) {
         return;
     }
     memcpy(report->delivered, bytes, report->length);

@@ -6,6 +6,7 @@
  * Exits 0 once the sink got the deltas between totals: none for the first report,
  * none for a repeat, a button change on its own, a rejected report's motion with the next one,
  * none after a silence past the link loss threshold, and none across a gap past the cap.
+ * Motion alone comes skippable, a button change does not.
  * Exits 1 on a missing, extra or wrong report.
  */
 #include <errno.h>
@@ -45,24 +46,26 @@ struct pointer_step {
     uint32_t silence_ms;
     bool sink_busy;
     bool reaches_sink;
+    bool skippable;
     int16_t d_x;
     int16_t d_y;
 };
 
 static const struct pointer_step steps[] = {
     {.total_x = BASE_X, .total_y = -7},
-    {.total_x = BASE_X + 5, .total_y = -7, .reaches_sink = true, .d_x = 5},
+    {.total_x = BASE_X + 5, .total_y = -7, .reaches_sink = true, .skippable = true, .d_x = 5},
     {.total_x = BASE_X + 5, .total_y = -7},
     {.total_x = BASE_X + 5, .total_y = -7, .buttons = PRIMARY_BUTTON, .reaches_sink = true},
-    {.total_x = BASE_X + 9, .total_y = -4, .buttons = PRIMARY_BUTTON, .sink_busy = true},
+    {.total_x = BASE_X + 9, .total_y = -4, .buttons = PRIMARY_BUTTON, .sink_busy = true,
+     .skippable = true},
     {.total_x = MOVED_X, .total_y = -4, .buttons = PRIMARY_BUTTON, .reaches_sink = true,
-     .d_x = 6, .d_y = 3},
+     .skippable = true, .d_x = 6, .d_y = 3},
     {.total_x = 0, .total_y = 0, .buttons = PRIMARY_BUTTON, .silence_ms = SILENCE_MS},
     {.total_x = RESTART_X, .total_y = 0, .buttons = PRIMARY_BUTTON, .reaches_sink = true,
-     .d_x = RESTART_X},
+     .skippable = true, .d_x = RESTART_X},
     {.total_x = FAR_X, .total_y = 0, .buttons = PRIMARY_BUTTON},
     {.total_x = FAR_X - 2, .total_y = 0, .buttons = PRIMARY_BUTTON, .reaches_sink = true,
-     .d_x = -2},
+     .skippable = true, .d_x = -2},
 };
 
 static size_t step_index;
@@ -112,8 +115,13 @@ static void check_sink_report(const struct pointer_step *step, const uint8_t *by
     }
 }
 
-static int sink(const uint8_t *bytes, size_t length) {
+static int sink(const uint8_t *bytes, size_t length, bool skippable) {
     const struct pointer_step *step = &steps[step_index];
+    if (skippable != step->skippable) {
+        printk("FAIL: step %u reached the sink with skippable %d\n",
+               (unsigned int)(step_index + 1), (int)skippable);
+        exit(1);
+    }
     if (step->sink_busy) {
         return -EBUSY;
     }

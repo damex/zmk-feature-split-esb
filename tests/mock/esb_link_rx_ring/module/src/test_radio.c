@@ -53,7 +53,8 @@ static size_t expected_index(size_t delivery) {
     return RECOVERY_INDEX;
 }
 
-static int sink(const uint8_t *bytes, size_t length) {
+static int sink(const uint8_t *bytes, size_t length, bool skippable) {
+    ARG_UNUSED(skippable);
     if (delivered > RING_DEPTH) {
         printk("FAIL: extra report reached the sink:");
         mock_print_bytes(bytes, length);
