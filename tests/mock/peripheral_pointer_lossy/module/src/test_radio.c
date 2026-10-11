@@ -267,7 +267,10 @@ static int write_event_packet(const struct esb_payload *payload) {
         k_work_submit(&tx_success_work);
     }
     check_verdict();
-    return refused ? -ENOMEM : 0;
+    if (refused) {
+        return -ENOMEM;
+    }
+    return 0;
 }
 
 int esb_write_payload(const struct esb_payload *payload) {

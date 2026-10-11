@@ -216,7 +216,11 @@ static int observation_listener(const zmk_event_t *event) {
     const struct zmk_position_state_changed *position = as_zmk_position_state_changed(event);
     if (position != NULL) {
         if (position->source == PIPE) {
-            observe(OBSERVED_POSITION, position->position, position->state ? PRESSED : RELEASED);
+            int64_t state = RELEASED;
+            if (position->state) {
+                state = PRESSED;
+            }
+            observe(OBSERVED_POSITION, position->position, state);
         }
         return ZMK_EV_EVENT_BUBBLE;
     }

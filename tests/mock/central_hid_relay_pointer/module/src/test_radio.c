@@ -134,7 +134,9 @@ int esb_write_payload(const struct esb_payload *payload) {
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
             struct zmk_hid_mouse_report report = {0};
             memcpy(&report, &payload->data[offset], sizeof(report));
-            moving_reports += report_moves(&report) ? 1 : 0;
+            if (report_moves(&report)) {
+                moving_reports++;
+            }
             add_pointer_report(&report);
         }
         offset += length;

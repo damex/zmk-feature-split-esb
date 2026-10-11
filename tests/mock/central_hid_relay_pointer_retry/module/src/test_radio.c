@@ -145,7 +145,9 @@ static size_t walk_reports(const struct esb_payload *payload,
             exit(1);
         }
         if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
-            moving_reports += totals_advance(&payload->data[offset], &seen) ? 1 : 0;
+            if (totals_advance(&payload->data[offset], &seen)) {
+                moving_reports++;
+            }
             if (on_pointer != NULL) {
                 on_pointer(&payload->data[offset]);
             }

@@ -100,7 +100,10 @@ void hop_boot_mask(void) {
 
 uint32_t hop_pipe_quiet_ms(uint8_t pipe) {
     ARG_UNUSED(pipe);
-    return atomic_get(&silent) != 0 ? UINT32_MAX : 0;
+    if (atomic_get(&silent) != 0) {
+        return UINT32_MAX;
+    }
+    return 0;
 }
 
 bool hop_pipe_heard(uint8_t pipe) {
@@ -201,7 +204,8 @@ static void step_fn(struct k_work *work) {
     if (next_step < ARRAY_SIZE(steps)) {
         uint32_t now_ms = k_uptime_get_32();
         uint32_t at_ms = steps[next_step].at_ms;
-        k_work_reschedule(&step_work, K_MSEC(at_ms > now_ms ? at_ms - now_ms : 0));
+        uint32_t delay_ms = at_ms - MIN(at_ms, now_ms);
+        k_work_reschedule(&step_work, K_MSEC(delay_ms));
     }
 }
 

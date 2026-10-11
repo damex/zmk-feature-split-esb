@@ -239,9 +239,14 @@ static K_WORK_DELAYABLE_DEFINE(release_work, release_fn);
 static void verdict_fn(struct k_work *work) {
     ARG_UNUSED(work);
     if (sink_key_changes != KEY_CHANGES || !sink_press_seen) {
+        const char *press = "missing";
+        if (sink_press_seen) {
+            press = "seen";
+        }
         printk("FAIL: sink got %u of %u key changes, press %s\n",
-               (unsigned int)sink_key_changes, (unsigned int)KEY_CHANGES,
-               sink_press_seen ? "seen" : "missing");
+               (unsigned int)sink_key_changes,
+               (unsigned int)KEY_CHANGES,
+               press);
         exit(1);
     }
     if (keyed_acks == 0 || lost_acks == 0) {

@@ -200,11 +200,20 @@ static void verdict_fn(struct k_work *work) {
     int32_t expected_x = total_x - FIRST_TOTAL_X;
     bool passed = key_changes_skipped == 0 && next_key_change == key_changes_sent &&
                   max_key_latency_ms <= KEY_LATENCY_BOUND_MS && host_x == expected_x;
+    const char *verdict = "FAIL";
+    int status = 1;
+    if (passed) {
+        verdict = "PASS";
+        status = 0;
+    }
     printk("%s: %u of %u key changes skipped, max key latency %u ms, motion %d of %d\n",
-           passed ? "PASS" : "FAIL", (unsigned int)key_changes_skipped,
-           (unsigned int)key_changes_sent, (unsigned int)max_key_latency_ms, (int)host_x,
+           verdict,
+           (unsigned int)key_changes_skipped,
+           (unsigned int)key_changes_sent,
+           (unsigned int)max_key_latency_ms,
+           (int)host_x,
            (int)expected_x);
-    exit(passed ? 0 : 1);
+    exit(status);
 }
 static K_WORK_DELAYABLE_DEFINE(verdict_work, verdict_fn);
 
