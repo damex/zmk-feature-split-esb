@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-tx-stall
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..
