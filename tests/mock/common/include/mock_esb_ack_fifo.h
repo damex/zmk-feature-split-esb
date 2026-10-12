@@ -20,4 +20,4 @@ const struct esb_payload *mock_esb_ack_fifo_receive(const struct esb_payload *pa
 
 size_t mock_esb_ack_fifo_full_refusals(void);
 size_t mock_esb_ack_fifo_peak_slots(void);
-size_t mock_esb_ack_fifo_queued(uint8_t pipe);
+size_t mock_esb_ack_fifo_peak_queued(uint8_t pipe);

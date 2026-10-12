@@ -4,7 +4,8 @@
 /*
  * Peripheral traffic on a one millisecond tick into a real central through the fake ACK FIFO.
  * A case defines peripheral_traffic_mode.
- * Exits 1 on the first write the central's ACK FIFO refuses, 0 after the whole run.
+ * Exits 1 once the central's ACK FIFO refuses a write or holds more than two replies
+ * for one pipe, 0 after the whole run.
  * With relay_new_motion_every_poll, also exits 1 on a relay poll whose ACK carries no new
  * motion once motion arrived. A poll answered with link control counts apart.
  */

@@ -48,6 +48,7 @@
 #define TRAFFIC_THREAD_STACK_SIZE 2048
 #define TRAFFIC_THREAD_PRIORITY 7
 #define REPORT_ID_OFFSET 0
+#define REPLIES_PER_PIPE_MAX 2
 
 static const bool relay_present = DT_NODE_EXISTS(RELAY_NODE);
 static const uint8_t relay_pipe =
@@ -272,13 +273,25 @@ static void send_due(uint32_t tick_ms) {
     }
 }
 
+static bool pipe_overfilled(void) {
+    for (uint8_t pipe = 0; pipe < PIPE_COUNT; pipe++) {
+        if (mock_esb_ack_fifo_peak_queued(pipe) > REPLIES_PER_PIPE_MAX) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void check_ack_fifo(uint32_t tick_ms) {
-    if (mock_esb_ack_fifo_full_refusals() == 0) {
+    size_t refusals = mock_esb_ack_fifo_full_refusals();
+    if (refusals == 0 && !pipe_overfilled()) {
         return;
     }
-    printk("FAIL: central ACK FIFO full at %u ms, queued per pipe:", (unsigned int)tick_ms);
+    printk("FAIL: central ACK FIFO at %u ms refused %u, peak replies per pipe:",
+           (unsigned int)tick_ms,
+           (unsigned int)refusals);
     for (uint8_t pipe = 0; pipe < PIPE_COUNT; pipe++) {
-        printk(" %u", (unsigned int)mock_esb_ack_fifo_queued(pipe));
+        printk(" %u", (unsigned int)mock_esb_ack_fifo_peak_queued(pipe));
     }
     printk("\n");
     exit(1);

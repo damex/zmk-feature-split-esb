@@ -514,7 +514,8 @@ the `CONFIG_ZMK_SPLIT_ESB` prefix.
 | command msgq, peripheral | `..._COMMAND_QUEUE_SIZE` | command dropped |
 | reply queue, per pipe | `reply-queue-depth` | stage returns -ENOBUFS |
 | control latch, per pipe | one slot per kind | newest overwrites, by design |
-| ESB TX FIFO | `CONFIG_ESB_TX_FIFO_SIZE` | send fails, stall flush recovers |
+| ESB RX FIFO | `CONFIG_ESB_RX_FIFO_SIZE`, raise on a relay central | radio drops the packet, no ACK |
+| ESB TX FIFO | `CONFIG_ESB_TX_FIFO_SIZE`, 2 per pipe or more on a central | send fails, stall flush recovers |
 | wire RX ring | `WIRE_FRAME_MAX_ENCODED * 2` | ISR logs, bytes dropped |
 | wire TX event ring | `WIRE_FRAME_MAX_ENCODED * 2` | send returns -ENOBUFS |
 | wire TX input ring | `WIRE_FRAME_MAX_ENCODED * 2` | send returns -ENOBUFS |

@@ -45,6 +45,12 @@ Set `CONFIG_ESB_MAX_PAYLOAD_LENGTH` equal to `ZMK_SPLIT_ESB_MAX_PAYLOAD` (48)
 on every device. sdk-nrf default is 32, build assert catches it.
 Raise `CONFIG_ESB_TX_FIFO_SIZE` to 16 on a peripheral with bursty senders
 (chattery encoder). sdk-nrf default 8 drops events at source under a burst.
+Set `CONFIG_ESB_TX_FIFO_SIZE` on a central to twice its peripheral count or more,
+build assert catches it. Each pipe holds up to two ACK replies. sdk-nrf's 8 covers
+four peripherals. On a central with `CONFIG_ZMK_SPLIT_ESB_HID_RELAY=y`, raise
+`CONFIG_ESB_RX_FIFO_SIZE` above sdk-nrf's 8. Relay polls can overflow it, and a packet
+arriving then drops without an ACK. Size it with the link counters: `full` above 0
+means it overflowed.
 
 DT side: shared dtsi every device includes, plus role-specific lines. Everything
 reports to the dongle (central). Two examples, by peripheral count and what each

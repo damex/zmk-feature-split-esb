@@ -18,6 +18,7 @@ struct pipe_queue {
     struct esb_payload payloads[CONFIG_ESB_TX_FIFO_SIZE];
     size_t head;
     size_t count;
+    size_t peak;
     bool head_sent;
 };
 
@@ -46,6 +47,7 @@ int esb_write_payload(const struct esb_payload *payload) {
     struct pipe_queue *queue = &queues[payload->pipe];
     queue->payloads[(queue->head + queue->count) % CONFIG_ESB_TX_FIFO_SIZE] = *payload;
     queue->count++;
+    queue->peak = MAX(queue->peak, queue->count);
     slots_used++;
     slots_peak = MAX(slots_peak, slots_used);
     return 0;
@@ -93,9 +95,9 @@ size_t mock_esb_ack_fifo_peak_slots(void) {
     return slots_peak;
 }
 
-size_t mock_esb_ack_fifo_queued(uint8_t pipe) {
+size_t mock_esb_ack_fifo_peak_queued(uint8_t pipe) {
     if (pipe >= ARRAY_SIZE(queues)) {
         return 0;
     }
-    return queues[pipe].count;
+    return queues[pipe].peak;
 }

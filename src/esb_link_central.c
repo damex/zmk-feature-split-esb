@@ -84,6 +84,10 @@ uint8_t esb_link_source_ids(uint8_t *out_ids) {
 BUILD_ASSERT(ESB_LINK_CONTROL_MAX_LENGTH <= CONFIG_ZMK_SPLIT_ESB_MAX_PAYLOAD,
              "control latch does not fit one ESB payload");
 
+#define REPLIES_PER_PIPE_MAX 2
+BUILD_ASSERT(CONFIG_ESB_TX_FIFO_SIZE >= REPLIES_PER_PIPE_MAX * REPLY_PIPE_COUNT,
+             "set CONFIG_ESB_TX_FIFO_SIZE to twice the peripheral count or more in your .conf");
+
 #define CONTROL_LATCH_SLOTS 2
 
 struct control_payload {
