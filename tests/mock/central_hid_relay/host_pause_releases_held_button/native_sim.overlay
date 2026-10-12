@@ -11,10 +11,7 @@
         event-startup-delay = <60>;
         event-period = <60>;
         events = <
-            INPUT_EV_REL INPUT_REL_X 4 0
             INPUT_EV_KEY INPUT_BTN_0 1 1
-            INPUT_EV_REL INPUT_REL_X 9 1
-            INPUT_EV_REL INPUT_REL_X 9 1
         >;
     };
 

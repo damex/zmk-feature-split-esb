@@ -8,8 +8,8 @@
 
         default_layer {
             bindings = <
-                &kp A &kp B
-                &kp C &none
+                &kp A &none
+                &none &none
             >;
         };
     };
@@ -18,11 +18,6 @@
 &kscan {
     /delete-property/ exit-after;
     events = <
-        ZMK_MOCK_PRESS(0,0,60)
-        ZMK_MOCK_PRESS(0,1,80)
-        ZMK_MOCK_RELEASE(0,0,30)
-        ZMK_MOCK_RELEASE(0,1,120)
-        ZMK_MOCK_PRESS(1,0,50)
-        ZMK_MOCK_RELEASE(1,0,10)
+        ZMK_MOCK_PRESS(0,0,150)
     >;
 };

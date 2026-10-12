@@ -41,7 +41,14 @@ MOCK_CASES += \
 	central_hid_relay/button_backlog \
 	central_hid_relay/button_heal \
 	central_hid_relay/commands \
-	central_hid_relay/host_pause \
+	central_hid_relay/host_pause_drops_key_press \
+	central_hid_relay/host_pause_drops_motion \
+	central_hid_relay/host_pause_releases_held_button \
+	central_hid_relay/host_pause_releases_held_key \
+	central_hid_relay/host_pause_releases_queued_button_press \
+	central_hid_relay/host_pause_saves_dongle_leds_for_no_host \
+	central_hid_relay/host_resume_relays_keys \
+	central_hid_relay/host_resume_represses_held_button \
 	central_hid_relay/idle_ack \
 	central_hid_relay/indicators \
 	central_hid_relay/mouse_keys \

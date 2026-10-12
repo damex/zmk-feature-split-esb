@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-central-hid-relay-host-pause-releases-held-button
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..
