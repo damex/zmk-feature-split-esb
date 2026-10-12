@@ -30,6 +30,7 @@
 #define LEFT_PIPE DT_PROP(DT_NODELABEL(left), pipe)
 #define MOUSE_PIPE DT_PROP(DT_NODELABEL(mouse), pipe)
 #define RELAY_NODE DT_NODELABEL(relay)
+#define RIGHT_NODE DT_NODELABEL(right)
 #define PIPE_COUNT DT_CHILD_NUM_STATUS_OKAY(DT_INST_CHILD(0, peripherals))
 #define POINTER_REG DT_REG_ADDR(DT_NODELABEL(split_pointer))
 #define HOP_WINDOW_MS DT_INST_PROP(0, hop_window_ms)
@@ -48,6 +49,9 @@ static const uint8_t relay_pipe =
     COND_CODE_1(DT_NODE_EXISTS(RELAY_NODE), (DT_PROP(RELAY_NODE, pipe)), (0));
 static const uint32_t relay_poll_ms =
     COND_CODE_1(DT_NODE_EXISTS(RELAY_NODE), (CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS), (1));
+static const bool right_present = DT_NODE_EXISTS(RIGHT_NODE);
+static const uint8_t right_pipe =
+    COND_CODE_1(DT_NODE_EXISTS(RIGHT_NODE), (DT_PROP(RIGHT_NODE, pipe)), (0));
 
 struct typing_step {
     uint8_t position;
@@ -122,6 +126,10 @@ static void send_left_keepalive(void) {
     send_keepalive(LEFT_PIPE, left_positions, NULL, 0);
 }
 
+static void send_right_keepalive(void) {
+    send_keepalive(right_pipe, no_positions, NULL, 0);
+}
+
 static void send_mouse_motion(void) {
     struct zmk_split_transport_peripheral_event event = {
         .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
@@ -180,6 +188,9 @@ static void send_due(uint32_t tick_ms) {
     }
     if (due(tick_ms, keepalive_period_ms(peripheral_traffic_mode.left_types))) {
         send_left_keepalive();
+    }
+    if (right_present && due(tick_ms, IDLE_KEEPALIVE_MS)) {
+        send_right_keepalive();
     }
     if (due(tick_ms, keepalive_period_ms(peripheral_traffic_mode.mouse_moves))) {
         send_mouse_keepalive();

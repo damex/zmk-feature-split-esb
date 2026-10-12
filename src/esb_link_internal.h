@@ -31,10 +31,10 @@ extern const uint8_t esb_link_pipe_count;
  * Peripheral: no-op. */
 int esb_link_role_start(void);
 
-/* Radio ISR after RX FIFO drains, pipes_seen a bit per RXed pipe.
+/* Radio ISR after RX FIFO drains, pipes_acked a bit per pipe whose packet asked for an ACK.
  * Central: drains those pipes' staged replies into ACK FIFO.
  * Peripheral: no-op. */
-void esb_link_role_rx_done(uint8_t pipes_seen);
+void esb_link_role_rx_done(uint8_t pipes_acked);
 
 /* Radio ISR on TX_SUCCESS.
  * Central: no-op.

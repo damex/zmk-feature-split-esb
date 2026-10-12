@@ -286,8 +286,8 @@ int esb_link_role_start(void) {
     return 0;
 }
 
-void esb_link_role_rx_done(uint8_t pipes_seen) {
-    ARG_UNUSED(pipes_seen);
+void esb_link_role_rx_done(uint8_t pipes_acked) {
+    ARG_UNUSED(pipes_acked);
 }
 
 void esb_link_role_tx_succeeded(void) {

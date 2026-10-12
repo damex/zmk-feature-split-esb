@@ -300,12 +300,11 @@ static void write_idle_reply(uint8_t pipe) {
 }
 
 /* ISR-only, so esb_write_payload has a single caller context, no lock.
- * ACK FIFO is shared across pipes: reply only for a pipe that just RXed, one write
- * per RX, so an idle pipe never head-of-line blocks others and a dying one leaks a
- * single slot. */
-void esb_link_role_rx_done(uint8_t pipes_seen) {
+ * Shared ACK FIFO: a pipe's reply leaves only on that pipe's next packet asking for an ACK.
+ * One write per such packet holds a pipe at two replies, a silent pipe keeps those two. */
+void esb_link_role_rx_done(uint8_t pipes_acked) {
     for (uint8_t pipe = 0; pipe < REPLY_PIPE_COUNT; pipe++) {
-        if ((pipes_seen & BIT(pipe)) == 0) {
+        if ((pipes_acked & BIT(pipe)) == 0) {
             continue;
         }
         if (write_pending_control(pipe)) {

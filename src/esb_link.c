@@ -123,10 +123,12 @@ static void on_esb_event(const struct esb_evt *event) {
     switch (event->evt_id) {
     case ESB_EVENT_RX_RECEIVED: {
         bool received = false;
-        uint8_t pipes_seen = 0;
+        uint8_t pipes_acked = 0;
         struct esb_payload payload;
         while (esb_read_rx_payload(&payload) == 0) {
-            pipes_seen |= (uint8_t)BIT(payload.pipe);
+            if (payload.noack == 0) {
+                pipes_acked |= (uint8_t)BIT(payload.pipe);
+            }
             if (hop_consume_rx(payload.pipe, payload.data, payload.length, payload.rssi)) {
                 continue;
             }
@@ -144,7 +146,7 @@ static void on_esb_event(const struct esb_evt *event) {
         if (received) {
             k_sem_give(&rx_sem);
         }
-        esb_link_role_rx_done(pipes_seen);
+        esb_link_role_rx_done(pipes_acked);
         break;
     }
     case ESB_EVENT_TX_SUCCESS:

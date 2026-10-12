@@ -23,7 +23,9 @@ MOCK_CASES += \
 	central/startup_order \
 	central_hid_relay/ack_fifo_room_idle \
 	central_hid_relay/ack_fifo_room_lossless_mouse \
+	central_hid_relay/ack_fifo_room_lossless_mouse_two_halves \
 	central_hid_relay/ack_fifo_room_lossy_mouse \
+	central_hid_relay/ack_fifo_room_lossy_mouse_two_halves \
 	central_hid_relay/burst \
 	central_hid_relay/burst_room \
 	central_hid_relay/button_backlog \

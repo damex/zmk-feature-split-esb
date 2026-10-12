@@ -1,0 +1,50 @@
+/ {
+    esb_relay_pointer: esb_relay_pointer {
+        compatible = "zmk,input-processor-esb-relay-pointer";
+        #input-processor-cells = <0>;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+
+            right: peripheral_right {
+                pipe = <1>;
+                prefix = <0x5A>;
+            };
+
+            mouse: peripheral_mouse {
+                pipe = <2>;
+                prefix = <0xC3>;
+            };
+
+            relay: peripheral_relay {
+                pipe = <3>;
+                prefix = <0xA5>;
+                role = "relay";
+            };
+        };
+    };
+
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        split_pointer: split_pointer@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    pointer_listener {
+        compatible = "zmk,input-listener";
+        device = <&split_pointer>;
+        input-processors = <&esb_relay_pointer>;
+    };
+};
