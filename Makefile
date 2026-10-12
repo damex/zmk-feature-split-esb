@@ -96,9 +96,13 @@ MOCK_CASES += \
 	peripheral/restart_retune \
 	peripheral/sleep \
 	peripheral/startup_order \
-	peripheral/tx_failed \
+	peripheral/tx_failed_exhausted_drops_link_to_searching \
+	peripheral/tx_failed_flushed_press_kept_in_keepalive \
 	peripheral/tx_failed_one_in_16_keeps_channel_lossless \
 	peripheral/tx_failed_one_in_16_keeps_channel_lossy \
+	peripheral/tx_failed_restarts_capped_then_flushes \
+	peripheral/tx_failed_while_searching_flushes \
+	peripheral/tx_restart_count_clears_after_success \
 	peripheral/tx_stall \
 	wire/central_hid_state \
 	wire/central_simplex \

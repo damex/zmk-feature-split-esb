@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-tx-failed-flushed-press-kept-in-keepalive
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..

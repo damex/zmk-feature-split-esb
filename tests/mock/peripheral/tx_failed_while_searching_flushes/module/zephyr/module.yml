@@ -1,5 +1,5 @@
 ---
-name: zmk-feature-split-esb-test-peripheral-tx-failed
+name: zmk-feature-split-esb-test-peripheral-tx-failed-while-searching-flushes
 build:
   cmake: .
   kconfig: ../../../../../Kconfig

@@ -4,6 +4,6 @@
     /delete-property/ exit-after;
     events = <
         ZMK_MOCK_PRESS(0,0,200)
-        ZMK_MOCK_RELEASE(0,0,10)
+        ZMK_MOCK_RELEASE(0,0,1000)
     >;
 };
