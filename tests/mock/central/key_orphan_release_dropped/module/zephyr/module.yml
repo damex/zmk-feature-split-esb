@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-central-key-orphan-release-dropped
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..

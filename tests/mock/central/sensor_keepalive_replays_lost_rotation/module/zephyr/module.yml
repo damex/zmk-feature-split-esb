@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-central-sensor-keepalive-replays-lost-rotation
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..

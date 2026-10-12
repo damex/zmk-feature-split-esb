@@ -1,0 +1,39 @@
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/kscan_mock.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            bindings = <
+                &kp A &kp B
+                &kp C &kp D
+            >;
+            sensor-bindings = <&inc_dec_kp C_VOL_UP C_VOL_DN>;
+        };
+    };
+
+    mock_encoder: mock_encoder {
+        compatible = "zmk,sensor-encoder-mock";
+        status = "okay";
+        event-startup-delay = <60000>;
+        event-period = <10>;
+        events = <18>;
+    };
+
+    sensors: sensors {
+        compatible = "zmk,keymap-sensors";
+        sensors = <&mock_encoder>;
+        triggers-per-rotation = <20>;
+    };
+};
+
+&kscan {
+    /delete-property/ exit-after;
+    events = <
+        ZMK_MOCK_PRESS(1,1,5000)
+        ZMK_MOCK_RELEASE(1,1,10)
+    >;
+};

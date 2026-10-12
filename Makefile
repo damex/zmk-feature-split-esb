@@ -9,17 +9,27 @@ ZMK_APP ?= $(error ZMK_APP is not set)
 MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
 	central/ack_fifo_room_lossy_mouse \
+	central/battery_from_keepalive \
 	central/held_input_two_buttons \
 	central/hid_state_sync \
 	central/idle_ack \
+	central/input_key_keepalive_presses_lost_press \
+	central/input_key_keepalive_releases_lost_release \
+	central/input_key_late_press_dropped \
+	central/input_key_tracking_limit \
+	central/keepalive_bitmap_replays_key_positions \
+	central/key_orphan_release_dropped \
 	central/key_repeated_press_heals_lost_release \
 	central/lossy_totals \
 	central/pointer_lossless \
-	central/reconcile \
 	central/rendezvous \
 	central/return_path \
 	central/self_pipe_not_a_source \
+	central/sensor_keepalive_replays_lost_rotation \
+	central/sensor_resync_past_cap \
 	central/sleep \
+	central/stale_peripheral_keepalive_represses \
+	central/stale_peripheral_releases_held \
 	central/startup_order \
 	central_hid_relay/ack_fifo_room_idle \
 	central_hid_relay/ack_fifo_room_lossless_mouse \
