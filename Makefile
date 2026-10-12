@@ -57,7 +57,13 @@ MOCK_CASES += \
 	hid_relay_dongle/busy_channel \
 	hid_relay_dongle/host_leds \
 	hid_relay_dongle/lost_sweep \
-	hid_relay_dongle/pointer \
+	hid_relay_dongle/pointer_busy_sink_motion_carried \
+	hid_relay_dongle/pointer_button_change_not_skippable \
+	hid_relay_dongle/pointer_first_total_sets_baseline \
+	hid_relay_dongle/pointer_gap_past_cap_resyncs \
+	hid_relay_dongle/pointer_motion_with_button_held_skippable \
+	hid_relay_dongle/pointer_repeated_total_dropped \
+	hid_relay_dongle/pointer_silence_rebaselines \
 	hid_relay_dongle/poll \
 	hid_relay_dongle/reports \
 	hid_relay_dongle/usb_drain \

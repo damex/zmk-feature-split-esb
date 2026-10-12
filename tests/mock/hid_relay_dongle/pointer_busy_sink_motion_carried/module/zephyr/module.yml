@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-hid-relay-dongle-pointer-busy-sink-motion-carried
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..
