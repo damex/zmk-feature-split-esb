@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-central-hid-relay-relay-poll-carries-new-motion-lossy
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..

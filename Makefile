@@ -57,6 +57,8 @@ MOCK_CASES += \
 	central_hid_relay/pointer \
 	central_hid_relay/pointer_retry \
 	central_hid_relay/poll \
+	central_hid_relay/relay_poll_carries_new_motion_lossless \
+	central_hid_relay/relay_poll_carries_new_motion_lossy \
 	central_hid_relay/tap \
 	central_hid_relay/totals \
 	esb_link/rx_ring \

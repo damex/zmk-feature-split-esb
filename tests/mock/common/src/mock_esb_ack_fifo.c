@@ -63,13 +63,26 @@ static bool answer_with_ack(uint8_t pipe) {
     return head_delivered;
 }
 
-void mock_esb_ack_fifo_receive(const struct esb_payload *payload) {
+static const struct esb_payload *ack_payload(uint8_t pipe) {
+    const struct pipe_queue *queue = &queues[pipe];
+    if (!queue->head_sent) {
+        return NULL;
+    }
+    return &queue->payloads[queue->head];
+}
+
+const struct esb_payload *mock_esb_ack_fifo_receive(const struct esb_payload *payload) {
     mock_check(payload->pipe < ARRAY_SIZE(queues), "received pipe is an ESB pipe");
-    if (payload->noack == 0 && answer_with_ack(payload->pipe)) {
-        mock_esb_tx_success(0);
+    const struct esb_payload *ack = NULL;
+    if (payload->noack == 0) {
+        if (answer_with_ack(payload->pipe)) {
+            mock_esb_tx_success(0);
+        }
+        ack = ack_payload(payload->pipe);
     }
     mock_esb_rx_push(payload);
     mock_esb_rx_raise();
+    return ack;
 }
 
 size_t mock_esb_ack_fifo_full_refusals(void) {

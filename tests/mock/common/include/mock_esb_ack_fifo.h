@@ -14,8 +14,9 @@
 
 /* Every call is a new packet, never a retransmit.
  * A packet asking for an ACK carries its pipe's queued head back as ACK payload.
- * That head leaves on the pipe's next packet asking for an ACK, raising TX success. */
-void mock_esb_ack_fifo_receive(const struct esb_payload *payload);
+ * That head leaves on the pipe's next packet asking for an ACK, raising TX success.
+ * Returns the ACK payload, NULL without one, valid until the pipe's next packet. */
+const struct esb_payload *mock_esb_ack_fifo_receive(const struct esb_payload *payload);
 
 size_t mock_esb_ack_fifo_full_refusals(void);
 size_t mock_esb_ack_fifo_peak_slots(void);

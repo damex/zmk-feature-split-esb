@@ -14,16 +14,20 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
+#include <zmk/hid.h>
 #include <zmk/split/transport/types.h>
 
 #include <esb.h>
 
+#include "esb_hid_relay_pointer.h"
 #include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_wire.h"
+#include "hop_internal.h"
 #include "mock.h"
 #include "mock_esb_ack_fifo.h"
 
@@ -43,6 +47,7 @@
 #define TRAFFIC_RUN_MS 3000
 #define TRAFFIC_THREAD_STACK_SIZE 2048
 #define TRAFFIC_THREAD_PRIORITY 7
+#define REPORT_ID_OFFSET 0
 
 static const bool relay_present = DT_NODE_EXISTS(RELAY_NODE);
 static const uint8_t relay_pipe =
@@ -69,15 +74,22 @@ static const uint8_t no_positions[ESB_KEEPALIVE_BITMAP_BYTES];
 static uint8_t left_positions[ESB_KEEPALIVE_BITMAP_BYTES];
 static size_t typing_index;
 static int32_t mouse_total;
+static int16_t relay_total_x;
+static bool relay_motion_arrived;
+static size_t relay_polls_with_new_motion;
+static size_t relay_polls_with_control;
 
-static void receive(uint8_t pipe, const uint8_t *data, size_t length, bool ack) {
+static const struct esb_payload *receive(uint8_t pipe,
+                                         const uint8_t *data,
+                                         size_t length,
+                                         bool ack) {
     mock_check(length <= CONFIG_ESB_MAX_PAYLOAD_LENGTH, "traffic packet fits one ESB payload");
     struct esb_payload payload = {.pipe = pipe, .length = (uint8_t)length, .noack = 1};
     if (ack) {
         payload.noack = 0;
     }
     memcpy(payload.data, data, length);
-    mock_esb_ack_fifo_receive(&payload);
+    return mock_esb_ack_fifo_receive(&payload);
 }
 
 static void send_event(uint8_t pipe,
@@ -160,9 +172,72 @@ static void send_mouse_keepalive(void) {
     send_keepalive(MOUSE_PIPE, no_positions, &motion_total, 1);
 }
 
-static void send_relay_poll(void) {
+static size_t relay_report_length(uint8_t report_id) {
+    if (report_id == ZMK_HID_REPORT_ID_KEYBOARD) {
+        return sizeof(struct zmk_hid_keyboard_report);
+    }
+    if (report_id == ZMK_HID_REPORT_ID_CONSUMER) {
+        return sizeof(struct zmk_hid_consumer_report);
+    }
+    if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
+        return ESB_HID_RELAY_POINTER_LENGTH;
+    }
+    return 0;
+}
+
+static bool relay_ack_total_x(const struct esb_payload *ack, int16_t *total_x) {
+    size_t offset = 0;
+    while (offset < ack->length) {
+        uint8_t report_id = ack->data[offset + REPORT_ID_OFFSET];
+        size_t length = relay_report_length(report_id);
+        bool whole = length != 0 && length <= ack->length - offset;
+        mock_check(whole, "relay ACK holds whole reports");
+        if (report_id == ZMK_HID_REPORT_ID_MOUSE) {
+            size_t motion = offset + ESB_HID_RELAY_POINTER_MOTION_OFFSET;
+            *total_x = (int16_t)sys_get_le16(&ack->data[motion]);
+            return true;
+        }
+        offset += length;
+    }
+    return false;
+}
+
+static bool is_link_control(const struct esb_payload *ack) {
+    if (ack == NULL) {
+        return false;
+    }
+    return esb_is_beacon(ack->data, ack->length) || esb_is_mask_update(ack->data, ack->length);
+}
+
+static void check_relay_motion(uint32_t tick_ms, const struct esb_payload *ack) {
+    if (is_link_control(ack)) {
+        relay_polls_with_control++;
+        return;
+    }
+    int16_t total_x = relay_total_x;
+    bool carried = ack != NULL && relay_ack_total_x(ack, &total_x);
+    bool new_motion = carried && total_x != relay_total_x;
+    relay_total_x = total_x;
+    if (!relay_motion_arrived) {
+        relay_motion_arrived = new_motion;
+        return;
+    }
+    if (!new_motion) {
+        printk("FAIL: relay poll at %u ms carried no new motion, total %d\n",
+               (unsigned int)tick_ms,
+               total_x);
+        exit(1);
+    }
+    relay_polls_with_new_motion++;
+}
+
+static void send_relay_poll(uint32_t tick_ms) {
     const struct esb_relay_poll poll = {.tag = ESB_RELAY_POLL_TAG};
-    receive(relay_pipe, (const uint8_t *)&poll, sizeof(poll), true);
+    const struct esb_payload *ack =
+        receive(relay_pipe, (const uint8_t *)&poll, sizeof(poll), true);
+    if (peripheral_traffic_mode.relay_new_motion_every_poll) {
+        check_relay_motion(tick_ms, ack);
+    }
 }
 
 static uint32_t keepalive_period_ms(bool active) {
@@ -181,7 +256,7 @@ static void send_due(uint32_t tick_ms) {
         send_mouse_motion();
     }
     if (relay_present && due(tick_ms, relay_poll_ms)) {
-        send_relay_poll();
+        send_relay_poll(tick_ms);
     }
     if (peripheral_traffic_mode.left_types && due(tick_ms, TYPING_STEP_MS)) {
         type_next_step();
@@ -217,6 +292,12 @@ static void traffic_thread_fn(void *unused_a, void *unused_b, void *unused_c) {
         send_due(tick_ms);
         check_ack_fifo(tick_ms);
         k_msleep(1);
+    }
+    if (peripheral_traffic_mode.relay_new_motion_every_poll) {
+        mock_check(relay_motion_arrived, "relay polls carried motion");
+        printk("relay: %u polls carried new motion, %u carried link control instead\n",
+               (unsigned int)relay_polls_with_new_motion,
+               (unsigned int)relay_polls_with_control);
     }
     printk("PASS: central ACK FIFO took every write for %u ms, peak %u of %u slots\n",
            (unsigned int)TRAFFIC_RUN_MS,
