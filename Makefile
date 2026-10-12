@@ -8,6 +8,7 @@ ZMK_APP ?= $(error ZMK_APP is not set)
 
 MOCK_ROOT := $(CURDIR)/tests/mock
 MOCK_CASES += \
+	central/ack_fifo_room_lossy_mouse \
 	central/held_input_two_buttons \
 	central/hid_state_sync \
 	central/idle_ack \
@@ -20,6 +21,9 @@ MOCK_CASES += \
 	central/self_pipe_not_a_source \
 	central/sleep \
 	central/startup_order \
+	central_hid_relay/ack_fifo_room_idle \
+	central_hid_relay/ack_fifo_room_lossless_mouse \
+	central_hid_relay/ack_fifo_room_lossy_mouse \
 	central_hid_relay/burst \
 	central_hid_relay/burst_room \
 	central_hid_relay/button_backlog \
