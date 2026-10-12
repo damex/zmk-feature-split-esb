@@ -11,6 +11,7 @@ MOCK_CASES += \
 	central/held_input_two_buttons \
 	central/hid_state_sync \
 	central/idle_ack \
+	central/key_repeated_press_heals_lost_release \
 	central/lossy_totals \
 	central/pointer_lossless \
 	central/reconcile \
