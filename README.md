@@ -97,7 +97,8 @@ Mouse (peripheral): claim pipe, bind sensor.
 &mouse_split { device = <&your_sensor>; };
 ```
 Two mice, same shape: second child, second `mouse_split@1` and listener. Each mouse
-binds its own split, disables the others.
+binds its own split and disables the other mouse's split. Peripheral nodes under
+`esb_link` stay enabled on every device, `zmk,esb-self` alone picks the pipe.
 
 ### Two peripherals: a split keyboard
 
