@@ -72,6 +72,8 @@ MOCK_CASES += \
 	peripheral/sleep \
 	peripheral/startup_order \
 	peripheral/tx_failed \
+	peripheral/tx_failed_one_in_16_keeps_channel_lossless \
+	peripheral/tx_failed_one_in_16_keeps_channel_lossy \
 	peripheral/tx_stall \
 	wire/central_hid_state \
 	wire/central_simplex \

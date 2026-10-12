@@ -409,7 +409,7 @@ Time flows down, one column per device.
 |                                                                              |
 |  peripheral                          central                                 |
 |                                                                              |
-|  [TX unacked]                        [pipe quiet grows]                      |
+|  [TX failed, no ACK]                 [pipe quiet grows]                      |
 |  link_acked drops                    hop_pipe_quiet_ms past                  |
 |      |                               ESB_HOP_LOSS_DETECT_MS                  |
 |      v                                   |                                   |

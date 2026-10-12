@@ -51,6 +51,7 @@ static atomic_t window_noack_packets;
 static atomic_t data_sent_since_tick;
 static atomic_t tx_succeeded_since_tick;
 static atomic_t tx_failed_since_tick;
+static atomic_t noack_sent_since_tick;
 static atomic_t link_acked;
 static atomic_t beacon_epoch;
 static uint8_t bad_windows;
@@ -225,11 +226,14 @@ static uint8_t retransmit_budget(void) {
     return hop_policy_adaptive_retransmits(attempts_ewma_x10, retransmit_floor, ceiling);
 }
 
-/* Fire-and-forget sends raise TX success too, so only a failure proves loss. */
+/* Fire-and-forget sends raise TX success too.
+ * Without them in the window, a success after the last failure proves an ACK. */
 static void settle_link_state(void) {
     bool failed = atomic_set(&tx_failed_since_tick, 0) != 0;
     bool succeeded = atomic_set(&tx_succeeded_since_tick, 0) != 0;
-    if (failed) {
+    bool noack_sent = atomic_set(&noack_sent_since_tick, 0) != 0;
+    bool ack_proven = succeeded && !noack_sent;
+    if (failed && !ack_proven) {
         atomic_set(&link_acked, 0);
     } else if (succeeded) {
         atomic_set(&link_acked, 1);
@@ -331,12 +335,14 @@ void hop_note_tx_success(uint8_t attempts) {
 
 void hop_note_tx_failed(void) {
     atomic_set(&tx_failed_since_tick, 1);
+    atomic_set(&tx_succeeded_since_tick, 0);
     if (HOP_COUNT > 1) {
         record_tx_attempts(0xFF); /* a lost packet is the worst this window */
     }
 }
 
 void hop_note_noack_sent(void) {
+    atomic_set(&noack_sent_since_tick, 1);
     if (HOP_COUNT > 1) {
         (void)atomic_inc(&window_noack_packets);
     }

@@ -43,7 +43,8 @@ void hop_note_tx_failed(void);
 void hop_note_data_sent(void);
 
 /* Central: no-op.
- * Peripheral: a packet left without ACK, its success stays out of the window grade. */
+ * Peripheral: a packet left without ACK.
+ * Its success proves no ACK and stays out of the window grade. */
 void hop_note_noack_sent(void);
 
 /* Channel the radio should currently tune to. */
