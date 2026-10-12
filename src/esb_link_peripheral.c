@@ -16,6 +16,7 @@
 
 #include <esb.h>
 
+#include "esb_hid_relay_stats.h"
 #include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
@@ -262,7 +263,11 @@ void esb_link_send_relay_poll(void) {
     payload.pipe = self_pipe;
     payload.length = sizeof(poll);
     memcpy(payload.data, &poll, sizeof(poll));
-    (void)submit_payload(&payload);
+    enum esb_hid_relay_stat stat = ESB_HID_RELAY_STAT_POLL_SENT;
+    if (submit_payload(&payload) != 0) {
+        stat = ESB_HID_RELAY_STAT_POLL_REFUSED;
+    }
+    esb_hid_relay_stat_note(stat);
 }
 
 #if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)
@@ -291,10 +296,12 @@ void esb_link_role_rx_done(uint8_t pipes_acked) {
 }
 
 void esb_link_role_tx_succeeded(void) {
+    esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_TX_ACKED);
     atomic_set(&tx_restarts, 0);
 }
 
 bool esb_link_role_retry_failed_tx(void) {
+    esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_TX_FAILED);
     apply_hop_channel();
     atomic_val_t restarts = atomic_inc(&tx_restarts);
     if (!hop_link_acked() || restarts >= ESB_LINK_TX_RESTARTS_MAX) {

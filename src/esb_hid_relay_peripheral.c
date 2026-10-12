@@ -18,6 +18,7 @@
 
 #include "esb_hid_relay_peripheral.h"
 #include "esb_hid_relay_pointer.h"
+#include "esb_hid_relay_stats.h"
 #include "esb_motion_total.h"
 #include "hop_internal.h"
 
@@ -87,11 +88,16 @@ static void deliver_pointer(zmk_split_esb_hid_relay_callback_t callback, const u
     struct esb_motion_track tracks[ESB_HID_RELAY_POINTER_AXES];
     memcpy(tracks, pointer_tracks, sizeof(tracks));
     bool moves = pointer_totals_to_deltas(bytes, usb, tracks);
+    if (moves) {
+        esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_NEW_MOTION);
+    }
     uint8_t buttons = usb[ESB_HID_RELAY_POINTER_BUTTONS_OFFSET];
     if (moves || buttons != delivered_buttons) {
         if (callback(usb, sizeof(usb), buttons == delivered_buttons) != 0) {
+            esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_USB_REFUSED);
             return;
         }
+        esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_USB_TOOK);
         delivered_buttons = buttons;
     }
     memcpy(pointer_tracks, tracks, sizeof(tracks));
@@ -142,8 +148,10 @@ static void deliver_report(zmk_split_esb_hid_relay_callback_t callback,
         return;
     }
     if (callback(bytes, report->length, false) != 0) {
+        esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_USB_REFUSED);
         return;
     }
+    esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_USB_TOOK);
     memcpy(report->delivered, bytes, report->length);
 }
 
