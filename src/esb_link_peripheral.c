@@ -16,11 +16,11 @@
 
 #include <esb.h>
 
-#include "esb_hid_relay_stats.h"
 #include "esb_hid_state.h"
 #include "esb_keepalive.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
+#include "esb_stats.h"
 #include "hop.h"
 #include "hop_policy.h"
 
@@ -182,6 +182,15 @@ void esb_link_set_idle(bool idle) {
     k_mutex_unlock(&hfclk_gate_mutex);
 }
 
+static int note_send(int error) {
+    enum esb_stat stat = ESB_STAT_SENT;
+    if (error != 0) {
+        stat = ESB_STAT_SEND_REFUSED;
+    }
+    esb_stat_add(stat, 1);
+    return error;
+}
+
 /* esb_write_payload checks FIFO space before its internal irq_lock, so two
  * submitters racing at a near-full FIFO can overflow the ring. Input thread and
  * system workqueue both submit here: extend esb.c's own lock domain over the
@@ -194,7 +203,7 @@ static int submit_payload(const struct esb_payload *payload) {
     irq_unlock(key);
     uint32_t silence_ms = k_uptime_get_32() - esb_link_tx_last_event_ms();
     if (error != -ENOMEM || silence_ms <= live_retry_cycle_ms(TX_STALL_MARGIN, TX_STALL_FLOOR_MS)) {
-        return error;
+        return note_send(error);
     }
     LOG_WRN("TX engine stalled, flushing to recover");
     (void)esb_flush_tx();
@@ -202,7 +211,7 @@ static int submit_payload(const struct esb_payload *payload) {
     key = irq_lock();
     error = esb_write_payload(payload);
     irq_unlock(key);
-    return error;
+    return note_send(error);
 }
 
 static atomic_t tx_restarts;
@@ -235,6 +244,7 @@ static int send_on_pipe(uint8_t pipe, const uint8_t *data, size_t length, bool a
     }
     if (error == 0 && !ack) {
         hop_note_noack_sent();
+        esb_stat_add(ESB_STAT_NOACK_SENT, 1);
     }
     return error;
 }
@@ -263,11 +273,9 @@ void esb_link_send_relay_poll(void) {
     payload.pipe = self_pipe;
     payload.length = sizeof(poll);
     memcpy(payload.data, &poll, sizeof(poll));
-    enum esb_hid_relay_stat stat = ESB_HID_RELAY_STAT_POLL_SENT;
-    if (submit_payload(&payload) != 0) {
-        stat = ESB_HID_RELAY_STAT_POLL_REFUSED;
+    if (submit_payload(&payload) == 0) {
+        esb_stat_add(ESB_STAT_RELAY_POLLS, 1);
     }
-    esb_hid_relay_stat_note(stat);
 }
 
 #if defined(CONFIG_ZMK_SPLIT_ESB_WIRE_RELAY)
@@ -296,16 +304,15 @@ void esb_link_role_rx_done(uint8_t pipes_acked) {
 }
 
 void esb_link_role_tx_succeeded(void) {
-    esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_TX_ACKED);
     atomic_set(&tx_restarts, 0);
 }
 
 bool esb_link_role_retry_failed_tx(void) {
-    esb_hid_relay_stat_note(ESB_HID_RELAY_STAT_TX_FAILED);
     apply_hop_channel();
     atomic_val_t restarts = atomic_inc(&tx_restarts);
     if (!hop_link_acked() || restarts >= ESB_LINK_TX_RESTARTS_MAX) {
         atomic_set(&tx_restarts, 0);
+        esb_stat_add(ESB_STAT_TX_FLUSHED, 1);
         return false;
     }
     k_work_submit(&tx_restart_work);

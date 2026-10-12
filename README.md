@@ -461,6 +461,30 @@ relayed in the beacon roster, so a half's widget can show the other half's
 battery and signal. HID state for widgets: `zmk_split_esb_hid_modifiers()` and
 `zmk_split_esb_hid_indicators()`.
 
+## Link counters
+
+Every device logs its link counters once a second at debug level:
+
+```
+CONFIG_LOG=y
+CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL_DBG=y
+```
+
+| Field | Device | Meaning |
+|---|---|---|
+| `pipe N rx` | central | packets heard on pipe N |
+| `data` | central | those neither keepalive nor relay poll |
+| `replies written`, `refused` | central | ACK replies queued, refused with the ACK FIFO full |
+| `sent`, `refused` | peripheral | packets queued, refused with the TX FIFO full |
+| `noack` | peripheral | packets sent without ACK |
+| `tx ok` | peripheral | packets done, ACKed or sent without ACK |
+| `retries` | peripheral | extra attempts before a packet got through |
+| `failed` | peripheral | packets out of retransmits |
+| `flushed` | peripheral | TX FIFO flushes after a failed packet |
+| `relay polls` | relay dongle | polls queued |
+| `new motion` | relay dongle | replies carrying new pointer motion |
+| `usb took`, `refused` | relay dongle | reports the USB endpoint took, refused while busy |
+
 ## Limitations
 
 Peripheral battery levels raise `zmk_peripheral_battery_state_changed` on the

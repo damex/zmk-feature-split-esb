@@ -17,6 +17,7 @@
 
 #include "esb_keepalive.h"
 #include "esb_link.h"
+#include "esb_stats.h"
 #include "spsc_latch.h"
 
 #ifndef CONFIG_ZMK_SPLIT_ESB_HID_RELAY_POLL_MS
@@ -325,6 +326,11 @@ static void record_tx_attempts(uint8_t attempts) {
 }
 
 void hop_note_tx_success(uint8_t attempts) {
+    esb_stat_add(ESB_STAT_TX_OK, 1);
+    if (attempts > 1) {
+        uint32_t retries = (uint32_t)attempts - 1;
+        esb_stat_add(ESB_STAT_TX_RETRIES, retries);
+    }
     atomic_set(&tx_succeeded_since_tick, 1);
     if (HOP_COUNT > 1) {
         record_tx_attempts(attempts);
@@ -334,6 +340,7 @@ void hop_note_tx_success(uint8_t attempts) {
 }
 
 void hop_note_tx_failed(void) {
+    esb_stat_add(ESB_STAT_TX_FAILED, 1);
     atomic_set(&tx_failed_since_tick, 1);
     atomic_set(&tx_succeeded_since_tick, 0);
     if (HOP_COUNT > 1) {

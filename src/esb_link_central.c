@@ -20,6 +20,7 @@
 #include "esb_hid_relay_pointer.h"
 #include "esb_link.h"
 #include "esb_link_internal.h"
+#include "esb_stats.h"
 #include "spsc_latch.h"
 
 #define ESB_PERIPHERALS DT_INST_CHILD(0, peripherals)
@@ -177,6 +178,16 @@ void esb_link_set_idle(bool idle) {
     ARG_UNUSED(idle);
 }
 
+static int write_reply(const struct esb_payload *payload) {
+    int error = esb_write_payload(payload);
+    enum esb_stat stat = ESB_STAT_REPLY_WRITTEN;
+    if (error != 0) {
+        stat = ESB_STAT_REPLY_REFUSED;
+    }
+    esb_stat_add(stat, 1);
+    return error;
+}
+
 static bool write_pending_control(uint8_t pipe) {
     for (size_t kind = 0; kind < ESB_LINK_CONTROL_COUNT; kind++) {
         struct control_payload *slot = spsc_latch_peek(&control_latch[pipe][kind]);
@@ -187,7 +198,7 @@ static bool write_pending_control(uint8_t pipe) {
         payload.pipe = pipe;
         payload.length = slot->length;
         memcpy(payload.data, slot->data, slot->length);
-        if (esb_write_payload(&payload) == 0) {
+        if (write_reply(&payload) == 0) {
             (void)spsc_latch_release(&control_latch[pipe][kind], slot);
         }
         return true;
@@ -262,7 +273,7 @@ static bool write_queued_replies(uint8_t pipe) {
         packed.pointer_offset = payload.length;
         packed.has_pointer = append_pointer(pipe, &payload, changes_queued) != 0;
     }
-    if (esb_write_payload(&payload) == 0) {
+    if (write_reply(&payload) == 0) {
         for (uint32_t index = 0; index < packed.taken; index++) {
             (void)k_msgq_get(reply_queue[pipe], &packet, K_NO_WAIT);
         }
@@ -290,7 +301,7 @@ static void write_idle_reply(uint8_t pipe) {
     }
     size_t pointer_offset = payload.length;
     bool has_pointer = append_pointer(pipe, &payload, false) != 0;
-    if (payload.length == 0 || esb_write_payload(&payload) != 0) {
+    if (payload.length == 0 || write_reply(&payload) != 0) {
         return;
     }
     if (slot != NULL) {
