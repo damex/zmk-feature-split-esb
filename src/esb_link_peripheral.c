@@ -183,11 +183,12 @@ void esb_link_set_idle(bool idle) {
 }
 
 static int note_send(int error) {
-    enum esb_stat stat = ESB_STAT_SENT;
     if (error != 0) {
-        stat = ESB_STAT_SEND_REFUSED;
+        esb_stat_add(ESB_STAT_SEND_REFUSED, 1);
+        return error;
     }
-    esb_stat_add(stat, 1);
+    esb_stat_add(ESB_STAT_SENT, 1);
+    esb_stat_tx_queued();
     return error;
 }
 
@@ -207,6 +208,7 @@ static int submit_payload(const struct esb_payload *payload) {
     }
     LOG_WRN("TX engine stalled, flushing to recover");
     (void)esb_flush_tx();
+    esb_stat_tx_cleared();
     esb_link_mark_tx_event();
     key = irq_lock();
     error = esb_write_payload(payload);

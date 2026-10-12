@@ -17,6 +17,10 @@ config ESB_TX_FIFO_SIZE
     int "TX buffer length"
     default 8
 
+config ESB_RX_FIFO_SIZE
+    int "RX buffer length"
+    default 8
+
 config ESB_PIPE_COUNT
     int "Maximum number of pipes"
     default 8

@@ -180,11 +180,12 @@ void esb_link_set_idle(bool idle) {
 
 static int write_reply(const struct esb_payload *payload) {
     int error = esb_write_payload(payload);
-    enum esb_stat stat = ESB_STAT_REPLY_WRITTEN;
     if (error != 0) {
-        stat = ESB_STAT_REPLY_REFUSED;
+        esb_stat_add(ESB_STAT_REPLY_REFUSED, 1);
+        return error;
     }
-    esb_stat_add(stat, 1);
+    esb_stat_add(ESB_STAT_REPLY_WRITTEN, 1);
+    esb_stat_reply_written(payload->pipe);
     return error;
 }
 

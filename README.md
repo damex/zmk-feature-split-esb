@@ -473,9 +473,13 @@ CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL_DBG=y
 
 | Field | Device | Meaning |
 |---|---|---|
+| `rx queue peak` | every | most packets one drain took from the radio's RX FIFO, of `CONFIG_ESB_RX_FIFO_SIZE` |
+| `full` | every | drains that found the RX FIFO full, a packet arriving while full is dropped unacked |
+| `ring dropped` | every | packets lost with the ring to the dispatch thread full |
 | `pipe N rx` | central | packets heard on pipe N |
 | `data` | central | those neither keepalive nor relay poll |
 | `replies written`, `refused` | central | ACK replies queued, refused with the ACK FIFO full |
+| `tx queue peak` | every | most packets waiting in the TX FIFO at once, of `CONFIG_ESB_TX_FIFO_SIZE`. Central: ACK replies waiting for their pipe's next packet |
 | `sent`, `refused` | peripheral | packets queued, refused with the TX FIFO full |
 | `noack` | peripheral | packets sent without ACK |
 | `tx ok` | peripheral | packets done, ACKed or sent without ACK |

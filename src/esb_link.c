@@ -13,6 +13,7 @@
 
 #include "esb_link.h"
 #include "esb_link_internal.h"
+#include "esb_stats.h"
 #include "hop.h"
 
 #define RX_THREAD_STACK_SIZE 1536
@@ -124,10 +125,13 @@ static void on_esb_event(const struct esb_evt *event) {
     case ESB_EVENT_RX_RECEIVED: {
         bool received = false;
         uint8_t pipes_acked = 0;
+        uint32_t drained = 0;
         struct esb_payload payload;
         while (esb_read_rx_payload(&payload) == 0) {
+            drained++;
             if (payload.noack == 0) {
                 pipes_acked |= (uint8_t)BIT(payload.pipe);
+                esb_stat_reply_asked(payload.pipe);
             }
             if (hop_consume_rx(payload.pipe, payload.data, payload.length, payload.rssi)) {
                 continue;
@@ -135,6 +139,7 @@ static void on_esb_event(const struct esb_evt *event) {
             struct esb_link_packet *slot = spsc_acquire(&rx_spsc);
             if (slot == NULL) {
                 LOG_DBG("RX ring full, dropping packet");
+                esb_stat_add(ESB_STAT_RX_RING_DROPPED, 1);
                 continue; /* keep draining the radio FIFO */
             }
             slot->pipe = payload.pipe;
@@ -146,6 +151,10 @@ static void on_esb_event(const struct esb_evt *event) {
         if (received) {
             k_sem_give(&rx_sem);
         }
+        esb_stat_peak(ESB_STAT_RX_PEAK, drained);
+        if (drained >= CONFIG_ESB_RX_FIFO_SIZE) {
+            esb_stat_add(ESB_STAT_RX_FULL, 1);
+        }
         esb_link_role_rx_done(pipes_acked);
         break;
     }
@@ -153,6 +162,7 @@ static void on_esb_event(const struct esb_evt *event) {
         esb_link_mark_tx_event();
         hop_note_tx_success((uint8_t)event->tx_attempts);
         esb_link_role_tx_succeeded();
+        esb_stat_tx_done();
         break;
     case ESB_EVENT_TX_FAILED: {
         esb_link_mark_tx_event();
@@ -167,6 +177,7 @@ static void on_esb_event(const struct esb_evt *event) {
         if (flush_error) {
             LOG_DBG("esb_flush_tx after TX_FAILED returned %d", flush_error);
         }
+        esb_stat_tx_cleared();
         break;
     }
     default:
@@ -262,6 +273,7 @@ int esb_link_set_enabled(bool enabled) {
         if (flush_error) {
             LOG_DBG("esb_flush_tx returned %d", flush_error);
         }
+        esb_stat_tx_cleared();
         esb_link_hfclk_release();
         return 0;
     }
