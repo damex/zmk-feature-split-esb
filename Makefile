@@ -80,6 +80,11 @@ MOCK_CASES += \
 	peripheral/adaptive_retransmits \
 	peripheral/bad_channel_lossless \
 	peripheral/bad_channel_lossy \
+	peripheral/beacon_longer_adopts_epoch \
+	peripheral/beacon_shorter_adopts_epoch \
+	peripheral/beacon_wrong_length_flags_mismatch \
+	peripheral/beacon_wrong_length_keeps_peer_table \
+	peripheral/beacon_wrong_length_syncs_hid_state \
 	peripheral/burst_keepalive \
 	peripheral/burst_start_keepalive \
 	peripheral/busy_keys \
@@ -92,6 +97,9 @@ MOCK_CASES += \
 	peripheral/keepalive \
 	peripheral/lossy_drop \
 	peripheral/lost_tap \
+	peripheral/mask_wrong_length_discarded \
+	peripheral/mask_wrong_length_flags_mismatch \
+	peripheral/matching_lengths_leave_mismatch_clear \
 	peripheral/pointer_lossless \
 	peripheral/pointer_lossy \
 	peripheral/rendezvous \

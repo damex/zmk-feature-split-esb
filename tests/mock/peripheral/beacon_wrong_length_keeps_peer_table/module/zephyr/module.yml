@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-peripheral-beacon-wrong-length-keeps-peer-table
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..
