@@ -189,7 +189,7 @@ static void on_esb_event(const struct esb_evt *event) {
 /* Push base addresses, prefix, channel, TX power into the radio.
  * set_* failures are logged and ignored.
  * The radio starts on whatever values it already held. */
-static int esb_link_radio_setup(void) {
+static __noinline int esb_link_radio_setup(void) {
     int set_error = esb_set_address_length(address_length);
     if (set_error) {
         LOG_DBG("esb_set_address_length returned %d", set_error);
