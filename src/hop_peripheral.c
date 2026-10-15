@@ -295,13 +295,14 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
     ARG_UNUSED(rssi);
     /* Fixed link beacons HID state too. */
     if (esb_is_beacon(data, length)) {
-        const struct esb_beacon *beacon = (const struct esb_beacon *)data;
-        atomic_set(&beacon_epoch, beacon->epoch); /* adopted in keepalive_work, not queued */
-        atomic_set(&uplink_rssi_dbm, beacon->peers[self_pipe].rssi_dbm);
-        peripheral_hid_state_store(beacon->hid_modifiers, beacon->hid_indicators);
+        struct esb_beacon beacon = {0};
+        memcpy(&beacon, data, sizeof(beacon));
+        atomic_set(&beacon_epoch, beacon.epoch); /* adopted in keepalive_work, not queued */
+        atomic_set(&uplink_rssi_dbm, beacon.peers[self_pipe].rssi_dbm);
+        peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
         for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
-            atomic_set(&peer_table[peer], peer_pack(beacon->peers[peer].battery,
-                                                    beacon->peers[peer].rssi_dbm));
+            atomic_set(&peer_table[peer], peer_pack(beacon.peers[peer].battery,
+                                                    beacon.peers[peer].rssi_dbm));
         }
         return !wire_relay_owns_pipe(pipe);
     }
@@ -309,9 +310,10 @@ bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rs
         return false;
     }
     if (esb_is_mask_update(data, length)) {
-        const struct esb_mask_update *update = (const struct esb_mask_update *)data;
         uint8_t index = spsc_latch_claim(&staged_mask_latch);
-        memcpy(staged_mask_pool[index].bytes, update->mask, ESB_HOP_MASK_BYTES);
+        memcpy(staged_mask_pool[index].bytes,
+               &data[offsetof(struct esb_mask_update, mask)],
+               sizeof(staged_mask_pool[index].bytes));
         spsc_latch_publish(&staged_mask_latch, &staged_mask_pool[index]);
         return true;
     }
