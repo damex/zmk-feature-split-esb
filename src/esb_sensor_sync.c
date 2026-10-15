@@ -26,11 +26,14 @@ bool esb_sensor_track_delta(struct esb_sensor_track *track, int64_t total_udeg,
     __ASSERT_NO_MSG(track != NULL);
     __ASSERT_NO_MSG(delta_udeg != NULL);
     int64_t delta = total_udeg - track->last_udeg;
-    bool forward = track->valid && delta != 0 && delta >= -ESB_SENSOR_RESYNC_UDEG &&
-                   delta <= ESB_SENSOR_RESYNC_UDEG;
+    bool valid = track->valid;
 
     track->last_udeg = total_udeg;
     track->valid = true;
+    if (!valid || delta == 0 || delta > ESB_SENSOR_RESYNC_UDEG ||
+        delta < -ESB_SENSOR_RESYNC_UDEG) {
+        return false;
+    }
     *delta_udeg = delta;
-    return forward;
+    return true;
 }
