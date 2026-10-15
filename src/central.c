@@ -290,9 +290,10 @@ static void staleness_work_fn(struct k_work *work) {
         LOG_DBG("pipe %u heard=%d quiet=%ums connection=%d", (unsigned)pipe, (int)heard,
                 (unsigned)quiet_ms, (int)pipe_connected[pipe]);
         if (heard) {
-            bool wire_peer = wire_central_owns_pipe(pipe);
-            bool peer_active = wire_peer ? (wire_central_peer_is_up() && quiet_ms <= peripheral_timeout_ms)
-                                         : (quiet_ms <= peripheral_timeout_ms);
+            bool peer_active = quiet_ms <= peripheral_timeout_ms;
+            if (wire_central_owns_pipe(pipe) && !wire_central_peer_is_up()) {
+                peer_active = false;
+            }
             if (peer_active) {
                 pipe_stale[pipe] = false;
             } else if (!pipe_stale[pipe]) {
