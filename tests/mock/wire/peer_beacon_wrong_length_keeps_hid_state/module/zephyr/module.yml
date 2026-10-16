@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-wire-peer-beacon-wrong-length-keeps-hid-state
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..

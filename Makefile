@@ -116,10 +116,16 @@ MOCK_CASES += \
 	peripheral/tx_stall \
 	wire/central_hid_state \
 	wire/central_simplex \
+	wire/peer_beacon_wrong_length_flags_mismatch \
+	wire/peer_beacon_wrong_length_keeps_hid_state \
 	wire/peer_held_input \
 	wire/peer_hid_state \
 	wire/peer_idle_keepalive \
+	wire/peer_matching_beacon_leaves_mismatch_clear \
 	wire/peer_simplex \
+	wire/peer_status_searching_until_frame \
+	wire/peer_status_simplex_not_searching \
+	wire/peer_status_without_radio_reads_zero \
 	wire/relay_beacon_rssi \
 	wire/relay_downlink \
 	wire/relay_hid_state \

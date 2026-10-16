@@ -1,0 +1,7 @@
+---
+name: zmk-feature-split-esb-test-wire-peer-status-searching-until-frame
+build:
+  cmake: .
+  kconfig: ../../../../../Kconfig
+  settings:
+    dts_root: ../../../../..
