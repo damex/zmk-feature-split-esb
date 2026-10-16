@@ -36,6 +36,13 @@ uint8_t peripheral_sensor_count(void);
 
 void peripheral_deliver_command(const uint8_t *bytes, size_t length);
 void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators);
+/* Raises config_mismatch, logs one warning on the first call.
+ * payload and setting need static storage for deferred logging. */
+void peripheral_note_config_mismatch(const char *payload,
+                                     uint8_t length,
+                                     uint8_t expected_length,
+                                     const char *setting);
+bool peripheral_config_mismatched(void);
 
 uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost,
                                   const struct esb_keepalive_motion_total *motion_totals,

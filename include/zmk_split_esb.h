@@ -23,7 +23,8 @@ struct zmk_split_esb_status {
  * attempts_ewma_x10 is delivery cost, 10 = every packet on first try.
  * config_mismatch stays set once a central beacon or mask update length differs from own build.
  * Central: worst sampled peripheral link, attempts 0 (no transmit path), never mismatched.
- * Peripheral: own central link. */
+ * ESB peripheral: own central link.
+ * Wire peer: searching follows the wire, never on simplex, radio fields 0. */
 void zmk_split_esb_get_status(struct zmk_split_esb_status *status);
 
 /* Links tracked.

@@ -16,6 +16,8 @@
 #include <zmk/split/transport/peripheral.h>
 #include <zmk/split/transport/types.h>
 
+#include <zmk_split_esb.h>
+
 #include "esb_wire.h"
 #include "hop_internal.h"
 #include "wire_link.h"
@@ -69,6 +71,17 @@ static struct zmk_split_transport_status wire_peripheral_get_status(void) {
     };
 }
 
+void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
+    __ASSERT_NO_MSG(status != NULL);
+    status->channel = 0;
+    status->epoch = 0;
+    status->searching =
+        wire_peripheral_connections() != ZMK_SPLIT_TRANSPORT_CONNECTIONS_STATUS_ALL_CONNECTED;
+    status->rssi_dbm = 0;
+    status->attempts_ewma_x10 = 0;
+    status->config_mismatch = peripheral_config_mismatched();
+}
+
 static int
 wire_peripheral_set_status_callback(zmk_split_transport_peripheral_status_changed_cb_t callback) {
     ARG_UNUSED(callback);
@@ -85,12 +98,23 @@ static const struct zmk_split_transport_peripheral_api wire_peripheral_api = {
 ZMK_SPLIT_TRANSPORT_PERIPHERAL_REGISTER(wire_peripheral, &wire_peripheral_api,
                                         CONFIG_ZMK_SPLIT_ESB_PRIORITY);
 
+static void wire_peripheral_consume_beacon(const uint8_t *payload, size_t length) {
+    if (length != ESB_BEACON_LENGTH) {
+        peripheral_note_config_mismatch("beacon",
+                                        (uint8_t)length,
+                                        (uint8_t)ESB_BEACON_LENGTH,
+                                        "this peripheral list");
+        return;
+    }
+    struct esb_beacon beacon = {0};
+    memcpy(&beacon, payload, sizeof(beacon));
+    peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
+}
+
 static void wire_peripheral_on_frame(const uint8_t *payload, size_t length, void *user_data) {
     ARG_UNUSED(user_data);
-    if (esb_is_beacon(payload, (uint8_t)length)) {
-        struct esb_beacon beacon;
-        memcpy(&beacon, payload, sizeof(beacon));
-        peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
+    if (esb_has_beacon_tag(payload, (uint8_t)length)) {
+        wire_peripheral_consume_beacon(payload, length);
         return;
     }
     peripheral_deliver_command(payload, length);

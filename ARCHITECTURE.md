@@ -330,6 +330,7 @@ initialized.
 |   [wire_on_frame] --> [wire_peripheral_on_frame]  wire_peripheral.c          |
 |       |                                                                      |
 |       |--beacon--> [peripheral_hid_state_store]   peripheral.c               |
+|       |    wrong length: refused, config_mismatch set, one warning           |
 |       |                                                                      |
 |       |command                                                               |
 |       v                                                                      |

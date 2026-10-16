@@ -11,7 +11,6 @@
 
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk_split_esb.h>
@@ -29,8 +28,6 @@
 #include "hop_policy.h"
 #include "peripheral.h"
 #include "wire_relay.h"
-
-LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
@@ -64,7 +61,6 @@ static uint8_t degrade_undo_index;
 static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
 static atomic_t uplink_rssi_dbm;
-static atomic_t config_mismatch;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 
@@ -295,27 +291,12 @@ void hop_stop(void) {
     k_work_cancel_delayable(&relay_poll_work);
 }
 
-static void note_beacon_length_mismatch(uint8_t length) {
-    bool first_mismatch = atomic_set(&config_mismatch, 1) == 0;
-    if (first_mismatch) {
-        LOG_WRN("Refusing beacon length %u from central, expected %u for this peripheral list",
-                (unsigned int)length,
-                (unsigned int)ESB_BEACON_LENGTH);
-    }
-}
-
-static void note_mask_update_length_mismatch(uint8_t length) {
-    bool first_mismatch = atomic_set(&config_mismatch, 1) == 0;
-    if (first_mismatch) {
-        LOG_WRN("Refusing mask update length %u from central, expected %u for these hop-channels",
-                (unsigned int)length,
-                (unsigned int)ESB_MASK_UPDATE_LENGTH);
-    }
-}
-
 static void consume_beacon(const uint8_t *data, uint8_t length) {
     if (length != ESB_BEACON_LENGTH) {
-        note_beacon_length_mismatch(length);
+        peripheral_note_config_mismatch("beacon",
+                                        length,
+                                        (uint8_t)ESB_BEACON_LENGTH,
+                                        "this peripheral list");
         return;
     }
     struct esb_beacon beacon = {0};
@@ -331,7 +312,10 @@ static void consume_beacon(const uint8_t *data, uint8_t length) {
 
 static void consume_mask_update(const uint8_t *data, uint8_t length) {
     if (length != ESB_MASK_UPDATE_LENGTH) {
-        note_mask_update_length_mismatch(length);
+        peripheral_note_config_mismatch("mask update",
+                                        length,
+                                        (uint8_t)ESB_MASK_UPDATE_LENGTH,
+                                        "these hop-channels");
         return;
     }
     uint8_t index = spsc_latch_claim(&staged_mask_latch);
@@ -426,7 +410,7 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     status->searching = atomic_get(&link_acked) == 0;
     status->rssi_dbm = uplink_rssi_dbm_get();
     status->attempts_ewma_x10 = attempts_ewma_x10;
-    status->config_mismatch = atomic_get(&config_mismatch) != 0;
+    status->config_mismatch = peripheral_config_mismatched();
 }
 
 uint8_t zmk_split_esb_pipe_count(void) {

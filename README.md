@@ -458,12 +458,16 @@ zmk_split_esb_get_status(&status);
 
 `rssi_dbm` reads 0 until the first packet arrives.
 
+Wire peer: `searching` follows the wire link and stays clear on simplex.
+Its `channel`, `epoch`, `rssi_dbm` and `attempts_ewma_x10` read 0.
+
 `config_mismatch` means the central's `esb_link` node differs from this device's.
 Different peripheral list changes beacon length.
 Different `hop-channels` changes mask update length.
 Peripheral refuses either payload and logs one warning with both lengths.
 It keeps its epoch, HID state, peer roster and mask, so it stops following the central's
 hops.
+Wire peer refuses a wrong-length beacon the same way and keeps its HID state.
 Build every device from the same `esb_link` node.
 
 Per-link signal on a multi-peripheral central: `zmk_split_esb_pipe_count()` plus

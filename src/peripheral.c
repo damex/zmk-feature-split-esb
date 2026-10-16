@@ -162,6 +162,28 @@ void peripheral_hid_state_store(uint8_t modifiers, uint8_t indicators) {
     atomic_set(&synced_hid_state, esb_hid_state_pack(modifiers, indicators));
 }
 
+static atomic_t config_mismatch;
+
+void peripheral_note_config_mismatch(const char *payload,
+                                     uint8_t length,
+                                     uint8_t expected_length,
+                                     const char *setting) {
+    __ASSERT_NO_MSG(payload != NULL);
+    __ASSERT_NO_MSG(setting != NULL);
+    bool first_mismatch = atomic_set(&config_mismatch, 1) == 0;
+    if (first_mismatch) {
+        LOG_WRN("Refusing %s length %u from central, expected %u for %s",
+                payload,
+                (unsigned int)length,
+                (unsigned int)expected_length,
+                setting);
+    }
+}
+
+bool peripheral_config_mismatched(void) {
+    return atomic_get(&config_mismatch) != 0;
+}
+
 uint8_t peripheral_keepalive_fill(uint8_t *out, size_t out_size, uint8_t state, uint8_t link_cost,
                                   const struct esb_keepalive_motion_total *motion_totals,
                                   uint8_t motion_count) {
