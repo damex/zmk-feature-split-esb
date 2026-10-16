@@ -1,0 +1,20 @@
+/ {
+    chosen {
+        zmk,esb-self = &left;
+    };
+
+    esb_link {
+        compatible = "zmk,split-esb";
+        base-address = [E7 D3 9A 5C];
+        hop-channels = [0A 14 1E 28];
+        hop-window-ms = <8>;
+        idle-keepalive-ms = <16>;
+
+        peripherals {
+            left: peripheral_left {
+                pipe = <0>;
+                prefix = <0x4B>;
+            };
+        };
+    };
+};

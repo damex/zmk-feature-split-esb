@@ -85,6 +85,7 @@ MOCK_CASES += \
 	peripheral/beacon_wrong_length_flags_mismatch \
 	peripheral/beacon_wrong_length_keeps_hid_state \
 	peripheral/beacon_wrong_length_keeps_peer_table \
+	peripheral/beacon_wrong_length_warns_once \
 	peripheral/burst_keepalive \
 	peripheral/burst_start_keepalive \
 	peripheral/busy_keys \
@@ -99,6 +100,7 @@ MOCK_CASES += \
 	peripheral/lost_tap \
 	peripheral/mask_wrong_length_discarded \
 	peripheral/mask_wrong_length_flags_mismatch \
+	peripheral/mask_wrong_length_warns_once \
 	peripheral/matching_lengths_leave_mismatch_clear \
 	peripheral/pointer_lossless \
 	peripheral/pointer_lossy \
@@ -118,6 +120,7 @@ MOCK_CASES += \
 	wire/central_simplex \
 	wire/peer_beacon_wrong_length_flags_mismatch \
 	wire/peer_beacon_wrong_length_keeps_hid_state \
+	wire/peer_beacon_wrong_length_warns_once \
 	wire/peer_held_input \
 	wire/peer_hid_state \
 	wire/peer_idle_keepalive \
