@@ -1,5 +1,5 @@
 ---
-name: zmk-feature-split-esb-test-peripheral-beacon-longer-adopts-epoch
+name: zmk-feature-split-esb-test-peripheral-beacon-wrong-length-keeps-hid-state
 build:
   cmake: .
   kconfig: ../../../../../Kconfig

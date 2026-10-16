@@ -11,6 +11,7 @@
 
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
 #include <zmk_split_esb.h>
@@ -28,6 +29,8 @@
 #include "hop_policy.h"
 #include "peripheral.h"
 #include "wire_relay.h"
+
+LOG_MODULE_DECLARE(zmk_split_esb, CONFIG_ZMK_SPLIT_ESB_LOG_LEVEL);
 
 static const uint16_t hop_threshold = DT_INST_PROP(0, hop_threshold);
 BUILD_ASSERT(DT_INST_PROP(0, hop_threshold) <= UINT8_MAX,
@@ -61,6 +64,7 @@ static uint8_t degrade_undo_index;
 static bool degrade_undo_armed;
 static uint8_t adopted_epoch;
 static atomic_t uplink_rssi_dbm;
+static atomic_t config_mismatch;
 static uint8_t active_mask[ESB_HOP_MASK_BYTES];
 static bool mask_ready;
 
@@ -291,30 +295,64 @@ void hop_stop(void) {
     k_work_cancel_delayable(&relay_poll_work);
 }
 
+static void note_beacon_length_mismatch(uint8_t length) {
+    bool first_mismatch = atomic_set(&config_mismatch, 1) == 0;
+    if (first_mismatch) {
+        LOG_WRN("Refusing beacon length %u from central, expected %u for this peripheral list",
+                (unsigned int)length,
+                (unsigned int)ESB_BEACON_LENGTH);
+    }
+}
+
+static void note_mask_update_length_mismatch(uint8_t length) {
+    bool first_mismatch = atomic_set(&config_mismatch, 1) == 0;
+    if (first_mismatch) {
+        LOG_WRN("Refusing mask update length %u from central, expected %u for these hop-channels",
+                (unsigned int)length,
+                (unsigned int)ESB_MASK_UPDATE_LENGTH);
+    }
+}
+
+static void consume_beacon(const uint8_t *data, uint8_t length) {
+    if (length != ESB_BEACON_LENGTH) {
+        note_beacon_length_mismatch(length);
+        return;
+    }
+    struct esb_beacon beacon = {0};
+    memcpy(&beacon, data, sizeof(beacon));
+    atomic_set(&beacon_epoch, beacon.epoch); /* adopted in keepalive_work, not queued */
+    atomic_set(&uplink_rssi_dbm, beacon.peers[self_pipe].rssi_dbm);
+    peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
+    for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
+        atomic_set(&peer_table[peer], peer_pack(beacon.peers[peer].battery,
+                                                beacon.peers[peer].rssi_dbm));
+    }
+}
+
+static void consume_mask_update(const uint8_t *data, uint8_t length) {
+    if (length != ESB_MASK_UPDATE_LENGTH) {
+        note_mask_update_length_mismatch(length);
+        return;
+    }
+    uint8_t index = spsc_latch_claim(&staged_mask_latch);
+    memcpy(staged_mask_pool[index].bytes,
+           &data[offsetof(struct esb_mask_update, mask)],
+           sizeof(staged_mask_pool[index].bytes));
+    spsc_latch_publish(&staged_mask_latch, &staged_mask_pool[index]);
+}
+
 bool hop_consume_rx(uint8_t pipe, const uint8_t *data, uint8_t length, int8_t rssi) {
     ARG_UNUSED(rssi);
     /* Fixed link beacons HID state too. */
-    if (esb_is_beacon(data, length)) {
-        struct esb_beacon beacon = {0};
-        memcpy(&beacon, data, sizeof(beacon));
-        atomic_set(&beacon_epoch, beacon.epoch); /* adopted in keepalive_work, not queued */
-        atomic_set(&uplink_rssi_dbm, beacon.peers[self_pipe].rssi_dbm);
-        peripheral_hid_state_store(beacon.hid_modifiers, beacon.hid_indicators);
-        for (uint8_t peer = 0; peer < ESB_BEACON_PEER_COUNT; peer++) {
-            atomic_set(&peer_table[peer], peer_pack(beacon.peers[peer].battery,
-                                                    beacon.peers[peer].rssi_dbm));
-        }
+    if (esb_has_beacon_tag(data, length)) {
+        consume_beacon(data, length);
         return !wire_relay_owns_pipe(pipe);
     }
     if (HOP_COUNT <= 1) {
         return false;
     }
-    if (esb_is_mask_update(data, length)) {
-        uint8_t index = spsc_latch_claim(&staged_mask_latch);
-        memcpy(staged_mask_pool[index].bytes,
-               &data[offsetof(struct esb_mask_update, mask)],
-               sizeof(staged_mask_pool[index].bytes));
-        spsc_latch_publish(&staged_mask_latch, &staged_mask_pool[index]);
+    if (esb_has_mask_update_tag(data, length)) {
+        consume_mask_update(data, length);
         return true;
     }
     return false;
@@ -388,6 +426,7 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     status->searching = atomic_get(&link_acked) == 0;
     status->rssi_dbm = uplink_rssi_dbm_get();
     status->attempts_ewma_x10 = attempts_ewma_x10;
+    status->config_mismatch = atomic_get(&config_mismatch) != 0;
 }
 
 uint8_t zmk_split_esb_pipe_count(void) {

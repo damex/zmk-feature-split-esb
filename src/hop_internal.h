@@ -25,11 +25,18 @@ struct esb_mask_update {
 } __attribute__((packed));
 #define ESB_MASK_UPDATE_LENGTH (1 + ESB_HOP_MASK_BYTES)
 
+static inline bool esb_has_mask_update_tag(const uint8_t *data, uint8_t length) {
+    if (length == 0) {
+        return false;
+    }
+    return data[offsetof(struct esb_mask_update, tag)] == ESB_MASK_UPDATE_TAG;
+}
+
 static inline bool esb_is_mask_update(const uint8_t *data, uint8_t length) {
     if (length != ESB_MASK_UPDATE_LENGTH) {
         return false;
     }
-    return data[offsetof(struct esb_mask_update, tag)] == ESB_MASK_UPDATE_TAG;
+    return esb_has_mask_update_tag(data, length);
 }
 
 #define ESB_BEACON_TAG 0xFE
@@ -50,11 +57,18 @@ struct esb_beacon {
 #define ESB_BEACON_LENGTH (4 + ESB_BEACON_PEER_COUNT * 2)
 BUILD_ASSERT(sizeof(struct esb_beacon) == ESB_BEACON_LENGTH, "beacon wire size");
 
+static inline bool esb_has_beacon_tag(const uint8_t *data, uint8_t length) {
+    if (length == 0) {
+        return false;
+    }
+    return data[offsetof(struct esb_beacon, tag)] == ESB_BEACON_TAG;
+}
+
 static inline bool esb_is_beacon(const uint8_t *data, uint8_t length) {
     if (length != ESB_BEACON_LENGTH) {
         return false;
     }
-    return data[offsetof(struct esb_beacon, tag)] == ESB_BEACON_TAG;
+    return esb_has_beacon_tag(data, length);
 }
 
 extern uint8_t hop_index;

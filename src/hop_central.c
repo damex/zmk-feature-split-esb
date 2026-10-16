@@ -544,6 +544,7 @@ void zmk_split_esb_get_status(struct zmk_split_esb_status *status) {
     status->searching = silent_windows > 0;
     status->rssi_dbm = worst_pipe_rssi_dbm();
     status->attempts_ewma_x10 = 0;
+    status->config_mismatch = false;
 }
 
 uint8_t zmk_split_esb_pipe_count(void) {

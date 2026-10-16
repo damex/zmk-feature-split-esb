@@ -454,8 +454,17 @@ zmk_split_esb_get_status(&status);
 | `searching` | link degraded, hunting for the peer |
 | `rssi_dbm` | received signal: central reports worst sampled peripheral link, peripheral its central link |
 | `attempts_ewma_x10` | delivery cost, 10 = every packet on first try, central reads 0 |
+| `config_mismatch` | central beacon or mask update length differs from own build, set until reboot, central reads false |
 
 `rssi_dbm` reads 0 until the first packet arrives.
+
+`config_mismatch` means the central's `esb_link` node differs from this device's.
+Different peripheral list changes beacon length.
+Different `hop-channels` changes mask update length.
+Peripheral refuses either payload and logs one warning with both lengths.
+It keeps its epoch, HID state, peer roster and mask, so it stops following the central's
+hops.
+Build every device from the same `esb_link` node.
 
 Per-link signal on a multi-peripheral central: `zmk_split_esb_pipe_count()` plus
 `zmk_split_esb_pipe_rssi_dbm(pipe)`, indexed by ESB pipe. A peripheral has only

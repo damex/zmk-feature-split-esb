@@ -205,6 +205,7 @@ initialized.
 |       |               v               v                                      |
 |       |           [epoch, hid,    [staged mask]                              |
 |       |            peer roster]   adopted on epoch swap                      |
+|       |           wrong length: refused, config_mismatch set, one warning    |
 |       |command                                                               |
 |       v                                                                      |
 |   [SPSC ring]                                                                |

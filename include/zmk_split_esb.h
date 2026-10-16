@@ -15,12 +15,14 @@ struct zmk_split_esb_status {
     bool searching;
     int8_t rssi_dbm;
     uint16_t attempts_ewma_x10;
+    bool config_mismatch;
 };
 
 /* Lock-free snapshot of local link state.
  * rssi_dbm is received signal, never own transmit.
  * attempts_ewma_x10 is delivery cost, 10 = every packet on first try.
- * Central: worst sampled peripheral link, attempts 0 (no transmit path).
+ * config_mismatch stays set once a central beacon or mask update length differs from own build.
+ * Central: worst sampled peripheral link, attempts 0 (no transmit path), never mismatched.
  * Peripheral: own central link. */
 void zmk_split_esb_get_status(struct zmk_split_esb_status *status);
 
