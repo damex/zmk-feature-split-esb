@@ -9,6 +9,6 @@ name: unit test
 
 jobs:
   unit-test:
-    uses: ./.github/workflows/test.yml
+    uses: damex/zmk-module-test/.github/workflows/test.yml@main
     with:
       target: unit-test

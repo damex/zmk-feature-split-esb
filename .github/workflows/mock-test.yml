@@ -9,6 +9,6 @@ name: mock test
 
 jobs:
   mock-test:
-    uses: ./.github/workflows/test.yml
+    uses: damex/zmk-module-test/.github/workflows/test.yml@main
     with:
       target: mock-test

@@ -9,6 +9,6 @@ name: native sim test
 
 jobs:
   native-sim-test:
-    uses: ./.github/workflows/test.yml
+    uses: damex/zmk-module-test/.github/workflows/test.yml@main
     with:
       target: native-sim-test
