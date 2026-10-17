@@ -9,6 +9,6 @@ name: native sim test
 
 jobs:
   native-sim-test:
-    uses: ./.github/workflows/twister.yml
+    uses: ./.github/workflows/test.yml
     with:
       target: native-sim-test

@@ -9,6 +9,6 @@ name: unit test
 
 jobs:
   unit-test:
-    uses: ./.github/workflows/twister.yml
+    uses: ./.github/workflows/test.yml
     with:
       target: unit-test
