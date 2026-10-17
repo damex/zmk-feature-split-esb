@@ -34,3 +34,12 @@ target_sources(testbinary PRIVATE
   ${esb_root}/src/wire_frame.c
   ${ZEPHYR_BASE}/lib/crc/crc8_sw.c
 )
+
+target_compile_options(testbinary PRIVATE
+  -fsanitize=address,undefined
+  -fno-sanitize-recover=all
+)
+
+target_link_options(testbinary PRIVATE
+  -fsanitize=address,undefined
+)
