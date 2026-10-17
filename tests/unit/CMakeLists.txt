@@ -6,10 +6,9 @@ cmake_minimum_required(VERSION 3.20.0)
 project(esb_split_unit_test)
 find_package(Zephyr COMPONENTS unittest HINTS $ENV{ZEPHYR_BASE})
 
-if(NOT EXISTS "/usr/include/gnu/stubs-32.h")
-  string(REPLACE "-m32" "-m64" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-  string(REPLACE "-m32" "-m64" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-endif()
+# Zephyr unittest forces -m32, which needs 32-bit glibc on host.
+string(REPLACE "-m32" "-m64" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+string(REPLACE "-m32" "-m64" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 set(esb_root ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
